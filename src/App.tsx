@@ -1957,14 +1957,15 @@ export default function App() {
   return (
     <div className={"app" + (sidebar ? "" : " no-side")} style={sidebar ? { gridTemplateColumns: `${sideW}px minmax(0, 1fr)` } : undefined}>
       {sidebar && <div className="side-grip" style={{ left: sideW - 3 }} title="끌어서 목록 너비 바꾸기 · 두 번 누르면 처음 너비로" onMouseDown={dragSide} onDoubleClick={() => saveSideW(270)} />}
-      {/* 창 맨 윗줄: 신호등 단추 옆에 왼쪽 목록을, 오른쪽 끝에 오른쪽 칸(정보, 코드 검토의 이력)을 펴고 접는 단추 */}
+      {/* 창 맨 윗줄: 신호등 단추 옆에 앱 이름과 왼쪽 목록 단추를, 오른쪽 끝에 오른쪽 칸(정보, 코드 검토의 이력)을 펴고 접는 단추 */}
       <div className="topbar" data-tauri-drag-region>
+        <span className="topbar-name" data-tauri-drag-region>
+          Julgi
+        </span>
         <button type="button" className={"panel-btn" + (sidebar ? " on" : "")} title="왼쪽 목록 펴고 접기 (⌘B)" aria-label="왼쪽 목록 펴고 접기" onClick={() => setSidebar((v) => !v)}>
           <svg width="15" height="13" viewBox="0 0 15 13" fill="none" stroke="currentColor" strokeWidth="1.3" aria-hidden="true"><rect x="0.65" y="0.65" width="13.7" height="11.7" rx="2.2" /><line x1="5.2" y1="0.8" x2="5.2" y2="12.2" /></svg>
         </button>
-        <span className="topbar-title" data-tauri-drag-region>
-          Julgi
-        </span>
+        <span className="topbar-fill" data-tauri-drag-region />
         <button
           type="button"
           className="panel-btn"
@@ -1993,6 +1994,7 @@ export default function App() {
           onShow={show}
           onClose={sleep}
           onOpenSession={openSession}
+          onSearch={() => setOverlay("palette")}
         />
       )}
       <div
