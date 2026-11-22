@@ -238,7 +238,15 @@ export default function App() {
     const id = crypto.randomUUID();
     openTerm({ key: "c:" + id, label: `새 세션 · ${repoOf(cwd)}`, cwd, sessionId: id }, newCommand(id));
   };
-  const newShell = (cwd: string) => openTerm({ key: "s:" + crypto.randomUUID(), label: `셸 · ${repoOf(cwd)}`, cwd });
+  /** ⌘T: 셸은 보던 것 옆에 칸을 하나 더 내서 연다. 지금 칸이 비었거나 칸이 꽉 찼으면 지금 칸에 연다 */
+  const newShell = (cwd: string) => {
+    const o: Open = { key: "s:" + crypto.randomUUID(), label: `셸 · ${repoOf(cwd)}`, cwd };
+    const { panes, focus } = live.current;
+    if (!panes[focus] || panes.length >= MAX_PANES) return openTerm(o);
+    terms.create({ key: o.key, cwd });
+    setOpen((list) => [...list, o]);
+    split(o.key);
+  };
   /** 줄기 기억(인계 글, 메모)에서 일이 끝나도 남길 것을 추려 브레인에 담는다 */
   const learn = async (thread: Thread, memory: string) => {
     learning.current = true;
@@ -946,19 +954,21 @@ export default function App() {
     const { panes, widths, open, states, focus } = live.current;
     const at = panes.indexOf(key);
     // 세션을 닫은 칸: 내 차례인 세션이 가려져 있으면 그것을 올리고, 없으면 빈 칸을 남기지 않고 칸째 없앤다
-    const next = keepPane || at < 0 ? undefined : open.find((o) => o.key !== key && waiting(states[o.key]) && !panes.includes(o.key));
+    // 셸은 보던 것 옆에 칸을 내서 연 것이라, 닫으면 칸째 없애서 열기 전 화면으로 돌아간다
+    const shell = key.startsWith("s:");
+    const next = keepPane || at < 0 || shell ? undefined : open.find((o) => o.key !== key && waiting(states[o.key]) && !panes.includes(o.key));
     if (keepPane || at < 0 || panes.length < 2 || next) return setPanes((list) => list.map((k) => (k === key ? (next?.key ?? null) : k)));
     setPanes(panes.filter((_, i) => i !== at));
     setWidths(widths.filter((_, i) => i !== at));
     previous.current.splice(at, 1);
-    setFocus(Math.max(0, focus > at ? focus - 1 : Math.min(focus, panes.length - 2)));
+    setFocus(Math.max(0, focus > at || (shell && focus === at) ? focus - 1 : Math.min(focus, panes.length - 2)));
   };
-  /** ⌘D: 지금 칸 오른쪽에 빈 칸을 하나 더 만든다 */
-  const split = () => {
+  /** ⌘D: 지금 칸 오른쪽에 칸을 하나 더 만든다. key를 주면 그 터미널을 새 칸에 올린다 */
+  const split = (key: string | null = null) => {
     const { panes, widths, focus } = live.current;
     if (panes.length >= MAX_PANES) return say(`칸은 ${MAX_PANES}개까지다.`);
     const at = focus + 1;
-    setPanes([...panes.slice(0, at), null, ...panes.slice(at)]);
+    setPanes([...panes.slice(0, at), key, ...panes.slice(at)]);
     setWidths([...widths.slice(0, at), widths[focus], ...widths.slice(at)]);
     previous.current.splice(at, 0, null);
     setZoom(false);
