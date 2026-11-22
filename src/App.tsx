@@ -121,6 +121,7 @@ export default function App() {
   const [drawing, setDrawing] = useState(false);
   const [closing, setClosing] = useState(""); // 닫을지 묻고 있는 세션
   const [prShown, setPrShown] = useState<PrTarget | null>(null); // 펴 둔 PR 화면
+  const [settingsAt, setSettingsAt] = useState<string | undefined>(undefined); // 설정을 열 때 먼저 보일 묶음
   // 열린 세션이 올린 PR의 형편. "소유자/레포#번호" → 형편
   const [prs, setPrs] = useState<Record<string, PrStatus>>({});
   // PR에 봐야 할 일이 생긴 세션: 터미널 키 → 까닭. 그 세션을 보면 풀린다
@@ -2057,7 +2058,7 @@ export default function App() {
       }
       else if (cmd && e.code === "Slash") setOverlay(overlay === "help" ? null : "help");
       else if (cmd && e.code === "KeyY") setOverlay(overlay === "history" ? null : "history");
-      else if (cmd && e.code === "Comma") setOverlay(overlay === "settings" ? null : "settings");
+      else if (cmd && e.code === "Comma") (setSettingsAt(undefined), setOverlay(overlay === "settings" ? null : "settings"));
       else if (cmd && e.code === "KeyG") setOverlay(overlay === "threads" ? null : "threads");
       else if (cmd && e.shiftKey && e.code === "KeyU") setOverlay(overlay === "usage" ? null : "usage");
       else if (cmd && e.code === "KeyU") setOverlay(overlay === "work" ? null : "work");
@@ -2632,6 +2633,7 @@ export default function App() {
       )}
       {overlay === "settings" && (
         <Settings
+          startAt={settingsAt}
           remoteUrl={remoteUrl}
           onConnectLab={() => {
             // glab이 호스트와 로그인 방식(웹 또는 토큰)을 묻는다. 끝나면 셸 칸을 닫으면 된다
@@ -2667,6 +2669,7 @@ export default function App() {
         <Work
           groups={workGroups()}
           ticketGroups={config.jiraSite ? TICKET_GROUPS : []}
+          onConnectJira={() => (setSettingsAt("연결"), setOverlay("settings"))}
           loadTickets={(jql) => invoke<Ticket[]>("jira_search", { conn: jiraConn(), jql, limit: 50 })}
           ticketNews={ticketNewsMap}
           onStartTicket={(key) => void invoke<TicketFull>("jira_view", { conn: jiraConn(), key }).then(setStartTicket, (e) => say(String(e).slice(0, 100)))}

@@ -33,6 +33,8 @@ type Props = {
   ticketPane?: (key: string) => ReactNode;
   ticketNews?: Record<string, string>;
   onStartTicket?: (key: string) => void;
+  /** Jira가 연결돼 있지 않을 때 설정의 연결 묶음을 연다 */
+  onConnectJira?: () => void;
   onClose: () => void;
   /** PR과 리뷰 요청을 바로 다시 읽는다 */
   onRefresh: () => void;
@@ -46,7 +48,7 @@ const idOf = (t: PrTarget) => `${t.repo}#${t.number}`;
  * 작업 (⌘U). PR을 묶음별로 한 화면에서 둘러본다: 왼쪽 묶음, 가운데 목록, 오른쪽 PR 화면.
  * ⌘J가 "지금 손댈 것"만 모은다면, 여기는 "전부 둘러보기"다. Jira를 붙이면 티켓 묶음이 같은 자리에 들어온다
  */
-export default function Work({ groups, ticketGroups = [], loadTickets, ticketPane, ticketNews = {}, onStartTicket, onClose, onRefresh, onOpenSession, onHand }: Props) {
+export default function Work({ groups, ticketGroups = [], loadTickets, ticketPane, ticketNews = {}, onStartTicket, onConnectJira, onClose, onRefresh, onOpenSession, onHand }: Props) {
   const allCount = groups.length + ticketGroups.length;
   // 새 소식이 있는 묶음부터 연다
   const [groupAt, setGroupAt] = useState(() => Math.max(0, groups.findIndex((g) => g.rows.some((r) => r.news))));
@@ -119,7 +121,16 @@ export default function Work({ groups, ticketGroups = [], loadTickets, ticketPan
           </button>
         ))}
         <div className="wk-sec">티켓</div>
-        {!ticketGroups.length && <div className="wk-soon">⌘,의 연결에서 Jira를 붙이면 진행 중, 할 일, 스프린트가 여기 온다</div>}
+        {!ticketGroups.length && (
+          <div className="wk-soon">
+            Jira를 연결하면 진행 중, 할 일, 이번 스프린트, 내가 보고한 것이 여기 온다
+            {onConnectJira && (
+              <button type="button" tabIndex={-1} className="wk-connect" onClick={onConnectJira}>
+                Jira 연결하기
+              </button>
+            )}
+          </div>
+        )}
         {ticketGroups.map((g, n) => {
           const list = ticketRows[g.id];
           const hot = Array.isArray(list) && list.some((t) => ticketNews[t.key]);

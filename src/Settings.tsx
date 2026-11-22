@@ -16,6 +16,8 @@ type Props = {
   onConnect: () => void;
   /** GitLab 연결: 셸 칸에서 glab auth login을 돌린다 */
   onConnectLab: () => void;
+  /** 처음 열 묶음 이름 (예: "연결"). 없으면 첫 묶음 */
+  startAt?: string;
 };
 
 type Row =
@@ -148,8 +150,8 @@ const showKey = (combo: string) =>
     .join("");
 
 /** 설정 (⌘,). 바꾸는 즉시 적용되고 ~/.julgi/config.json에 남는다 */
-export default function Settings({ onChange, onClose, remoteUrl, onConnect, onConnectLab }: Props) {
-  const [at, setAt] = useState(0);
+export default function Settings({ onChange, onClose, remoteUrl, onConnect, onConnectLab, startAt }: Props) {
+  const [at, setAt] = useState(() => Math.max(0, FIRST_OF[SECTIONS.findIndex((s) => s.title === startAt)] ?? 0));
   // gh가 있는가, 누구로 로그인했는가. undefined면 아직 보는 중
   const [gh, setGh] = useState<[boolean, string] | undefined>(undefined);
   useEffect(() => void invoke<[boolean, string]>("gh_status").then(setGh, () => setGh([false, ""])), []);
