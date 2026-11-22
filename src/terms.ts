@@ -12,6 +12,11 @@ import { openUrl } from "@tauri-apps/plugin-opener";
 import "@xterm/xterm/css/xterm.css";
 import { config } from "./model";
 
+// ~/.julgi/keylog 파일이 있으면 키 입력이 어떻게 들어오고 무엇이 나갔는지 julgi.log에 남긴다 (입력기 문제를 볼 때만)
+let keylog = false;
+void invoke<string | null>("data_read", { name: "keylog" }).then((v) => (keylog = v != null), () => {});
+const klog = (line: string) => keylog && void invoke("log_line", { line: `key ${Date.now() % 100000} ${line}` });
+
 export type TermSpec = { key: string; cwd?: string; command?: string };
 
 type Entry = {
@@ -255,6 +260,7 @@ function open(entry: Entry) {
     else if (/[\r\x03\x15]/.test(data) && !data.startsWith("\x1b[200~")) entry.draft = 0;
     else if (!data.startsWith("\x1b") || data.startsWith("\x1b[200~"))
       entry.draft = Math.max(0, entry.draft + [...data].reduce((n, ch) => n + (ch === "\x7f" ? -1 : 1), 0));
+    klog(`send ${JSON.stringify(data)}`);
     void invoke("pty_write", { id, data });
   };
 
@@ -268,6 +274,7 @@ function open(entry: Entry) {
     "keydown",
     (e) => {
       lastKeyCode = e.keyCode;
+      klog(`down ${e.keyCode} ${JSON.stringify(e.key)} composing=${e.isComposing}`);
       if (e.keyCode !== 229 && !MODIFIERS.has(e.keyCode)) pending = "";
     },
     true,
@@ -276,6 +283,7 @@ function open(entry: Entry) {
     "input",
     (ev) => {
       const e = ev as InputEvent;
+      klog(`input ${e.inputType} ${JSON.stringify(e.data)} composing=${e.isComposing}`);
       if (e.isComposing) return; // 조합 이벤트를 제대로 보내는 입력기는 xterm에 맡긴다
       if (e.inputType === "insertText" && e.data) {
         e.stopPropagation();
