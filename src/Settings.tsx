@@ -1,3 +1,4 @@
+import qrcode from "qrcode-generator";
 import { useEffect, useRef, useState } from "react";
 import { config, kilo } from "./model";
 import { THEMES } from "./themes";
@@ -91,6 +92,13 @@ const SECTION_OF: number[] = SECTIONS.flatMap((sec, n) => sec.rows.map(() => n))
 /** 묶음 번호 → 그 묶음의 첫 줄 번호 */
 const FIRST_OF: number[] = SECTIONS.map((_, n) => SECTION_OF.indexOf(n));
 
+/** 주소를 QR 그림(SVG)으로. 폰으로 옮길 때 찍는다 */
+const qrSvg = (text: string) => {
+  const qr = qrcode(0, "M");
+  qr.addData(text);
+  qr.make();
+  return qr.createSvgTag({ cellSize: 3, margin: 2, scalable: true });
+};
 /** "ctrl+super+KeyJ"를 ⌃⌘J로 보여 준다 */
 const showKey = (combo: string) =>
   combo
@@ -106,7 +114,7 @@ export default function Settings({ onChange, onClose, remoteUrl }: Props) {
   const [, redraw] = useState(0);
   const box = useRef<HTMLDivElement>(null);
   useEffect(() => box.current?.focus(), []);
-  useEffect(() => box.current?.querySelector(".set-row.on")?.scrollIntoView({ block: "nearest" }), [at]);
+  useEffect(() => void box.current?.querySelector(".set-row.on")?.scrollIntoView({ block: "nearest" }), [at]);
 
   const set = (key: Key, value: string | number | boolean) => {
     onChange(key, value);
@@ -189,9 +197,15 @@ export default function Settings({ onChange, onClose, remoteUrl }: Props) {
                     {row.label}
                     <div className="set-note">{row.note}</div>
                     {row.kind === "toggle" && row.key === "remote" && config.remote && remoteUrl && (
-                      <button type="button" tabIndex={-1} className="set-url" title="누르면 복사한다" onClick={() => void navigator.clipboard.writeText(remoteUrl.match(/https?:\S+/)?.[0]?.replace(/\)$/, "") ?? remoteUrl).catch(() => {})}>
-                        {remoteUrl}
-                      </button>
+                      <div className="set-remote">
+                        {remoteUrl.startsWith("http") && <span className="set-qr" title="폰 카메라로 찍는다" dangerouslySetInnerHTML={{ __html: qrSvg(remoteUrl) }} />}
+                        <div>
+                          <button type="button" tabIndex={-1} className="set-url" title="누르면 복사한다" onClick={() => void navigator.clipboard.writeText(remoteUrl.match(/https?:\S+/)?.[0]?.replace(/\)$/, "") ?? remoteUrl).catch(() => {})}>
+                            {remoteUrl}
+                          </button>
+                          {remoteUrl.startsWith("http") && <div className="set-note">폰 카메라로 QR을 찍어 연 뒤, 공유 단추에서 "홈 화면에 추가"를 누르면 다음부터는 아이콘으로 들어온다. 주소를 외울 일이 없다.</div>}
+                        </div>
+                      </div>
                     )}
                   </div>
                   <div className="set-value">

@@ -130,7 +130,7 @@ export default function Threads({ repos, nameOf, onShow, map, drawing, onRedraw,
   const [cell, setCell] = useState(-1); // -1: 그 줄기의 지금(맨 뒤) 세션
   const box = useRef<HTMLDivElement>(null);
   useEffect(() => box.current?.focus(), []);
-  useEffect(() => box.current?.querySelector(".th-row.on")?.scrollIntoView({ block: "nearest" }), [sel]);
+  useEffect(() => void box.current?.querySelector(".th-row.on")?.scrollIntoView({ block: "nearest" }), [sel]);
   const at = Math.min(sel, rows.length - 1);
   const row = rows[at];
   const cellAt = row ? (cell < 0 ? row.cells.length - 1 : Math.min(cell, row.cells.length - 1)) : 0;

@@ -41,6 +41,8 @@ async function invoke(cmd: string, args: Record<string, unknown> = {}): Promise<
               ],
             }
           : null;
+    case "remote_start":
+      return "http://macbook.tail1a2b3c.ts.net:4747/?t=0123456789abcdef0123456789abcdef";
     case "term_load":
       return Object.fromEntries([1, 2, 3, 4, 5, 6].map((id) => [id, [260_000 + id * 61_000, id === 1 ? 14.2 : 0.1]]));
     case "claude_usage":
@@ -64,7 +66,7 @@ async function invoke(cmd: string, args: Record<string, unknown> = {}): Promise<
     case "repo_diff":
       return flags.has("review") ? 'diff --git a/src/refund/RefundCalculator.kt b/src/refund/RefundCalculator.kt\nindex 1a2b3c4..5d6e7f8 100644\n--- a/src/refund/RefundCalculator.kt\n+++ b/src/refund/RefundCalculator.kt\n@@ -84,9 +84,12 @@ class RefundCalculator(private val policy: RefundPolicy) {\n     fun refund(order: Order): Money {\n         val paid = order.paidAmount\n-        val discount = order.coupons.sumOf { it.amount }\n-        return (paid - discount).roundToWon()\n+        // 쿠폰마다 따로 반올림한 뒤 더한다. 한꺼번에 반올림하면 1원이 어긋난다\n+        val discount = order.coupons.sumOf { it.amount.roundToWon() }\n+        val refund = paid - discount\n+        require(refund >= Money.ZERO) { "환불액이 음수다: $refund" }\n+        return refund\n     }\n \n     private fun Money.roundToWon(): Money = Money(amount.setScale(0, RoundingMode.HALF_UP))\ndiff --git a/src/refund/RefundCalculatorTest.kt b/src/refund/RefundCalculatorTest.kt\nnew file mode 100644\nindex 0000000..9f8e7d6\n--- /dev/null\n+++ b/src/refund/RefundCalculatorTest.kt\n@@ -0,0 +1,9 @@\n+class RefundCalculatorTest {\n+    @Test\n+    fun `쿠폰 두 개가 겹쳐도 1원이 어긋나지 않는다`() {\n+        val order = orderWith(paid = 10_000, coupons = listOf(333.3, 333.3))\n+\n+        assertEquals(Money(9_334), RefundCalculator(policy).refund(order))\n+    }\n+}\n+' : null;
     case "config_load":
-      return JSON.stringify({ ...(flags.has("theme") ? { theme: flags.get("theme") } : {}), usage: flags.has("usage") });
+      return JSON.stringify({ ...(flags.has("theme") ? { theme: flags.get("theme") } : {}), usage: flags.has("usage"), remote: flags.has("remote") });
     case "layout_load": {
       if (!flags.has("open")) return null;
       const sessions = await fetch("/mock-ledger.json").then((r) => r.json());
@@ -145,6 +147,9 @@ Object.assign(window, {
   __TAURI_EVENT_PLUGIN_INTERNALS__: { unregisterListener() {} },
 });
 
+// 왼쪽 목록 너비를 정해 띄운다: ?side=200
+if (flags.has("side")) localStorage.setItem("side-width", String(flags.get("side")));
+else localStorage.removeItem("side-width");
 const press = (code: string, key = "") => window.dispatchEvent(new KeyboardEvent("keydown", { code, key, metaKey: true }));
 setTimeout(() => {
   if (flags.has("info")) press("KeyI");
@@ -155,6 +160,8 @@ setTimeout(() => {
   if (flags.has("review")) press("KeyE");
   if (flags.has("hist")) press("KeyY");
   // 세션 상태가 한 번 읽힌 뒤에 눌러야 내 차례인 세션이 잡힌다
+  // 설정의 묶음을 넘긴다: ?settings&sec=6
+  for (let i = 0; i < Number(flags.get("sec") ?? 0); i++) setTimeout(() => document.querySelector(".settings")?.dispatchEvent(new KeyboardEvent("keydown", { key: "Tab", bubbles: true })), 400 + i * 150);
   if (flags.has("queue")) setTimeout(() => press("KeyJ"), 2500);
   // 줄기 보기의 탭을 넘긴다: ?stems&tab=3 이면 숫자 탭
   const tabs = Number(flags.get("tab") ?? 0);

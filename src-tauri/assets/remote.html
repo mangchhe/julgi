@@ -73,10 +73,10 @@ form button:disabled { opacity: 0.5; }
 <div class="toast" id="toast" hidden></div>
 <script>
 const $ = (id) => document.getElementById(id);
-// 토큰은 주소로 한 번 받아 이 브라우저에 두고, 주소에서는 지운다
+// 토큰은 주소로 받아 이 브라우저에도 둔다. 주소에서는 지우지 않는다: 홈 화면에 추가한 아이콘은
+// 저장 공간이 따로라서, 주소에 토큰이 남아 있어야 그 아이콘으로 다시 들어올 수 있다
 let token = new URLSearchParams(location.search).get("t") || "";
 try { if (token) localStorage.setItem("julgi-token", token); else token = localStorage.getItem("julgi-token") || ""; } catch (e) {}
-if (location.search) history.replaceState(null, "", location.pathname);
 const api = (path, body) => fetch(path, { method: body ? "POST" : "GET", headers: { "x-julgi-token": token, ...(body ? { "Content-Type": "application/json" } : {}) }, body: body ? JSON.stringify(body) : undefined }).then((r) => (r.ok ? r.json() : Promise.reject(r.status)));
 const ago = (ms) => { const s = Math.max(0, (Date.now() - ms) / 1000); return s < 60 ? "방금" : s < 3600 ? Math.floor(s / 60) + "분 전" : s < 86400 ? Math.floor(s / 3600) + "시간 전" : Math.floor(s / 86400) + "일 전"; };
 const el = (tag, cls, text) => { const n = document.createElement(tag); if (cls) n.className = cls; if (text !== undefined) n.textContent = text; return n; };

@@ -72,13 +72,19 @@ export default function Sidebar({ open, items, threads, byId, states, tasks, cha
       <div className="side-head">
         {/* 앱 이름은 창 맨 윗줄에 있다. 여기에는 지금 형편을 숫자로 둔다 */}
         <span className={"side-stat wait" + (waitCount ? "" : " zero")} title="내 답을 기다리는 세션 (⌘J)">
-          <i className="dot wait" />내 차례 <b>{waitCount}</b>
+          <i className="dot wait" />
+          <span className="lbl">내 차례 </span>
+          <b>{waitCount}</b>
         </span>
         <span className={"side-stat run" + (counts[1] ? "" : " zero")} title="일하는 중인 세션">
-          <i className="dot run" />일하는 중 <b>{counts[1]}</b>
+          <i className="dot run" />
+          <span className="lbl">일하는 중 </span>
+          <b>{counts[1]}</b>
         </span>
         <span className="side-stat zero" title="열려 있는 세션">
-          열림 <b>{open.length}</b>
+          <span className="lbl">열림 </span>
+          <b>{open.length}</b>
+          <span className="lbl-narrow">개</span>
         </span>
         {filter && <span className="side-filter" title="이 프로젝트만 보는 중 (⌘P)">{filter}</span>}
       </div>
@@ -98,6 +104,7 @@ export default function Sidebar({ open, items, threads, byId, states, tasks, cha
               {head && <div className={"grp g" + rank}>{[`내 차례 ${counts[0]}`, `일하는 중 ${counts[1]}`, "열려 있음"][rank]}</div>}
             <div
               className={"row" + (job ? " child" : "") + (o.key === current ? " on" : pane >= 0 ? " vis" : "")}
+              title={job ? job.ask.split("\n")[0] : (threadOf(o.sessionId)?.name ?? s?.title ?? o.label)}
               onClick={() => onShow(o.key)}
             >
               <span className="slot">{job ? "└" : i < 9 ? i + 1 : ""}</span>
@@ -106,15 +113,26 @@ export default function Sidebar({ open, items, threads, byId, states, tasks, cha
                 <div className="row-title">{job ? `${job.repo} · ${job.ask.split("\n")[0].replace(/^배경:\s*/, "").slice(0, 40)}` : (threadOf(o.sessionId)?.name ?? s?.title ?? o.label)}</div>
                 <div className={"row-meta" + (!job && waiting(st) ? " wait" : "")}>
                   {job
-                    ? [`일감 ${job.status}`, job.redo ? `다시 ${job.redo}번` : "", pane >= 0 ? `칸 ${pane + 1}` : ""].filter(Boolean).join(" · ")
-                    : [st?.state === "hold" ? `일감 기다리는 중 · ${tasks.filter((t) => t.lead === o.sessionId && (t.status === "대기" || t.status === "하는 중")).length}개` : st ? STATE_LABEL[st.state] : "", s?.repo ?? "", pane >= 0 ? `칸 ${pane + 1}` : "", pinned.includes(o.key) ? "고정" : ""].filter(Boolean).join(" · ")}
+                    ? [`일감 ${job.status}`, job.redo ? `다시 ${job.redo}번` : "", pane >= 0 ? "화면에 있음" : ""].filter(Boolean).join(" · ")
+                    : [st?.state === "hold" ? `일감 기다리는 중 · ${tasks.filter((t) => t.lead === o.sessionId && (t.status === "대기" || t.status === "하는 중")).length}개` : st ? STATE_LABEL[st.state] : "", s?.repo ?? "", pinned.includes(o.key) ? "고정" : ""].filter(Boolean).join(" · ")}
+                  {!job && pane >= 0 && <span className="onscreen"> · {shown.length >= 3 ? `화면 ${pane + 1}번째` : "화면에 있음"}</span>}
                   {s && hot(s.tokens) && <span className="hot"> · {kilo(s.tokens)}</span>}
                 </div>
                 {changes[o.cwd]?.files > 0 && changes[o.cwd].by === o.sessionId && (
                   <div className="row-meta delta" title={changes[o.cwd].brief?.line ?? "이 세션이 고친 것"}>
-                    고침 · 파일 {changes[o.cwd].files} <b>+{changes[o.cwd].adds}</b> <i>−{changes[o.cwd].dels}</i>
-                    {changes[o.cwd].brief && changes[o.cwd].brief!.watch.length > 0 && <em> · 눈여겨볼 곳 {changes[o.cwd].brief!.watch.length}</em>}
-                    {(changes[o.cwd].brief?.found?.length ?? 0) > 0 && <em> · 짚은 곳 {changes[o.cwd].brief!.found!.length}</em>}
+                    <span className="lbl">고침 · </span>파일 {changes[o.cwd].files} <b>+{changes[o.cwd].adds}</b> <i>−{changes[o.cwd].dels}</i>
+                    {changes[o.cwd].brief && changes[o.cwd].brief!.watch.length > 0 && (
+                      <em title="브리핑이 눈여겨보라고 한 곳">
+                        {" "}
+                        · <span className="lbl">눈여겨</span>볼 곳 {changes[o.cwd].brief!.watch.length}
+                      </em>
+                    )}
+                    {(changes[o.cwd].brief?.found?.length ?? 0) > 0 && (
+                      <em title="다른 모델이 걸러 읽고 짚은 곳">
+                        {" "}
+                        · 짚은 곳 {changes[o.cwd].brief!.found!.length}
+                      </em>
+                    )}
                   </div>
                 )}
               </div>
@@ -153,14 +171,6 @@ export default function Sidebar({ open, items, threads, byId, states, tasks, cha
             ))}
             {list.length > (group === THREADS ? PER_GROUP * 2 : PER_GROUP) && <div className="side-more">외 {list.length - (group === THREADS ? PER_GROUP * 2 : PER_GROUP)}개 · ⌘K로 찾기</div>}
           </div>
-        ))}
-      </div>
-      <div className="side-foot">
-        {[["⌘L", "보내기"], ["⌘J", "내 차례"], ["⌘Y", "한 일"], ["⌘G", "줄기"]].map(([key, what]) => (
-          <span key={key}>
-            <kbd>{key}</kbd>
-            {what}
-          </span>
         ))}
       </div>
     </aside>

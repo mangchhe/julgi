@@ -34,7 +34,7 @@ export default function History({ acts, tasks, onPick, onClose }: Props) {
   const [sel, setSel] = useState(0);
   const box = useRef<HTMLDivElement>(null);
   useEffect(() => box.current?.focus(), []);
-  useEffect(() => box.current?.querySelector(".hs-row.on")?.scrollIntoView({ block: "nearest" }), [sel]);
+  useEffect(() => void box.current?.querySelector(".hs-row.on")?.scrollIntoView({ block: "nearest" }), [sel]);
 
   const kinds = useMemo(() => {
     const count = new Map<string, number>();

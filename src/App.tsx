@@ -2188,6 +2188,7 @@ export default function App() {
         onToggle={() => setLoadOpen((v) => !v)}
         onShow={(key) => (setLoadOpen(false), show(key))}
         onRefresh={readUsage}
+        onHelp={() => setOverlay("help")}
       />
       {toast && <div className="toast">{toast}</div>}
     </div>

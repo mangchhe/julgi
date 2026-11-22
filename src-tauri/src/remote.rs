@@ -58,6 +58,21 @@ fn tailnet_ip() -> Option<String> {
     None
 }
 
+/// 이 맥의 Tailscale 이름(예: macbook.tail1234.ts.net). 이름으로 찾기(MagicDNS)가 켜져 있을 때만 준다.
+/// 숫자 주소보다 알아보기 쉽고, 주소가 바뀌어도 그대로다
+fn tailnet_name() -> Option<String> {
+    for bin in ["tailscale", "/Applications/Tailscale.app/Contents/MacOS/Tailscale", "/opt/homebrew/bin/tailscale", "/usr/local/bin/tailscale"] {
+        let Ok(out) = Command::new(bin).args(["status", "--json"]).output() else { continue };
+        let Ok(value) = serde_json::from_slice::<serde_json::Value>(&out.stdout) else { continue };
+        if value.get("CurrentTailnet").and_then(|t| t.get("MagicDNSEnabled")).and_then(|v| v.as_bool()) != Some(true) {
+            return None;
+        }
+        let name = value.get("Self")?.get("DNSName")?.as_str()?.trim_end_matches('.').to_owned();
+        return (!name.is_empty()).then_some(name);
+    }
+    None
+}
+
 /// Tailscale 망(100.64.0.0/10)이나 이 맥 자신에게서 온 것인가
 fn trusted(peer: Option<IpAddr>) -> bool {
     match peer {
@@ -144,7 +159,7 @@ pub fn remote_start(port: u16) -> Result<String, String> {
     ON.store(true, Ordering::Relaxed);
     let port = *STARTED.get().unwrap_or(&port);
     Ok(match tailnet_ip() {
-        Some(ip) => format!("http://{ip}:{port}/?t={token}"),
+        Some(ip) => format!("http://{}:{port}/?t={token}", tailnet_name().unwrap_or(ip)),
         None => format!("Tailscale이 꺼져 있다. 켜면 여기에 주소가 나온다 (이 맥에서는 http://127.0.0.1:{port}/?t={token})"),
     })
 }
