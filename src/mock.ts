@@ -92,6 +92,18 @@ async function invoke(cmd: string, args: Record<string, unknown> = {}): Promise<
     case "default_dir":
       return "/Users/me/julgi";
     case "data_read": {
+      // 브리핑 화면을 보려고 넣는 가짜 값: 줄기 둘, 그 진행 정리, 아홉 시간 전에 마지막으로 봄
+      if (flags.has("morning")) {
+        const ids = (await fetch("/mock-ledger.json").then((r) => r.json())).map((x: { id: string }) => x.id);
+        const now = Date.now();
+        if (args.name === "seen.json") return JSON.stringify({ at: now - 9 * 3600_000 });
+        if (args.name === "threads.json") return JSON.stringify([{ id: "t1", name: "쿠폰 중복 환불 수정", sessions: [ids[5], ids[0]], created: now - 86400_000 }, { id: "t2", name: "주문 목록 지연 원인", sessions: [ids[2]], created: now - 2 * 86400_000 }]);
+        if (args.name === "progress.json")
+          return JSON.stringify({
+            t1: { goal: "쿠폰이 여러 장일 때 환불액이 1원 어긋나는 것을 고친다", done: "쿠폰별 반올림으로 바꾸고 시험 3개를 더했다", left: "PR #1852의 CI 실패와 리뷰 의견 반영", blocked: "음수 환불을 예외로 둘지 0으로 막을지 결정이 필요하다", at: now - 3 * 60_000 },
+            t2: { goal: "주문 목록이 느려진 원인을 찾는다", done: "인덱스를 타지 않는 쿼리 두 개를 찾았다", left: "인덱스를 더한 뒤 응답 시간을 다시 잰다", blocked: "", at: now - 3 * 3600_000 },
+          });
+      }
       if (args.name === "changes.json" && flags.has("review")) {
         // 코드 검토 화면을 보려고 넣는 가짜 값: 첫 세션의 폴더에 브리핑과 답 두 판
         const first = (await fetch("/mock-ledger.json").then((r) => r.json()))[0];
@@ -116,7 +128,7 @@ async function invoke(cmd: string, args: Record<string, unknown> = {}): Promise<
       // Jira 감시 기록: ABC-123은 그새 코멘트가 하나 늘어난 것으로
       if (args.name === "jira-seen.json" && flags.has("jira")) return JSON.stringify({ "ABC-123": { status: "In Progress", others: 1, assigned: true }, "ABC-130": { status: "To Do", others: 0, assigned: true }, "ABC-131": { status: "To Do", others: 0, assigned: true } });
       if (args.name === "pr-seen.json") return JSON.stringify({ "example/acme-api#1852": { state: "OPEN", ci: "SUCCESS", decision: "REVIEW_REQUIRED", others: 1 }, "example/acme-api#1700": { state: "OPEN", ci: "SUCCESS", decision: "APPROVED", others: -1 }, "example/acme-api#1830": { state: "OPEN", ci: "SUCCESS", decision: "REVIEW_REQUIRED", others: 0 } });
-      if (args.name === "activity.jsonl" && flags.has("hist")) return `{"at": 1795184436364, "kind": "보냄", "text": "쿠폰 중복 환불 ← \\"환불 테스트도 돌려줘\\" (모델이 고름)", "sessionId": "x"}\n{"at": 1795184441364, "kind": "갈아탐", "text": "알림 스펙 정리 · 인계 글만 들고 새 세션으로, 이어서 보냄. 이전 세션은 재움", "sessionId": "x"}\n{"at": 1795261841364, "kind": "배움", "text": "\\"알림 스펙 정리\\"에서 브레인에 3개: 푸시는 10초 배치로 판정된다 / 하루 1회 제한은 상태 알림에만 적용된다 / 품절 임박 푸시는 찜한 고객만 받는다", "sessionId": "x"}\n{"at": 1795263641364, "kind": "지도", "text": "레포 5개의 지도를 그림 · 최신으로 당긴 것 2개(acme-admin, acme-shop) · 작업 중이라 그대로 둔 것: acme-api(4커밋)"}\n{"at": 1795263741364, "kind": "지도", "text": "레포 5개의 지도를 그림 · 작업 중이라 그대로 둔 것: acme-api(4커밋)"}\n{"at": 1795267241364, "kind": "점검", "text": "2판(매주): 손댄 것 13개, 눈에 띈 것 2개. ⌘G의 통계에서 본다"}\n{"at": 1795269041364, "kind": "확인 필요", "text": "\\"배포 상태 확인\\" 세션이 시작하지 못하고 있다", "sessionId": "x"}\n{"at": 1795270241364, "kind": "칸", "text": "칸을 하나 늘려 기다리던 \\"JDK 교체\\"을 올림", "sessionId": "x"}\n{"at": 1795270781364, "kind": "보냄", "text": "새 줄기 · acme-api ← \\"쿠폰 기능 넣으려면 어디부터 봐야 해?\\" (이어 갈 줄기가 없어서)", "sessionId": "x"}`;
+      if (args.name === "activity.jsonl" && (flags.has("hist") || flags.has("morning"))) return `{"at": 1795184436364, "kind": "보냄", "text": "쿠폰 중복 환불 ← \\"환불 테스트도 돌려줘\\" (모델이 고름)", "sessionId": "x"}\n{"at": 1795184441364, "kind": "갈아탐", "text": "알림 스펙 정리 · 인계 글만 들고 새 세션으로, 이어서 보냄. 이전 세션은 재움", "sessionId": "x"}\n{"at": 1795261841364, "kind": "배움", "text": "\\"알림 스펙 정리\\"에서 브레인에 3개: 푸시는 10초 배치로 판정된다 / 하루 1회 제한은 상태 알림에만 적용된다 / 품절 임박 푸시는 찜한 고객만 받는다", "sessionId": "x"}\n{"at": 1795263641364, "kind": "지도", "text": "레포 5개의 지도를 그림 · 최신으로 당긴 것 2개(acme-admin, acme-shop) · 작업 중이라 그대로 둔 것: acme-api(4커밋)"}\n{"at": 1795263741364, "kind": "지도", "text": "레포 5개의 지도를 그림 · 작업 중이라 그대로 둔 것: acme-api(4커밋)"}\n{"at": 1795267241364, "kind": "점검", "text": "2판(매주): 손댄 것 13개, 눈에 띈 것 2개. ⌘G의 통계에서 본다"}\n{"at": 1795269041364, "kind": "확인 필요", "text": "\\"배포 상태 확인\\" 세션이 시작하지 못하고 있다", "sessionId": "x"}\n{"at": 1795270241364, "kind": "칸", "text": "칸을 하나 늘려 기다리던 \\"JDK 교체\\"을 올림", "sessionId": "x"}\n{"at": 1795270781364, "kind": "보냄", "text": "새 줄기 · acme-api ← \\"쿠폰 기능 넣으려면 어디부터 봐야 해?\\" (이어 갈 줄기가 없어서)", "sessionId": "x"}`;
       if (args.name !== "threads.json" || !flags.has("threads")) return null;
       const sessions = await fetch("/mock-ledger.json").then((r) => r.json());
       const ids = sessions.slice(8, 12).map((x: { id: string }) => x.id);
@@ -234,6 +246,7 @@ setTimeout(() => {
   if (flags.has("zoom")) press("Enter", "Enter");
   if (flags.has("help")) press("Slash");
   if (flags.has("settings")) press("Comma");
+  if (flags.has("morning")) window.dispatchEvent(new KeyboardEvent("keydown", { code: "KeyB", key: "B", metaKey: true, shiftKey: true }));
   if (flags.has("stems")) press("KeyG");
   if (flags.has("review")) press("KeyE");
   if (flags.has("hist")) press("KeyY");

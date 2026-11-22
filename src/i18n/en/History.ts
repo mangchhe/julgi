@@ -1,6 +1,6 @@
 export default {
   // 한 일의 종류. 기록에는 한국어로 남고 화면에서만 옮긴다
-  "확인 필요": "Needs confirmation",
+  "확인 필요": "Check",
   "보냄": "Sent",
   "옮김": "Moved",
   "칸": "Pane",

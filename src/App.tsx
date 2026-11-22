@@ -8,6 +8,7 @@ import Help from "./Help";
 import Queue from "./Queue";
 import Status from "./Status";
 import History, { Act } from "./History";
+import Morning from "./Morning";
 import Pane from "./Pane";
 import Palette, { Pick } from "./Palette";
 import Send, { RouteNote, Target } from "./Send";
@@ -26,7 +27,7 @@ import { firstKey, JiraConn, keyOfUrl, setKnownKeys, Ticket, TicketFull, TicketS
 import { isLab, newsOf, openPr, prOf, PrStatus, PrTarget, prUrl, repoName, ReviewAsk } from "./pr";
 import * as terms from "./terms";
 import { rank } from "./route";
-import { Brief, Change, Job, MAX_PARALLEL, setMapDirs, setPrefs, markAuto, isAuto, autoList, STATE_LABEL, ago, Item, modelFor, SkillInfo, SkillUse, aboutOf, buildFolders, buildItems, aliveElsewhere, config, elsewhere, enrich, markSlept, setAlive, handoffCommand, Ledger, Merge, mergeCandidates, mergeKey, newCommand, Open, repoOf, resumeCommand, Session, TermState, Thread, waiting, withPrompt } from "./model";
+import { Brief, Change, Job, Progress, MAX_PARALLEL, setMapDirs, setPrefs, markAuto, isAuto, autoList, STATE_LABEL, ago, Item, modelFor, SkillInfo, SkillUse, aboutOf, buildFolders, buildItems, aliveElsewhere, config, elsewhere, enrich, markSlept, setAlive, handoffCommand, Ledger, Merge, mergeCandidates, mergeKey, newCommand, Open, repoOf, resumeCommand, Session, TermState, Thread, waiting, withPrompt } from "./model";
 import { selftest } from "./selftest";
 import { tr } from "./i18n";
 import "./App.css";
@@ -62,6 +63,8 @@ const NOTE_AFTER_MS = 10 * 60_000;
 // i18n-off
 const NOTE_SYSTEM =
   "너는 작업 세션 요약기다. 첫 줄에 이 세션이 하는 일의 이름을 \"이름: \" 뒤에 적는다. 이름은 20자 안쪽의 명사구로, 무엇을 만들거나 고치는 일인지가 드러나야 한다(예: 이름: 재고 초과 주문 거절 처리). 사용자가 처음 한 말을 그대로 옮기지 않는다. 둘째 줄부터는 주어진 정보만으로 세 문장 이내로 요약한다: 무엇을 하는 세션인지, 어디까지 됐는지, 다음에 할 일. 레포·브랜치·티켓·PR 번호처럼 나중에 이 세션을 찾을 단서는 그대로 적는다. 다른 머리말이나 꾸밈은 쓰지 않는다.";
+const PROGRESS_SYSTEM =
+  "너는 작업 진행 정리기다. 한 가지 일을 이어 온 세션들의 요약을 시간 순서로 받는다. 그 일이 지금 어디까지 왔는지를 아래 네 줄로만 답한다. 줄마다 한 문장, 60자 안쪽으로 쓴다. 요약에 없는 것은 지어내지 않고, 해당하는 것이 없으면 그 줄에 \"없음\"이라고 적는다. 다른 머리말이나 꾸밈은 쓰지 않는다.\n목표: 이 일로 이루려는 것\n한 것: 지금까지 끝낸 것\n남은 것: 다음에 해야 할 것\n막힌 것: 사용자의 결정이나 확인을 기다리는 것, 또는 풀리지 않은 문제";
 const JUDGE_SYSTEM =
   '두 Claude Code 세션이 같은 작업인지 판정한다. 같은 작업이란 목표가 같고, 한쪽이 다른 쪽의 연속이거나 같은 변경을 다루는 것이다. 같은 레포, 같은 브랜치, 같은 티켓이나 PR을 언급했다는 것만으로는 같다고 하지 않는다. 내용이 모자라 확실하지 않으면 same을 false로 한다. JSON 한 줄만 답한다: {"same": true 또는 false, "why": "판단 근거 한 문장"}';
 // i18n-on
@@ -79,10 +82,13 @@ export default function App() {
   const [focus, setFocus] = useState(0);
   const [states, setStates] = useState<Record<string, TermState>>({});
   const [dead, setDead] = useState<string[]>([]);
-  const [overlay, setOverlay] = useState<"palette" | "send" | "help" | "history" | "settings" | "threads" | "queue" | "quit" | "close" | "work" | "usage" | null>(null);
+  const [overlay, setOverlay] = useState<"palette" | "send" | "help" | "history" | "settings" | "threads" | "queue" | "quit" | "close" | "work" | "usage" | "morning" | null>(null);
+  const [awaySince, setAwaySince] = useState(0); // 브리핑이 "그동안"의 기준으로 삼는 때
   const [threads, setThreads] = useState<Thread[]>([]);
   const [tasks, setTasks] = useState<Job[]>([]); // 조율 세션이 맡긴 일감들
   const [memories, setMemories] = useState<Record<string, string>>({});
+  const memoriesRef = useRef(memories);
+  memoriesRef.current = memories;
   const [notes, setNotes] = useState<Note[]>([]); // 브레인
   const [stats, setStats] = useState<Stats>({}); // 노트마다 쓰인 횟수
   const [hidden, setHidden] = useState<string[]>([]); // 점검이 목록에서 치운 세션. 파일은 그대로고 ⌘K로 찾으면 돌아온다
@@ -158,6 +164,9 @@ export default function App() {
   const [skills, setSkills] = useState<SkillInfo[]>([]);
   const [skillCands, setSkillCands] = useState<SkillCandidate[]>([]);
   const [names, setNames] = useState<Record<string, string>>({}); // 세션 ID → Julgi가 지은 이름
+  const [progress, setProgress] = useState<Record<string, Progress>>({}); // 줄기 id(없으면 세션 id) → 어디까지 왔나
+  const progressRef = useRef(progress);
+  progressRef.current = progress;
   const [finding, setFinding] = useState(false);
   const [handing, setHanding] = useState<string[]>([]);
   const [toast, setToast] = useState("");
@@ -716,6 +725,29 @@ export default function App() {
     void invoke("data_write", { name: "reviews.json", text: JSON.stringify(live.current.reviews, null, 1) });
     record("점검", tr`${next.v}판(${tr(kind)}): 손댄 것 ${did.length}개, 눈에 띈 것 ${next.seen.length}개. ⌘G의 통계에서 본다`); // i18n-ok
   };
+  /** 요약이 새로 나온 세션이 속한 일(줄기, 아니면 그 세션 하나)이 어디까지 왔는지 네 줄로 정리해 둔다 */
+  const trackProgress = async (sessionId: string, latest: string) => {
+    const thread = live.current.threads.find((t) => t.sessions.includes(sessionId));
+    const key = thread?.id ?? sessionId;
+    // 줄기면 이어 온 세션들의 요약을 순서대로, 마지막 여섯 개까지
+    const ids = thread ? thread.sessions.slice(-6) : [sessionId];
+    const parts = ids.map((id) => (id === sessionId ? latest : memoriesRef.current[id])).filter(Boolean);
+    if (!parts.length) return;
+    try {
+      const prompt = `일의 이름: ${thread?.name ?? live.current.names[sessionId] ?? ""}\n\n${parts.map((p, i) => `세션 ${i + 1} 요약:\n${p.slice(0, 1200)}`).join("\n\n")}\n`; // i18n-ok
+      const text = (await invoke<string | null>("route_ask", { system: PROGRESS_SYSTEM, prompt, model: modelFor("note") })) ?? "";
+      const pick = (label: string) => (text.match(new RegExp(`^\\s*${label}\\s*[:：]\\s*(.+)$`, "m"))?.[1] ?? "").trim().slice(0, 160);
+      const none = (v: string) => (/^(없음|none|n\/a|-)\.?$/i.test(v) ? "" : v);
+      const made: Progress = { goal: none(pick("목표")), done: none(pick("한 것")), left: none(pick("남은 것")), blocked: none(pick("막힌 것")), at: Date.now() }; // i18n-ok
+      if (!made.goal && !made.done && !made.left) return;
+      const next = { ...progressRef.current, [key]: made };
+      progressRef.current = next;
+      setProgress(next);
+      void invoke("data_write", { name: "progress.json", text: JSON.stringify(next) });
+    } catch {
+      // 진행 정리는 없어도 된다. 다음 요약 때 다시 해 본다
+    }
+  };
   /** 세션의 요약을 작은 모델로 만들어 둔다. 대화 기록이 그대로면 다시 만들지 않는다 */
   const summarize = async (sessionId: string) => {
     const s = live.current.byId.get(sessionId);
@@ -743,6 +775,7 @@ export default function App() {
       }
       if (!body) return;
       setMemories((old) => ({ ...old, [sessionId]: body }));
+      void trackProgress(sessionId, body);
       noted.current[sessionId] = s.mtime;
       void invoke("data_write", { name: `threads/${sessionId}.md`, text: body });
       void invoke("data_write", { name: "notes.json", text: JSON.stringify(noted.current) });
@@ -2067,6 +2100,7 @@ export default function App() {
       }
       else if (cmd && e.code === "Slash") setOverlay(overlay === "help" ? null : "help");
       else if (cmd && e.code === "KeyY") setOverlay(overlay === "history" ? null : "history");
+      else if (cmd && e.shiftKey && e.code === "KeyB") setOverlay(overlay === "morning" ? null : "morning");
       else if (cmd && e.code === "Comma") (setSettingsAt(undefined), setOverlay(overlay === "settings" ? null : "settings"));
       else if (cmd && e.code === "KeyG") setOverlay(overlay === "threads" ? null : "threads");
       else if (cmd && e.shiftKey && e.code === "KeyU") setOverlay(overlay === "usage" ? null : "usage");
@@ -2243,6 +2277,41 @@ export default function App() {
     };
     countSkills();
     const skillTimer = setInterval(countSkills, 10 * 60_000);
+    // 마지막으로 Julgi를 본 때를 적어 둔다. 오래 비웠다 돌아오면(켰을 때도) 브리핑을 띄운다
+    let seenAt = 0; // 0이면 아직 파일을 못 읽었다
+    const markSeen = () => {
+      if (!seenAt || document.hidden || !document.hasFocus()) return;
+      seenAt = Date.now();
+      void invoke("data_write", { name: "seen.json", text: JSON.stringify({ at: seenAt }) });
+    };
+    const backFromAway = () => {
+      const gone = seenAt && Date.now() - seenAt;
+      if (config.morning && gone && gone >= config.morningHours * 3600_000) {
+        setAwaySince(seenAt);
+        // 다른 창이 떠 있으면 덮지 않는다
+        setOverlay((cur) => cur ?? "morning");
+      }
+      seenAt = seenAt || Date.now();
+      markSeen();
+    };
+    void invoke<string | null>("data_read", { name: "seen.json" }).then((json) => {
+      try {
+        seenAt = (json && JSON.parse(json).at) || 0;
+      } catch {
+        seenAt = 0;
+      }
+      // 세션 목록이 뜬 뒤에 보이게 조금 기다린다. 처음 켜는 것이면(기록 없음) 띄우지 않는다
+      setTimeout(backFromAway, 2500);
+    });
+    const seenTimer = setInterval(markSeen, 60_000);
+    window.addEventListener("focus", backFromAway);
+    void invoke<string | null>("data_read", { name: "progress.json" }).then((json) => {
+      try {
+        if (json) setProgress(JSON.parse(json));
+      } catch {
+        // 깨졌으면 다음 요약 때 다시 만든다
+      }
+    });
     void invoke<string | null>("data_read", { name: "names.json" }).then((json) => {
       try {
         if (json) setNames(JSON.parse(json));
@@ -2274,6 +2343,8 @@ export default function App() {
       clearInterval(scanTimer);
       clearInterval(skillTimer);
       clearInterval(stateTimer);
+      window.removeEventListener("focus", backFromAway);
+      clearInterval(seenTimer);
       window.removeEventListener("focus", scan);
       window.removeEventListener("focus", onFocusBack);
       window.removeEventListener("julgi:pr", onPr);
@@ -2627,6 +2698,7 @@ export default function App() {
           threads={threads}
           byId={byId}
           memories={memories}
+          progress={progress}
           open={open}
           states={states}
           onClose={() => setOverlay(null)}
@@ -2756,6 +2828,38 @@ export default function App() {
             {tr`아니`}
           </button>
         </div>
+      )}
+      {overlay === "morning" && (
+        <Morning
+          since={awaySince}
+          waits={open
+            .filter((o) => waiting(states[o.key]))
+            .sort((a, b) => (states[a.key]?.since ?? Infinity) - (states[b.key]?.since ?? Infinity))
+            .map((o) => {
+              const stem = threads.find((t) => o.sessionId && t.sessions.includes(o.sessionId));
+              return { key: o.key, name: nameOf(o.key), repo: repoOf(o.cwd), ask: states[o.key]?.state === "ask", since: states[o.key]?.since ?? 0, blocked: progress[stem?.id ?? o.sessionId ?? ""]?.blocked };
+            })}
+          news={[
+            ...Object.entries(sleepNews).map(([id, { news, pr }]) => ({ key: "s" + id, kind: "PR", title: names[id] || byId.get(id)?.title || tr("세션"), news, open: () => (setOverlay(null), openPr(pr)) })),
+            ...Object.values(mineNews).map((a) => ({ key: "m" + a.url, kind: "PR", title: `#${a.number} ${a.title}`, news: a.news, open: () => (setOverlay(null), openPr({ repo: a.repository.nameWithOwner, number: a.number })) })),
+            ...Object.entries(ticketNewsMap).map(([key, news]) => ({ key: "t" + key, kind: tr("티켓"), title: `${key} ${tickets.find((x) => x.key === key)?.title ?? ""}`, news, open: () => (setOverlay(null), setTicketShown(key)) })),
+            ...asks.map((a) => ({ key: "a" + a.url, kind: tr("리뷰 요청"), title: `#${a.number} ${a.title}`, news: a.author.login, open: () => (setOverlay(null), openPr({ repo: a.repository.nameWithOwner, number: a.number })) })),
+          ]}
+          stems={threads
+            .filter((t) => !t.done && progress[t.id])
+            .sort((a, b) => progress[b.id].at - progress[a.id].at)
+            .slice(0, 5)
+            .map((t) => {
+              const last = t.sessions[t.sessions.length - 1];
+              const shown = open.find((o) => o.sessionId && t.sessions.includes(o.sessionId));
+              return { key: t.id, name: t.name, repo: byId.get(last)?.repo ?? "", progress: progress[t.id], show: shown?.key ?? (last ? "c:" + last : undefined) };
+            })}
+          acts={acts.filter((a) => a.at > (awaySince || Date.now() - 86400_000)).reverse()}
+          onShow={(key) => (setOverlay(null), show(key))}
+          onQueue={() => setOverlay("queue")}
+          onHistory={() => setOverlay("history")}
+          onClose={() => setOverlay(null)}
+        />
       )}
       {overlay === "history" && (
         <History

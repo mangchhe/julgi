@@ -1068,3 +1068,30 @@ body.dragging .pane-body { pointer-events: none; }
 /* 잠든 세션 줄에는 번호도 상태 점도 없다. 그 두 칸을 비워 두지 않고 묶음 이름 바로 아래에 살짝 들여 놓는다 */
 .row.sleep { grid-template-columns: minmax(0, 1fr) auto; padding-left: 16px; }
 .row.sleep .slot, .row.sleep .dot { display: none; }
+/* 일이 어디까지 왔는지 네 줄 */
+.pg { display: grid; gap: 1px; margin-top: 3px; font-size: 12px; line-height: 1.45; }
+.pg-row { display: grid; grid-template-columns: 52px minmax(0, 1fr); gap: 8px; }
+.pg-k { color: var(--muted); }
+.pg-v { color: color-mix(in srgb, var(--ink) 82%, var(--muted)); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pg-row.stuck .pg-k, .pg-row.stuck .pg-v { color: var(--wait); }
+/* 브리핑 */
+.mo { width: min(760px, 92vw); max-height: 82vh; display: flex; flex-direction: column; background: var(--surface); border: 1px solid var(--accent); border-radius: 12px; outline: 0; box-shadow: 0 18px 60px rgb(0 0 0 / 0.45); overflow: hidden; }
+.mo-head { display: flex; align-items: baseline; gap: 12px; padding: 14px 18px 10px; border-bottom: 1px solid var(--line); }
+.mo-head b { font-size: 16px; }
+.mo-head span { color: var(--muted); font-size: 12.5px; }
+.mo-body { overflow-y: auto; padding: 4px 10px 12px; }
+.mo section { margin-top: 12px; }
+.mo h3 { margin: 0 0 4px; padding: 0 8px; font-size: 12px; font-weight: 700; color: var(--muted); }
+.mo h3.wait { color: var(--wait); }
+.mo h3 i { font-style: normal; font-weight: 500; margin-left: 4px; }
+.mo-row { padding: 7px 8px; border-radius: 8px; cursor: default; }
+.mo-row.on { background: var(--accent-soft); }
+.mo-name { font-size: 13.5px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mo-meta { font-size: 12px; color: var(--muted); margin-top: 1px; }
+.mo-meta em { font-style: normal; color: var(--wait); font-weight: 600; }
+.mo-stuck { font-size: 12px; color: var(--wait); margin-top: 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mo-kind { display: inline-block; font-size: 11px; font-weight: 600; color: var(--muted); border: 1px solid var(--line); border-radius: 4px; padding: 0 5px; margin-right: 7px; }
+.mo-kinds { display: flex; flex-wrap: wrap; gap: 6px 14px; padding: 2px 8px 6px; font-size: 12.5px; color: var(--muted); }
+.mo-kinds b { color: var(--ink); }
+.mo-act { padding: 3px 8px; font-size: 12.5px; color: color-mix(in srgb, var(--ink) 80%, var(--muted)); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mo-act i { font-style: normal; color: var(--muted); }

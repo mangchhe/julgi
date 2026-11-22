@@ -1,4 +1,5 @@
 export default {
+  "브리핑: 나를 기다리는 것, 새 소식, 하던 일이 어디까지 왔는지": "Briefing: what is waiting on you, news, and where your work stands",
   "할 말을 치고 Enter. 어느 세션으로 보낼지, 새로 열지, 갈아탈지는 Julgi가 정한다": "Type what you want and press Enter. Julgi decides which session to send it to, whether to open a new one, and whether to hand off",
   "내 차례: 답을 기다리는 세션들과 마지막에 물은 말. 거기서 바로 답한다": "My turn: sessions waiting for your reply and the last thing they asked. Reply right there",
   "Julgi가 알아서 한 일 보기. 뭔가 사라졌거나 이상하면 여기부터": "See what Julgi did on its own. Start here if something disappeared or looks odd",

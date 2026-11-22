@@ -8,6 +8,7 @@
 
 오픈소스로 쓰기 전에 알아 둘 것들이다. 전부 설정으로 끄거나 좁힐 수 있다.
 
+- **간단한 허락은 대신 답하게 할 수 있다**(`autoAllow`, 기본은 꺼짐). `look`은 아무것도 바꾸지 않는 명령(git status/diff/log, ls, gh와 glab의 보기)을, `check`는 거기에 시험과 빌드를 더한다. 시험과 빌드는 프로젝트의 스크립트를 돌린다. 세션을 띄울 때 Claude Code의 허락 규칙으로 넘긴다. 파일 내용을 읽는 명령(cat, grep)은 들어 있지 않다. 원하면 `allowRules`에 적는다.
 - **`julgi` 명령은 묻지 않고 실행된다.** Julgi의 스킬이 전부 이 명령 하나를 부르기 때문이다.
 - **`~/.julgi/grown`에 쓰는 것과 대화 기록(`~/.claude/projects`)·스킬 폴더를 읽는 것도 묻지 않는다.** 스킬을 만들고 다듬는 세션이 쓴다.
 - **선호 노트가 세션의 시스템 프롬프트에 붙는다**(`--append-system-prompt-file`). `brain`을 끄면 붙지 않는다.
@@ -54,6 +55,8 @@
 | `usage` | 꺼짐 | 아래 상태 줄에 Claude 구독 사용량(5시간 창, 주간)을 보여 준다 |
 | `memoryLimitGb` | 8 | 세션들의 메모리 합계가 이만큼을 넘으면 쉬는 세션부터 재운다. 0이면 안 한다 |
 | `skipPermissions` | `off` | 허락을 묻지 않고 띄운다. `mine`(내가 연 세션만), `all` |
+| `morning`, `morningHours` | 켜짐, 6 | 이 시간 넘게 비웠다 돌아오면 브리핑을 띄운다 |
+| `autoAllow`, `allowRules` | `off`, 없음 | 묻지 않고 넘길 명령: `look`(살펴보기), `check`(시험과 빌드까지), 그리고 직접 적은 앞머리나 규칙 |
 | `notify` | 켜짐 | 창을 안 보고 있을 때 내 차례가 오면 알린다 |
 | `mapRoot` | 없음 | 레포가 모여 있는 폴더. 그 아래의 git 레포가 지도에 들어간다 |
 | `mapFetch` | 켜짐 | 지도를 그리기 전에 원격에서 받아 온다 |
@@ -102,6 +105,8 @@
 | `plugin/`, `grown/`, `bin/julgi` | Julgi의 스킬, Julgi가 만든 스킬, 세션이 쓰는 명령 |
 | `skill-history/` | 다듬기 전의 스킬 글 |
 | `pr-seen.json`, `jira-seen.json` | PR과 티켓의 지난 형편. 견줘서 새로 생긴 일만 알린다 |
+| `progress.json` | 줄기마다 목표, 한 것, 남은 것, 막힌 것 |
+| `seen.json` | 마지막으로 Julgi를 본 때. 브리핑이 쓴다 |
 | `tickets.json` | 세션과 Jira 티켓의 연결 |
 | `remote-token` | 폰용 화면의 토큰. 지우면 새로 만든다 |
 | `worktrees/` | 일감용 워크트리 |

@@ -44,6 +44,8 @@ const SECTIONS: { id: string; title: string; hint: string; rows: Row[] }[] = [
     { kind: "pick", key: "lang", label: tr("언어"), note: tr("화면 글의 언어. 바꾼 뒤 Julgi를 다시 켜야 적용된다"), options: [["auto", tr("시스템 따름")], ["en", "English"], ["ko", "한국어"]] }, // i18n-ok
     { kind: "number", key: "recentDays", label: tr("목록에 보이는 기간"), note: tr("이보다 오래 안 쓴 잠든 세션은 목록에서 빼고 ⌘K로만 찾는다"), step: 1, min: 1, max: 90, show: (n) => tr`${n}일` },
     { kind: "toggle", key: "usage", label: tr("Claude 사용량 보기"), note: tr("아래 상태 줄에 5시간 창과 주간 한도를 얼마나 썼는지 보여 준다. 켜면 Claude Code의 로그인 토큰을 키체인에서 읽어 Anthropic의 사용량 주소에만 보낸다(처음에 키체인이 허락을 묻는다). 문서에 없는 주소라 어느 날 안 나올 수 있다") },
+      { kind: "toggle", key: "morning", label: tr("돌아오면 브리핑"), note: tr("한동안 Julgi를 안 보다가 돌아오면 나를 기다리는 것, PR과 티켓에 생긴 일, 하던 일이 어디까지 왔는지, 그동안 Julgi가 한 일을 한 화면으로 보여 준다. ⌘⇧B로 언제든 연다") },
+      { kind: "number", key: "morningHours", label: tr("브리핑을 띄우는 간격"), note: tr("이만큼 넘게 안 봤을 때만 띄운다"), step: 1, min: 1, max: 72, show: (n) => tr`${n}시간` },
       { kind: "toggle", key: "notify", label: tr("알림"), note: tr("Julgi 창을 안 보고 있을 때 세션이 답을 끝내거나 확인을 물으면 macOS 알림을 띄운다") },
     { kind: "toggle", key: "confirmClose", label: tr("닫기 전에 묻기"), note: tr("⌘W나 ×로 세션을 닫을 때 한 번 묻는다") },
     { kind: "key", key: "hotkey", label: tr("창 꺼내기 키"), note: tr("어느 앱에서든 Julgi 창을 꺼내고 다시 넣는 키. Enter를 누른 뒤 쓸 키 조합을 누른다. Backspace면 쓰지 않는다") },

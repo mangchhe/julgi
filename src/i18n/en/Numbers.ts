@@ -63,7 +63,7 @@ export default {
   "Julgi가 알아서 한 일 · 최근 7일": "What Julgi did on its own · last 7 days",
   "한 일": "Actions",
   "⌘Y에 남은 것": "logged in ⌘Y",
-  "확인 필요": "Needs confirmation",
+  "확인 필요": "Check",
   "Julgi가 혼자 못 푼 것": "what Julgi could not settle alone",
   "열린 세션 / 최근 14일 세션": "Open sessions / sessions in the last 14 days",
   "이름을 붙인 세션": "Named sessions",

@@ -25,6 +25,8 @@ export type Session = SessionInfo & { repo: string; work?: Work; group: string; 
 const AUTO_REPEATS = 4;
 
 /** 줄기: 기능 하나의 긴 흐름. 갈아탈 때마다 세션이 뒤에 이어 달린다 */
+/** 일 하나가 어디까지 왔는지: 목표, 한 것, 남은 것, 막힌 것. 열쇠는 줄기 id이고, 줄기가 아닌 세션은 세션 id다 */
+export type Progress = { goal: string; done: string; left: string; blocked: string; at: number };
 export type Thread = { id: string; name: string; sessions: string[]; created: number; /** 내가 직접 지은 이름. Julgi가 바꾸지 않는다 */ named?: boolean; /** 끝난 줄기. 목록에서 내려가고 ⌘K로는 계속 찾는다 */ done?: boolean };
 
 /** 목록의 한 줄. 줄기면 가장 최근 세션이 대표로 나오고, 줄기가 아니면 세션 하나다 */
@@ -285,6 +287,10 @@ export const config = {
   repos: [] as string[],
   /** 창을 안 보고 있을 때 세션이 답을 끝내거나 확인을 물으면 macOS 알림을 띄운다 */
   notify: true,
+  /** 오래 자리를 비웠다 돌아오면 브리핑을 띄운다 */
+  morning: true,
+  /** 몇 시간 넘게 안 봤으면 브리핑을 띄우나 */
+  morningHours: 6,
   /** 어느 앱에서든 Julgi 창을 꺼내고 넣는 키. 비우면 쓰지 않는다. 바꾸면 Julgi를 다시 켜야 한다 */
   hotkey: "ctrl+super+KeyJ",
   /** 던진 일이 레포 여러 곳에 걸치면 새 세션을 조율자로 세운다: 직접 고치지 않고 일감으로 나눠 맡긴다 */

@@ -1,4 +1,8 @@
 export default {
+  "목표": "Goal",
+  "한 것": "Done",
+  "남은 것": "Left",
+  "막힌 것": "Blocked",
   // 줄기의 묶음. 값은 한국어로 견주고 화면에서만 옮긴다
   "내 차례": "My turn",
   "일하는 중": "Working",

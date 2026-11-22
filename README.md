@@ -106,6 +106,9 @@ Tokens by day, model, project and session, counted from Claude Code's own transc
 
 ### Also in the box
 
+- **Briefing** — come back after a while and one screen shows what is waiting on you, news on PRs and tickets, where each piece of work stands, and what Julgi did meanwhile (`⌘⇧B`).
+- **Progress per stem** — goal, done, left and blocked for each piece of work, kept up to date as sessions reply.
+- **Fewer permission prompts** — optionally let read-only commands, or tests and builds too, through without asking.
 - **Stems** — sessions doing the same work are joined into one stem; finished work is taken off the list.
 - **Brain** — decisions, pitfalls and facts worth keeping are saved when work ends and attached to new work that needs them.
 - **Preferences** — when you correct a session ("from now on…", "don't…"), Julgi turns it into a rule every later session follows.
@@ -147,6 +150,7 @@ Optional, for the integrations: [`gh`](https://cli.github.com) for GitHub, [`gla
 | `⌘U` / `⌘⇧U` | Work page / token usage |
 | `⌘G` | Stems, brain, skills, numbers, map, git |
 | `⌘Y` | What Julgi did on its own |
+| `⌘⇧B` | Briefing: what is waiting, news, where work stands |
 | `⌘T` / `⌘D` / `⌘W` | Shell in a new pane / add a pane / close |
 
 The rest are under `⌘/` in the app.

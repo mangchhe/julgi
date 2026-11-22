@@ -5,7 +5,7 @@ import { Review } from "./review";
 import MapGraph from "./MapGraph";
 import Repos from "./Repos";
 import { Candidate, mapDomains, mapEdges, mapItems, Note, stale, statOf, Stats, usedCount } from "./brain";
-import { Job, ago, elsewhere, SkillInfo, SkillUse, kilo, Open, Session, STATE_LABEL, TermState, Thread, waiting } from "./model";
+import { Job, Progress, ago, elsewhere, SkillInfo, SkillUse, kilo, Open, Session, STATE_LABEL, TermState, Thread, waiting } from "./model";
 import { tr } from "./i18n";
 
 type Props = {
@@ -35,6 +35,8 @@ type Props = {
   threads: Thread[];
   byId: Map<string, Session>;
   memories: Record<string, string>;
+  /** 줄기마다 어디까지 왔는지 */
+  progress: Record<string, Progress>;
   open: Open[];
   states: Record<string, TermState>;
   /** 세션 하나로 간다. 열려 있으면 그 칸으로, 잠들어 있으면 깨운다 */
@@ -50,7 +52,29 @@ const GROUPS = ["내 차례", "일하는 중", "쉬는 중", "끝냄"]; // i18n-
 const plain = (text: string) => text.replace(/[#*`>|]/g, " ").replace(/\s+/g, " ").trim();
 
 /** 줄기 보기 (⌘G). 일마다 어떤 세션들로 이어져 왔고 어디까지 했는지를 한 화면에 편다. */
-export default function Threads({ repos, nameOf, onShow, map, drawing, onRedraw, notes, stats, skills, skillUses, candidates, acts, tasks, reviews, sessions, named, onForget, threads, byId, memories, open, states, onPick, onClose }: Props) {
+/** 일 하나가 어디까지 왔는지 네 줄. 빈 줄은 내지 않고, 막힌 것은 눈에 띄게 */
+export function ProgressLines({ p }: { p: Progress }) {
+  const rows: [string, string, string][] = [
+    [tr("목표"), p.goal, ""],
+    [tr("한 것"), p.done, ""],
+    [tr("남은 것"), p.left, ""],
+    [tr("막힌 것"), p.blocked, " stuck"],
+  ];
+  return (
+    <div className="pg">
+      {rows
+        .filter(([, text]) => text)
+        .map(([label, text, cls]) => (
+          <div key={label} className={"pg-row" + cls}>
+            <span className="pg-k">{label}</span>
+            <span className="pg-v">{text}</span>
+          </div>
+        ))}
+    </div>
+  );
+}
+
+export default function Threads({ repos, nameOf, onShow, map, drawing, onRedraw, notes, stats, skills, skillUses, candidates, acts, tasks, reviews, sessions, named, onForget, threads, byId, progress, memories, open, states, onPick, onClose }: Props) {
   const [tab, setTab] = useState<"stems" | "brain" | "skills" | "nums" | "map" | "git">("stems");
   const [noteAt, setNoteAt] = useState(0);
   const [armed, setArmed] = useState(""); // 지우려고 한 번 누른 노트
@@ -356,7 +380,11 @@ export default function Threads({ repos, nameOf, onShow, map, drawing, onRedraw,
                   <div className="th-meta">
                     {[...new Set(r.cells.map((c) => c.repo))].join(" + ")} · {tr`세션 ${r.cells.length}개`}
                   </div>
-                  <div className="th-about">{r.about.slice(0, 190) || tr("요약이 아직 없다")}</div>
+                  {progress[r.thread.id] ? (
+                    <ProgressLines p={progress[r.thread.id]} />
+                  ) : (
+                    <div className="th-about">{r.about.slice(0, 190) || tr("요약이 아직 없다")}</div>
+                  )}
                   {tasks.some((t) => r.thread.sessions.includes(t.lead)) && (
                     <div className="th-tasks">
                       {tasks

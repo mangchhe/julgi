@@ -12,6 +12,7 @@ Read this before you run it. Everything here can be turned off or narrowed in se
 - **Writes to `~/.julgi/grown`, and reads of transcripts (`~/.claude/projects`) and skill folders, do not ask either.** Sessions that create and refine skills need them.
 - **A preference note is appended to each session's system prompt** (`--append-system-prompt-file`). Turn `brain` off and it is not attached.
 - **Usage display reads Claude Code's login token.** It reads it from the keychain and sends it only to `api.anthropic.com/api/oauth/usage`. This endpoint is undocumented and may stop working. Off by default.
+- **Simple permission prompts can be answered for you** (`autoAllow`, off by default). `look` lets read-only commands through (git status/diff/log, ls, gh and glab views); `check` adds test and build runners, which run scripts from the project. They are passed to Claude Code as permission rules at launch. Commands that read file contents (cat, grep) are not included; add them in `allowRules` if you want them.
 - **Phone view opens one port** (default 4747). It accepts only the Tailscale range (100.64.0.0/10) and this Mac, and the token in the URL (`~/.julgi/remote-token`) must match. Off by default.
 - **Sessions can read the repos on the map without asking** (a `Read` permission passed through `--settings`). Editing another repo still asks.
 - **Julgi answers the "do you trust this folder" prompt for some folders**: the default folder, folders in `autoTrust`, and repos you named through `mapRoot` or `repos`.
@@ -54,6 +55,8 @@ Change them in `⌘,`; they apply at once and are saved to `~/.julgi/config.json
 | `usage` | off | Show Claude subscription limits in the status bar |
 | `memoryLimitGb` | 8 | Sleep idle sessions when total memory passes this. 0 disables |
 | `skipPermissions` | `off` | Launch without permission prompts. `mine` (sessions I opened), `all` |
+| `morning`, `morningHours` | on, 6 | Show the briefing when you come back after this many hours away |
+| `autoAllow`, `allowRules` | `off`, none | Commands let through without asking: `look`, `check`, plus your own prefixes or rules |
 | `notify` | on | Notify when it becomes my turn and the window is not focused |
 | `mapRoot` | none | Folder holding your repos; git repos under it go on the map |
 | `mapFetch` | on | Fetch before drawing the map |
@@ -99,6 +102,8 @@ Everything is a text file under `~/.julgi/`. Conversations are not here; Claude 
 | `activity.jsonl`, `routes.jsonl`, `misroutes.jsonl` | What Julgi did, where it sent things, corrections |
 | `plugin/`, `grown/`, `bin/julgi` | Julgi's skills, skills it grew, the session command |
 | `pr-seen.json`, `jira-seen.json` | Last known state of PRs and tickets, to tell news from old |
+| `progress.json` | Goal, done, left, blocked per stem |
+| `seen.json` | When you last looked at Julgi, for the briefing |
 | `tickets.json` | Which session belongs to which Jira ticket |
 | `remote-token` | Token for the phone view. Delete it to get a new one |
 | `worktrees/` | Worktrees for tasks and tickets |
