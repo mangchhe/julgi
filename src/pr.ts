@@ -10,6 +10,9 @@ export function prOf(url: string): PrTarget | null {
 /** PR 링크를 Julgi 안의 PR 화면으로 연다. 터미널, 찾기, 코드 검토 어디서든 이것만 부른다. App이 받아서 연다 */
 export const openPr = (target: PrTarget) => window.dispatchEvent(new CustomEvent<PrTarget>("julgi:pr", { detail: target }));
 
+/** 나한테 온 리뷰 요청 하나 (gh search prs) */
+export type ReviewAsk = { number: number; title: string; repository: { nameWithOwner: string }; author: { login: string }; updatedAt: string; url: string; isDraft: boolean };
+
 /** 세션 줄에 달 PR의 형편 (Rust pr_status) */
 export type PrStatus = { state: string; ci: string; decision: string; others: number };
 

@@ -18,7 +18,7 @@ import { applyTheme } from "./themes";
 import { CHECK_SYSTEM, CORRECT_SYSTEM, prefsText, CAND_SYSTEM, Candidate as SkillCandidate, formatNote, indexLine, indexText, LEARN_SYSTEM, Note, parseNote, BRIEF_SYSTEM, MAP_SYSTEM, mapDomains, mapItems, recallText, stale, Stats, statOf, SWEEP_SYSTEM, TIDY_SYSTEM } from "./brain";
 import Sidebar from "./Sidebar";
 import PrView from "./PrView";
-import { newsOf, openPr, prOf, PrStatus, PrTarget } from "./pr";
+import { newsOf, openPr, prOf, PrStatus, PrTarget, ReviewAsk } from "./pr";
 import * as terms from "./terms";
 import { rank } from "./route";
 import { Brief, Change, Job, MAX_PARALLEL, setMapDirs, setPrefs, markAuto, isAuto, autoList, STATE_LABEL, ago, Item, modelFor, SkillInfo, SkillUse, aboutOf, buildFolders, buildItems, aliveElsewhere, config, elsewhere, enrich, markSlept, setAlive, handoffCommand, Ledger, Merge, mergeCandidates, mergeKey, newCommand, Open, repoOf, resumeCommand, Session, TermState, Thread, waiting, withPrompt } from "./model";
@@ -115,6 +115,8 @@ export default function App() {
   const [prNews, setPrNews] = useState<Record<string, string>>({});
   // 지난번에 본 PR 형편. 견줘서 새로 생긴 일만 알린다. Julgi를 다시 켜도 이어지게 파일에 둔다
   const prSeen = useRef<Record<string, PrStatus>>({});
+  // 나한테 온 리뷰 요청. ⌘J 대기열의 아래 묶음이 된다
+  const [asks, setAsks] = useState<ReviewAsk[]>([]);
   const [reviews, setReviews] = useState<Review[]>([]); // 점검 기록. 판마다 값과 한 일이 남는다
   const [skillUses, setSkillUses] = useState<SkillUse[]>([]);
   const [skills, setSkills] = useState<SkillInfo[]>([]);
@@ -196,8 +198,8 @@ export default function App() {
   const waitCount = open.filter((o) => waiting(states[o.key])).length;
 
   // 키 처리와 이벤트 콜백은 한 번만 걸고, 최신 상태는 여기서 읽는다
-  const live = useRef({ open, panes, widths, focus, states, overlay, filter, sessions, home, base, fontSize, handing, byId, threads, memories, pinned, items, folders, names, zoom, notes, skills, reviews, acts, skillUses, closing, dead, mapText, skillCands, reviewing, prNews });
-  live.current = { open, panes, widths, focus, states, overlay, filter, sessions, home, base, fontSize, handing, byId, threads, memories, pinned, items, folders, names, zoom, notes, skills, reviews, acts, skillUses, closing, dead, mapText, skillCands, reviewing, prNews };
+  const live = useRef({ open, panes, widths, focus, states, overlay, filter, sessions, home, base, fontSize, handing, byId, threads, memories, pinned, items, folders, names, zoom, notes, skills, reviews, acts, skillUses, closing, dead, mapText, skillCands, reviewing, prNews, asks });
+  live.current = { open, panes, widths, focus, states, overlay, filter, sessions, home, base, fontSize, handing, byId, threads, memories, pinned, items, folders, names, zoom, notes, skills, reviews, acts, skillUses, closing, dead, mapText, skillCands, reviewing, prNews, asks };
 
   const say = (message: string, ms = 3500) => {
     setToast(message);
@@ -1595,8 +1597,27 @@ export default function App() {
     void invoke("notify", { title: nameOf(key).slice(0, 60), body: text });
     notified.current = { key, at: Date.now() };
   };
-  const actions = useRef({ readUsage, publishRemote, say, dispatch, show, close, sleep, requestQuit, handoff, exited, newSession, newShell, nextWaiting, cycleFilter, openTerm, resize, split, unsplit, finishThread, move, togglePin, tend, serve, confirmClose, toggleReview, prNotice });
-  actions.current = { readUsage, publishRemote, say, dispatch, show, close, sleep, requestQuit, handoff, exited, newSession, newShell, nextWaiting, cycleFilter, openTerm, resize, split, unsplit, finishThread, move, togglePin, tend, serve, confirmClose, toggleReview, prNotice };
+  /** 새 리뷰 요청이 왔다 */
+  const askNotice = (a: ReviewAsk) => {
+    const repo = a.repository.nameWithOwner.split("/")[1];
+    record("리뷰 요청", `${a.author.login}: ${repo} #${a.number} ${a.title.slice(0, 60)}`);
+    if (!config.notify || document.hasFocus()) return;
+    void invoke("notify", { title: `리뷰 요청 · ${repo} #${a.number}`, body: `${a.author.login}: ${a.title.slice(0, 80)}` });
+  };
+  /** 리뷰 요청을 새 세션에 맡긴다. 로컬에 그 레포가 있으면 거기서 띄워 코드도 같이 읽게 한다 */
+  const handReview = (a: ReviewAsk, extra: string) => {
+    const name = a.repository.nameWithOwner.split("/")[1];
+    const cwd = mapState.current.repos.find((r) => r.repo === name)?.cwd ?? (live.current.base || live.current.home);
+    const ask =
+      `PR ${a.url} (${a.repository.nameWithOwner} #${a.number} "${a.title}", 작성 ${a.author.login})을 리뷰해 줘.\n\n` +
+      `- \`gh pr view ${a.number} -R ${a.repository.nameWithOwner} --comments\`와 \`gh pr diff ${a.number} -R ${a.repository.nameWithOwner}\`로 읽는다. 필요하면 이 폴더의 코드를 같이 본다.\n` +
+      `- 버그, 위험, 빠진 처리, 확인할 것을 "파일:줄 — 무엇을 왜" 목록으로 정리한다. 중요한 것부터.\n` +
+      `- GitHub에 코멘트를 달거나 승인하지 않는다. 올리는 것은 내가 Julgi의 PR 화면에서 한다.` +
+      (extra ? `\n\n덧붙여: ${extra}` : "");
+    void dispatch({ kind: "new", cwd }, ask, { rank: 0, by: "리뷰 요청" });
+  };
+  const actions = useRef({ readUsage, publishRemote, say, dispatch, show, close, sleep, requestQuit, handoff, exited, newSession, newShell, nextWaiting, cycleFilter, openTerm, resize, split, unsplit, finishThread, move, togglePin, tend, serve, confirmClose, toggleReview, prNotice, askNotice });
+  actions.current = { readUsage, publishRemote, say, dispatch, show, close, sleep, requestQuit, handoff, exited, newSession, newShell, nextWaiting, cycleFilter, openTerm, resize, split, unsplit, finishThread, move, togglePin, tend, serve, confirmClose, toggleReview, prNotice, askNotice };
 
   /** 세션이 남긴 링크 가운데 마지막 PR */
   const prOfSession = (id?: string) => {
@@ -1638,11 +1659,25 @@ export default function App() {
       setPrs(next);
       void invoke("data_write", { name: "pr-seen.json", text: JSON.stringify(prSeen.current) });
     };
+    // 리뷰 요청은 5분마다. 처음 보는 요청이 오면 알린다(Julgi를 켠 직후에 이미 있던 것은 알리지 않는다)
+    let known: Set<string> | null = null;
+    const pollAsks = async () => {
+      const text = await invoke<string>("pr_review_requests").catch(() => "");
+      if (!text) return;
+      const list = (JSON.parse(text) as ReviewAsk[]).filter((a) => !a.isDraft);
+      if (known) for (const a of list.filter((x) => !known!.has(x.url))) actions.current.askNotice(a);
+      known = new Set(list.map((a) => a.url));
+      setAsks(list);
+    };
     const first = setTimeout(() => void poll(), 8000);
     const timer = setInterval(() => void poll(), 120_000);
+    const firstAsks = setTimeout(() => void pollAsks(), 12_000);
+    const askTimer = setInterval(() => void pollAsks(), 300_000);
     return () => {
       clearTimeout(first);
       clearInterval(timer);
+      clearTimeout(firstAsks);
+      clearInterval(askTimer);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -1748,7 +1783,7 @@ export default function App() {
       } else if (cmd && e.code === "KeyJ") {
         // 내 차례인 세션들과 마지막에 물은 말을 편다. 거기서 바로 답한다
         if (overlay === "queue") setOverlay(null);
-        else if (live.current.open.some((o) => waiting(live.current.states[o.key]))) setOverlay("queue");
+        else if (live.current.open.some((o) => waiting(live.current.states[o.key]) || live.current.prNews[o.key]) || live.current.asks.length) setOverlay("queue");
         else a.say("내 차례인 세션이 없다");
       }
       // 창만 닫아 메뉴 막대로 보낸다. 세션은 계속 돈다
@@ -2187,9 +2222,15 @@ export default function App() {
       {overlay === "queue" && (
         <Queue
           rows={open
-            .filter((o) => waiting(states[o.key]))
-            .sort((a, b) => states[a.key].since - states[b.key].since)
-            .map((o) => ({ key: o.key, name: nameOf(o.key), repo: repoOf(o.cwd), state: states[o.key].state, since: states[o.key].since, sessionId: o.sessionId }))}
+            .filter((o) => waiting(states[o.key]) || (prNews[o.key] && states[o.key]?.state !== "run"))
+            .sort((a, b) => (states[a.key]?.since ?? Infinity) - (states[b.key]?.since ?? Infinity))
+            .map((o) => ({ key: o.key, name: nameOf(o.key), repo: repoOf(o.cwd), state: states[o.key]?.state ?? "", since: states[o.key]?.since ?? 0, sessionId: o.sessionId, news: prNews[o.key] }))}
+          asks={asks}
+          onView={(a) => openPr({ repo: a.repository.nameWithOwner, number: a.number })}
+          onHand={(a, extra) => {
+            handReview(a, extra);
+            record("리뷰 맡김", `${a.repository.nameWithOwner} #${a.number}을 새 세션에 맡김${extra ? `: ${extra.slice(0, 60)}` : ""}`);
+          }}
           onAnswer={(key, text) => {
             terms.submitWhenClear(key, text);
             record("답함", `"${nameOf(key)}"에 내 차례 목록에서 답함: ${text.slice(0, 80)}`, open.find((o) => o.key === key)?.sessionId);

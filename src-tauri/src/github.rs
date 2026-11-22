@@ -102,6 +102,12 @@ fn status_of(v: &serde_json::Value) -> Option<PrStatus> {
     })
 }
 
+/// 나한테 리뷰를 부탁한 열린 PR들. gh가 준 JSON 그대로
+#[tauri::command(async)]
+pub fn pr_review_requests() -> Result<String, String> {
+    run(&["search", "prs", "--review-requested=@me", "--state=open", "--limit", "30", "--json", "number,title,repository,author,updatedAt,url,isDraft"])
+}
+
 // ── 쓰기: GitHub에 글이 올라가고 머지된다. 화면에서 내가 누른 것만 부른다 ──
 
 fn check_body(body: &str) -> Result<(), String> {

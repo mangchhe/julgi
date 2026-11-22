@@ -137,6 +137,11 @@ async function invoke(cmd: string, args: Record<string, unknown> = {}): Promise<
         comments: [{ author: { login: "teammate" }, body: "배포 전에 스테이지에서 한 번 돌려 볼게요.", createdAt: new Date(Date.now() - 3600_000).toISOString() }],
         reviews: [{ author: { login: "reviewer" }, body: "음수 환불은 예외 말고 0으로 막는 게 맞지 않을까요?", submittedAt: new Date(Date.now() - 1800_000).toISOString(), state: "CHANGES_REQUESTED" }],
       });
+    case "pr_review_requests":
+      return JSON.stringify([
+        { number: 215, title: "결제 취소 API에 부분 취소 추가", repository: { nameWithOwner: "example/api-server" }, author: { login: "teammate" }, updatedAt: new Date(Date.now() - 7200_000).toISOString(), url: "https://github.com/example/api-server/pull/215", isDraft: false },
+        { number: 88, title: "검색 필터에 기간 추가", repository: { nameWithOwner: "example/web-admin" }, author: { login: "designer" }, updatedAt: new Date(Date.now() - 86400_000).toISOString(), url: "https://github.com/example/web-admin/pull/88", isDraft: false },
+      ]);
     case "pr_status":
       return args.number === 1852 ? { state: "OPEN", ci: "FAILURE", decision: "CHANGES_REQUESTED", others: 3 } : { state: "OPEN", ci: "SUCCESS", decision: "APPROVED", others: 0 };
     case "pr_diff":

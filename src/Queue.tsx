@@ -1,10 +1,18 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { ago } from "./model";
+import { ReviewAsk } from "./pr";
 
-export type Waiting = { key: string; name: string; repo: string; state: string; since: number; sessionId?: string };
+/** news: PR에 생긴 일(CI 실패, 새 코멘트 등). 있으면 답을 기다리는 게 아니라 PR 때문에 올라온 것이다 */
+export type Waiting = { key: string; name: string; repo: string; state: string; since: number; sessionId?: string; news?: string };
 type Props = {
   rows: Waiting[];
+  /** 나한테 온 리뷰 요청. 세션들 아래에 놓는다 */
+  asks: ReviewAsk[];
+  /** 리뷰 요청을 PR 화면으로 연다 */
+  onView: (ask: ReviewAsk) => void;
+  /** 리뷰 요청을 새 세션에 맡긴다. extra는 덧붙여 시킬 말 */
+  onHand: (ask: ReviewAsk, extra: string) => void;
   /** 그 세션에 답을 보낸다 */
   onAnswer: (key: string, text: string) => void;
   /** 그 세션을 칸에 올린다 */
@@ -23,16 +31,21 @@ const question = (reply: string) => {
  * 내 차례 (⌘J). 답을 기다리는 세션을 오래 기다린 순으로 놓고, 마지막에 무엇을 물었는지 보여 준다.
  * 여기서 바로 답을 쳐서 보내면 세션을 열어 읽고 돌아오는 왕복이 없다. 더 읽어야 하면 빈 채로 Enter를 눌러 연다
  */
-export default function Queue({ rows, onAnswer, onOpen, onClose }: Props) {
-  // 답을 보낸 세션은 상태가 바뀌기를 기다리지 않고 바로 뺀다
+export default function Queue({ rows, asks, onView, onHand, onAnswer, onOpen, onClose }: Props) {
+  // 답을 보낸 세션과 맡긴 리뷰는 상태가 바뀌기를 기다리지 않고 바로 뺀다
   const [gone, setGone] = useState<string[]>([]);
   const list = useMemo(() => rows.filter((r) => !gone.includes(r.key)), [rows, gone]);
+  const askList = useMemo(() => asks.filter((a) => !gone.includes(a.url)), [asks, gone]);
+  const total = list.length + askList.length;
   const [at, setAt] = useState(0);
-  const row = list[Math.min(at, list.length - 1)];
+  const pos = Math.min(at, total - 1);
+  // 위는 세션, 아래는 리뷰 요청. 고른 자리가 어느 쪽인지에 따라 오른쪽이 바뀐다
+  const row = pos < list.length ? list[pos] : undefined;
+  const ask = pos >= list.length ? askList[pos - list.length] : undefined;
   const [replies, setReplies] = useState<Record<string, string>>({});
   const [text, setText] = useState("");
   const input = useRef<HTMLTextAreaElement>(null);
-  useEffect(() => input.current?.focus(), [row?.key]);
+  useEffect(() => input.current?.focus(), [row?.key, ask?.url]);
   useEffect(() => {
     if (!row?.sessionId || replies[row.key] !== undefined) return;
     const key = row.key;
@@ -44,21 +57,28 @@ export default function Queue({ rows, onAnswer, onOpen, onClose }: Props) {
   }, [row?.key]);
   // 다 답했으면 닫는다
   useEffect(() => {
-    if (rows.length && !list.length) onClose();
+    if (rows.length + asks.length && !total) onClose();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [list.length]);
+  }, [total]);
 
   const reply = row ? replies[row.key] : undefined;
   const asked = reply ? question(reply) : "";
   const rest = reply ? (asked ? reply.slice(0, reply.lastIndexOf(asked)).trim() : reply.trim()) : "";
   const onKey = (e: React.KeyboardEvent) => {
     if (e.key === "Escape") return onClose();
-    if (!row) return;
+    if (!total) return;
     if (e.key === "ArrowDown" || e.key === "ArrowUp") {
       e.preventDefault();
-      setAt((Math.min(at, list.length - 1) + (e.key === "ArrowDown" ? 1 : list.length - 1)) % list.length);
+      setAt((pos + (e.key === "ArrowDown" ? 1 : total - 1)) % total);
       setText("");
-    } else if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) {
+    } else if (ask && e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) {
+      e.preventDefault();
+      // 빈 채로 Enter면 PR 화면, 글을 썼거나 ⌘Enter면 세션에 맡긴다
+      if (!text.trim() && !e.metaKey) return onView(ask), onClose();
+      onHand(ask, text.trim());
+      setGone((old) => [...old, ask.url]);
+      setText("");
+    } else if (row && e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) {
       e.preventDefault();
       // 빈 채로 누르거나 ⌘Enter면 세션을 연다. 확인을 묻는 세션(허락 창)은 글로 답할 수 없어 늘 연다
       if (!text.trim() || e.metaKey || row.state === "ask") return onOpen(row.key), onClose();
@@ -77,12 +97,37 @@ export default function Queue({ rows, onAnswer, onOpen, onClose }: Props) {
             <button key={r.key} type="button" tabIndex={-1} className={"qu-row" + (r.key === row?.key ? " on" : "")} onClick={() => (setAt(i), setText(""))}>
               <b>{r.name}</b>
               <small>
-                {r.repo} · {r.state === "ask" ? "확인이 필요함" : "답함"} · {ago(r.since / 1000)}
+                {r.repo} · {r.news ? <em className="qu-news">PR · {r.news}</em> : r.state === "ask" ? "확인이 필요함" : "답함"}
+                {r.since > 0 && ` · ${ago(r.since / 1000)}`}
+              </small>
+            </button>
+          ))}
+          {askList.length > 0 && <div className="qu-head">리뷰 요청 {askList.length}</div>}
+          {askList.map((a, i) => (
+            <button key={a.url} type="button" tabIndex={-1} className={"qu-row" + (a.url === ask?.url ? " on" : "")} onClick={() => (setAt(list.length + i), setText(""))}>
+              <b>{a.title}</b>
+              <small>
+                {a.repository.nameWithOwner.split("/")[1]} #{a.number} · {a.author.login} · {ago(Date.parse(a.updatedAt) / 1000)}
               </small>
             </button>
           ))}
         </div>
         <div className="qu-main">
+          {ask && (
+            <>
+              <div className="qu-reply">
+                <pre className="qu-asked">
+                  {ask.repository.nameWithOwner} #{ask.number}
+                  {"\n"}
+                  {ask.title}
+                </pre>
+                <small>
+                  {ask.author.login}이 리뷰를 부탁했다{ask.isDraft ? " · 초안" : ""} · 빈 채로 Enter면 PR 화면에서 본다. 세션에 맡기면 새 세션이 PR을 읽고 짚을 곳을 정리한다(GitHub에 직접 올리지는 않는다)
+                </small>
+              </div>
+              <textarea ref={input} rows={2} value={text} placeholder="세션에 맡길 때 덧붙일 말 (예: 트랜잭션 위주로) · Enter 맡기기 · 빈 채로 Enter면 PR 화면 · ⌘Enter 바로 맡기기" onChange={(e) => setText(e.target.value)} />
+            </>
+          )}
           {row && (
             <>
               <div className="qu-reply">
@@ -101,7 +146,7 @@ export default function Queue({ rows, onAnswer, onOpen, onClose }: Props) {
               />
             </>
           )}
-          <div className="pal-foot">↑↓ 세션 고르기 · Enter 답 보내기 (빈 채면 세션 열기) · ⌘Enter 세션 열기 · ⇧Enter 줄바꿈 · Esc</div>
+          <div className="pal-foot">{ask ? "↑↓ 고르기 · Enter PR 화면 (글이 있으면 세션에 맡기기) · ⌘Enter 세션에 맡기기 · Esc" : "↑↓ 고르기 · Enter 답 보내기 (빈 채면 세션 열기) · ⌘Enter 세션 열기 · ⇧Enter 줄바꿈 · Esc"}</div>
         </div>
       </div>
     </div>
