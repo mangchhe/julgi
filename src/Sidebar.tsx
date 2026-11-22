@@ -1,3 +1,4 @@
+import { openPr, prParts, PrStatus, PrTarget } from "./pr";
 import { Change, Job, ago, config, elsewhere, hot, Item, kilo, Open, Session, STATE_LABEL, TermState, Thread, waiting } from "./model";
 
 /** 이름을 붙였거나 세션이 이어진 줄기는 폴더와 상관없이 이 묶음으로 맨 위에 모은다 */
@@ -28,9 +29,13 @@ type Props = {
   onOpenSession: (s: Session) => void;
   /** 찾기 상자를 연다 (⌘K) */
   onSearch: () => void;
+  /** 이 세션이 올린 PR과 그 형편. news는 새로 생긴 일(CI 실패, 새 코멘트 등) */
+  prOf: (key: string) => { target: PrTarget; status: PrStatus; news?: string } | undefined;
+  /** PR에 일이 생긴 세션. 내 차례로 올린다 */
+  prNews: Record<string, string>;
 };
 
-export default function Sidebar({ open, items, threads, byId, states, tasks, changes, pinned, dead, loading, current, shown, filter, onShow, onClose, onOpenSession, onSearch }: Props) {
+export default function Sidebar({ open, items, threads, byId, states, tasks, changes, pinned, dead, loading, current, shown, filter, onShow, onClose, onOpenSession, onSearch, prOf, prNews }: Props) {
   const openIds = new Set(open.map((o) => o.sessionId));
   const cutoff = Date.now() / 1000 - config.recentDays * 86400;
 
@@ -55,7 +60,8 @@ export default function Sidebar({ open, items, threads, byId, states, tasks, cha
   const jobOf = new Map<string, Job>();
   for (const t of tasks) if (t.session && open.some((o) => o.sessionId === t.lead)) jobOf.set(t.session, t);
   // 일감을 기다리는 조율 세션은 일하는 중으로 본다(그 아래에서 일이 돌고 있다)
-  const rankOf = (key: string) => (dead.includes(key) ? 2 : waiting(states[key]) ? 0 : states[key]?.state === "run" || states[key]?.state === "hold" ? 1 : 2);
+  // PR에 일이 생긴 세션도 일하는 중이 아니면 내 차례로 본다
+  const rankOf = (key: string) => (dead.includes(key) ? 2 : waiting(states[key]) || (prNews[key] && states[key]?.state !== "run") ? 0 : states[key]?.state === "run" || states[key]?.state === "hold" ? 1 : 2);
   // 번호(⌘1–⌘9)는 일감을 맡은 세션을 빼고 매긴다
   const tops = open.filter((o) => !jobOf.has(o.sessionId ?? "")).map((o, i) => ({ o, i, rank: rankOf(o.key) })).sort((a, b) => a.rank - b.rank || a.i - b.i);
   const counts = [0, 1].map((rank) => tops.filter((r) => r.rank === rank).length);
@@ -113,6 +119,29 @@ export default function Sidebar({ open, items, threads, byId, states, tasks, cha
                     : [st?.state === "hold" ? `일감 기다리는 중 · ${tasks.filter((t) => t.lead === o.sessionId && (t.status === "대기" || t.status === "하는 중")).length}개` : st?.state === "ask" || st?.state === "dead" ? STATE_LABEL[st.state] : "", s?.repo ?? "", s?.branch ?? "", pinned.includes(o.key) ? "고정" : ""].filter(Boolean).join(" · ")}
                   {s && hot(s.tokens) && <span className="hot" title="세션이 크다. 다음에 보낼 때 갈아탄다"> · {kilo(s.tokens)}</span>}
                 </div>
+                {(() => {
+                  const pr = job ? undefined : prOf(o.key);
+                  if (!pr) return null;
+                  return (
+                    <div
+                      className={"row-meta pr-line" + (pr.news ? " news" : "")}
+                      title="PR 화면 열기"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        openPr(pr.target);
+                      }}
+                    >
+                      PR #{pr.target.number}
+                      {prParts(pr.status).map(([text, loud]) => (
+                        <span key={text} className={loud ? "loud" : ""}>
+                          {" "}
+                          · {text}
+                        </span>
+                      ))}
+                      {pr.news?.startsWith("새 코멘트") && <span className="loud"> · {pr.news}</span>}
+                    </div>
+                  );
+                })()}
                 {changes[o.cwd]?.files > 0 && changes[o.cwd].by === o.sessionId && (
                   <div className="row-meta delta" title={changes[o.cwd].brief?.line ?? "이 세션이 고친 것"}>
                     <span className="lbl">고침 · </span>파일 {changes[o.cwd].files} <b>+{changes[o.cwd].adds}</b> <i>−{changes[o.cwd].dels}</i>

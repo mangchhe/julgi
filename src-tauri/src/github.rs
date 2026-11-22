@@ -63,6 +63,45 @@ pub fn pr_comments(repo: String, number: u64) -> Result<String, String> {
     run(&["api", &format!("repos/{repo}/pulls/{number}/comments?per_page=100")])
 }
 
+/// 세션 줄에 달 PR의 지금 형편. 2분마다 열린 세션의 PR마다 한 번씩 부른다
+#[derive(serde::Serialize)]
+pub struct PrStatus {
+    /// OPEN, CLOSED, MERGED
+    state: String,
+    /// SUCCESS, FAILURE, ERROR, PENDING, EXPECTED, 또는 검사 없음이면 빈 글
+    ci: String,
+    /// APPROVED, CHANGES_REQUESTED, REVIEW_REQUIRED, 또는 빈 글
+    decision: String,
+    /// 나 말고 다른 사람이 쓴 코멘트·리뷰·줄 코멘트 수. 늘면 새 코멘트가 온 것이다
+    others: u32,
+}
+
+#[tauri::command(async)]
+pub fn pr_status(repo: String, number: u64) -> Result<PrStatus, String> {
+    check_repo(&repo)?;
+    let (owner, name) = repo.split_once('/').unwrap_or_default();
+    let query = "query($owner:String!,$name:String!,$number:Int!){viewer{login} repository(owner:$owner,name:$name){pullRequest(number:$number){state reviewDecision commits(last:1){nodes{commit{statusCheckRollup{state}}}} comments(last:100){nodes{author{login}}} reviews(last:100){nodes{author{login}}} reviewThreads(last:100){nodes{comments(last:100){nodes{author{login}}}}}}}}";
+    let out = run(&["api", "graphql", "-f", &format!("query={query}"), "-f", &format!("owner={owner}"), "-f", &format!("name={name}"), "-F", &format!("number={number}")])?;
+    let v: serde_json::Value = serde_json::from_str(&out).map_err(|e| e.to_string())?;
+    status_of(&v).ok_or_else(|| "PR을 찾지 못했다".into())
+}
+
+fn status_of(v: &serde_json::Value) -> Option<PrStatus> {
+    let me = v.pointer("/data/viewer/login")?.as_str()?;
+    let pr = v.pointer("/data/repository/pullRequest")?;
+    let text = |p: &str| pr.pointer(p).and_then(|x| x.as_str()).unwrap_or("").to_owned();
+    let not_me = |list: Option<&serde_json::Value>| {
+        list.and_then(|l| l.as_array()).map_or(0, |l| l.iter().filter(|n| n.pointer("/author/login").and_then(|x| x.as_str()).is_some_and(|who| who != me)).count() as u32)
+    };
+    let threads = pr.pointer("/reviewThreads/nodes").and_then(|t| t.as_array()).map_or(0, |t| t.iter().map(|th| not_me(th.pointer("/comments/nodes"))).sum());
+    Some(PrStatus {
+        state: text("/state"),
+        ci: text("/commits/nodes/0/commit/statusCheckRollup/state"),
+        decision: text("/reviewDecision"),
+        others: not_me(pr.pointer("/comments/nodes")) + not_me(pr.pointer("/reviews/nodes")) + threads,
+    })
+}
+
 // ── 쓰기: GitHub에 글이 올라가고 머지된다. 화면에서 내가 누른 것만 부른다 ──
 
 fn check_body(body: &str) -> Result<(), String> {
@@ -166,5 +205,16 @@ mod tests {
         assert!(check_repo("a/b").is_ok());
         assert!(check_repo("a/b --jq x").is_err());
         assert!(check_repo("a/b/c").is_err());
+    }
+
+    #[test]
+    fn status() {
+        let v: serde_json::Value = serde_json::from_str(r#"{"data":{"viewer":{"login":"me"},"repository":{"pullRequest":{"state":"OPEN","reviewDecision":"CHANGES_REQUESTED",
+            "commits":{"nodes":[{"commit":{"statusCheckRollup":{"state":"FAILURE"}}}]},
+            "comments":{"nodes":[{"author":{"login":"me"}},{"author":{"login":"you"}}]},
+            "reviews":{"nodes":[{"author":{"login":"you"}}]},
+            "reviewThreads":{"nodes":[{"comments":{"nodes":[{"author":{"login":"you"}},{"author":{"login":"me"}}]}}]}}}}}"#).unwrap();
+        let s = status_of(&v).unwrap();
+        assert_eq!((s.state.as_str(), s.ci.as_str(), s.decision.as_str(), s.others), ("OPEN", "FAILURE", "CHANGES_REQUESTED", 3));
     }
 }

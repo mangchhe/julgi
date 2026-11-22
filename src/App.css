@@ -915,3 +915,8 @@ body.dragging .pane-body { pointer-events: none; }
 .md a:hover { text-decoration: underline; }
 .md > :last-child { margin-bottom: 0; }
 .pr-text.md { white-space: normal; }
+/* 세션 줄의 PR 형편. 누르면 PR 화면 */
+.row-meta.pr-line { cursor: pointer; }
+.row-meta.pr-line:hover { color: var(--accent); }
+.row-meta.pr-line .loud { color: var(--wait); font-weight: 600; }
+.row-meta.pr-line.news { color: var(--ink); }

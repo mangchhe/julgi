@@ -18,7 +18,7 @@ import { applyTheme } from "./themes";
 import { CHECK_SYSTEM, CORRECT_SYSTEM, prefsText, CAND_SYSTEM, Candidate as SkillCandidate, formatNote, indexLine, indexText, LEARN_SYSTEM, Note, parseNote, BRIEF_SYSTEM, MAP_SYSTEM, mapDomains, mapItems, recallText, stale, Stats, statOf, SWEEP_SYSTEM, TIDY_SYSTEM } from "./brain";
 import Sidebar from "./Sidebar";
 import PrView from "./PrView";
-import { openPr, prOf, PrTarget } from "./pr";
+import { newsOf, openPr, prOf, PrStatus, PrTarget } from "./pr";
 import * as terms from "./terms";
 import { rank } from "./route";
 import { Brief, Change, Job, MAX_PARALLEL, setMapDirs, setPrefs, markAuto, isAuto, autoList, STATE_LABEL, ago, Item, modelFor, SkillInfo, SkillUse, aboutOf, buildFolders, buildItems, aliveElsewhere, config, elsewhere, enrich, markSlept, setAlive, handoffCommand, Ledger, Merge, mergeCandidates, mergeKey, newCommand, Open, repoOf, resumeCommand, Session, TermState, Thread, waiting, withPrompt } from "./model";
@@ -109,6 +109,12 @@ export default function App() {
   const [drawing, setDrawing] = useState(false);
   const [closing, setClosing] = useState(""); // 닫을지 묻고 있는 세션
   const [prShown, setPrShown] = useState<PrTarget | null>(null); // 펴 둔 PR 화면
+  // 열린 세션이 올린 PR의 형편. "소유자/레포#번호" → 형편
+  const [prs, setPrs] = useState<Record<string, PrStatus>>({});
+  // PR에 봐야 할 일이 생긴 세션: 터미널 키 → 까닭. 그 세션을 보면 풀린다
+  const [prNews, setPrNews] = useState<Record<string, string>>({});
+  // 지난번에 본 PR 형편. 견줘서 새로 생긴 일만 알린다. Julgi를 다시 켜도 이어지게 파일에 둔다
+  const prSeen = useRef<Record<string, PrStatus>>({});
   const [reviews, setReviews] = useState<Review[]>([]); // 점검 기록. 판마다 값과 한 일이 남는다
   const [skillUses, setSkillUses] = useState<SkillUse[]>([]);
   const [skills, setSkills] = useState<SkillInfo[]>([]);
@@ -190,8 +196,8 @@ export default function App() {
   const waitCount = open.filter((o) => waiting(states[o.key])).length;
 
   // 키 처리와 이벤트 콜백은 한 번만 걸고, 최신 상태는 여기서 읽는다
-  const live = useRef({ open, panes, widths, focus, states, overlay, filter, sessions, home, base, fontSize, handing, byId, threads, memories, pinned, items, folders, names, zoom, notes, skills, reviews, acts, skillUses, closing, dead, mapText, skillCands, reviewing });
-  live.current = { open, panes, widths, focus, states, overlay, filter, sessions, home, base, fontSize, handing, byId, threads, memories, pinned, items, folders, names, zoom, notes, skills, reviews, acts, skillUses, closing, dead, mapText, skillCands, reviewing };
+  const live = useRef({ open, panes, widths, focus, states, overlay, filter, sessions, home, base, fontSize, handing, byId, threads, memories, pinned, items, folders, names, zoom, notes, skills, reviews, acts, skillUses, closing, dead, mapText, skillCands, reviewing, prNews });
+  live.current = { open, panes, widths, focus, states, overlay, filter, sessions, home, base, fontSize, handing, byId, threads, memories, pinned, items, folders, names, zoom, notes, skills, reviews, acts, skillUses, closing, dead, mapText, skillCands, reviewing, prNews };
 
   const say = (message: string, ms = 3500) => {
     setToast(message);
@@ -1536,10 +1542,11 @@ export default function App() {
     setDead((list) => [...list, key]);
   };
   const nextWaiting = () => {
-    const { open, states, panes, focus } = live.current;
+    const { open, states, panes, focus, prNews } = live.current;
+    // PR에 일이 생긴 세션도 내 차례다. 답을 기다리는 세션 다음에 둔다
     const queue = open
-      .filter((o) => waiting(states[o.key]) && o.key !== panes[focus])
-      .sort((a, b) => states[a.key].since - states[b.key].since);
+      .filter((o) => (waiting(states[o.key]) || (prNews[o.key] && states[o.key]?.state !== "run")) && o.key !== panes[focus])
+      .sort((a, b) => (states[a.key]?.since ?? Infinity) - (states[b.key]?.since ?? Infinity));
     if (queue.length) show(queue[0].key);
   };
   const cycleFilter = () => {
@@ -1580,8 +1587,69 @@ export default function App() {
     terms.paste(key, `[참고: 다른 세션 "${s.title}" (${s.repo}) 요약] ${summary} `);
   };
 
-  const actions = useRef({ readUsage, publishRemote, say, dispatch, show, close, sleep, requestQuit, handoff, exited, newSession, newShell, nextWaiting, cycleFilter, openTerm, resize, split, unsplit, finishThread, move, togglePin, tend, serve, confirmClose, toggleReview });
-  actions.current = { readUsage, publishRemote, say, dispatch, show, close, sleep, requestQuit, handoff, exited, newSession, newShell, nextWaiting, cycleFilter, openTerm, resize, split, unsplit, finishThread, move, togglePin, tend, serve, confirmClose, toggleReview };
+  /** PR에 일이 생겼다: 기록에 남기고, 창을 안 보고 있으면 알린다. 알림을 누르고 돌아오면 그 세션이 뜬다 */
+  const prNotice = (key: string, text: string) => {
+    const sessionId = live.current.open.find((o) => o.key === key)?.sessionId;
+    record("PR", `${nameOf(key)} · ${text}`, sessionId);
+    if (!config.notify || document.hasFocus()) return;
+    void invoke("notify", { title: nameOf(key).slice(0, 60), body: text });
+    notified.current = { key, at: Date.now() };
+  };
+  const actions = useRef({ readUsage, publishRemote, say, dispatch, show, close, sleep, requestQuit, handoff, exited, newSession, newShell, nextWaiting, cycleFilter, openTerm, resize, split, unsplit, finishThread, move, togglePin, tend, serve, confirmClose, toggleReview, prNotice });
+  actions.current = { readUsage, publishRemote, say, dispatch, show, close, sleep, requestQuit, handoff, exited, newSession, newShell, nextWaiting, cycleFilter, openTerm, resize, split, unsplit, finishThread, move, togglePin, tend, serve, confirmClose, toggleReview, prNotice };
+
+  /** 세션이 남긴 링크 가운데 마지막 PR */
+  const prOfSession = (id?: string) => {
+    const s = id ? live.current.byId.get(id) : undefined;
+    const url = s?.links.slice().reverse().find((u) => prOf(u));
+    return url ? prOf(url) : null;
+  };
+  // 2분마다 열린 세션의 PR을 본다. CI가 깨지거나 남이 코멘트를 달거나 리뷰를 받거나 머지되면 그 세션을 내 차례로 올리고 알린다
+  useEffect(() => {
+    void invoke<string | null>("data_read", { name: "pr-seen.json" }).then((text) => {
+      try {
+        prSeen.current = text ? JSON.parse(text) : {};
+      } catch {
+        prSeen.current = {};
+      }
+    });
+    const poll = async () => {
+      const targets = new Map<string, { target: PrTarget; keys: string[] }>();
+      for (const o of live.current.open) {
+        const target = prOfSession(o.sessionId);
+        if (!target) continue;
+        const id = `${target.repo}#${target.number}`;
+        const entry = targets.get(id) ?? { target, keys: [] };
+        entry.keys.push(o.key);
+        targets.set(id, entry);
+      }
+      const next: Record<string, PrStatus> = {};
+      for (const [id, { target, keys }] of targets) {
+        const now = await invoke<PrStatus>("pr_status", { repo: target.repo, number: target.number }).catch(() => null);
+        if (!now) continue;
+        next[id] = now;
+        const before = prSeen.current[id];
+        const news = before ? newsOf(before, now) : "";
+        prSeen.current[id] = now;
+        if (!news) continue;
+        setPrNews((old) => ({ ...old, ...Object.fromEntries(keys.map((k) => [k, news])) }));
+        actions.current.prNotice(keys[0], `PR #${target.number} ${news}`);
+      }
+      setPrs(next);
+      void invoke("data_write", { name: "pr-seen.json", text: JSON.stringify(prSeen.current) });
+    };
+    const first = setTimeout(() => void poll(), 8000);
+    const timer = setInterval(() => void poll(), 120_000);
+    return () => {
+      clearTimeout(first);
+      clearInterval(timer);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  // PR 일이 생긴 세션을 보면 그 표시는 풀린다
+  useEffect(() => {
+    if (current && prNews[current]) setPrNews(({ [current]: _, ...rest }) => rest);
+  }, [current, prNews]);
 
   useEffect(() => {
     const scan = () =>
@@ -2008,6 +2076,12 @@ export default function App() {
           onClose={sleep}
           onOpenSession={openSession}
           onSearch={() => setOverlay("palette")}
+          prOf={(key) => {
+            const target = prOfSession(open.find((o) => o.key === key)?.sessionId);
+            const status = target ? prs[`${target.repo}#${target.number}`] : undefined;
+            return target && status ? { target, status, news: prNews[key] } : undefined;
+          }}
+          prNews={prNews}
         />
       )}
       <div
