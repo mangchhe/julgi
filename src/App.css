@@ -926,3 +926,4 @@ body.dragging .pane-body { pointer-events: none; }
 .set-row.keys .set-value { display: none; }
 .set-kbd { flex: none; min-width: 110px; font-family: ui-monospace, Menlo, monospace; font-size: 12px; color: var(--accent); background: none; border: 0; }
 .set-row.keys .set-note { color: var(--ink); font-size: 13px; margin: 0; }
+.qu:focus { outline: none; }

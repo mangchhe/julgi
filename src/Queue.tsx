@@ -51,7 +51,9 @@ export default function Queue({ rows, asks, mine, onView, onHand, onAnswer, onOp
   const [replies, setReplies] = useState<Record<string, string>>({});
   const [text, setText] = useState("");
   const input = useRef<HTMLTextAreaElement>(null);
-  useEffect(() => input.current?.focus(), [row?.key, ask?.url]);
+  const box = useRef<HTMLDivElement>(null);
+  // 입력칸이 없는 줄(내 PR)을 골랐을 때도 키가 이 창으로 오게, 입력칸이 없으면 창 자체에 포커스를 둔다
+  useEffect(() => (input.current ?? box.current)?.focus(), [row?.key, ask?.url]);
   useEffect(() => {
     if (!row?.sessionId || replies[row.key] !== undefined) return;
     const key = row.key;
@@ -96,9 +98,9 @@ export default function Queue({ rows, asks, mine, onView, onHand, onAnswer, onOp
 
   return (
     <div className="pal-back wide" onMouseDown={onClose}>
-      <div className="qu" onMouseDown={(e) => e.stopPropagation()} onKeyDown={onKey}>
+      <div className="qu" ref={box} tabIndex={-1} onMouseDown={(e) => e.stopPropagation()} onKeyDown={onKey}>
         <div className="qu-list">
-          <div className="qu-head">내 차례 {list.length}</div>
+          {list.length > 0 && <div className="qu-head">내 차례 {list.length}</div>}
           {list.map((r, i) => (
             <button key={r.key} type="button" tabIndex={-1} className={"qu-row" + (r.key === row?.key ? " on" : "")} onClick={() => (setAt(i), setText(""))}>
               <b>{r.name}</b>
