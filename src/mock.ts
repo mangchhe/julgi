@@ -129,7 +129,7 @@ async function invoke(cmd: string, args: Record<string, unknown> = {}): Promise<
     case "pr_view":
       return JSON.stringify({
         number: 1852, title: "쿠폰 여러 장일 때 환불액 1원 어긋남 수정", body: "## 무엇을\n쿠폰마다 따로 반올림한 뒤 더한다.\n\n## 확인\n- RefundCalculatorTest 추가", author: { login: "me" },
-        state: "OPEN", isDraft: false, baseRefName: "develop", headRefName: "fix/refund-rounding", url: "https://github.com/example/api-server/pull/1852",
+        state: "OPEN", isDraft: false, baseRefName: "develop", headRefName: "fix/refund-rounding", headRefOid: "5d6e7f8", mergeable: "MERGEABLE", url: "https://github.com/example/api-server/pull/1852",
         reviewDecision: "CHANGES_REQUESTED", additions: 14, deletions: 2, changedFiles: 2, createdAt: new Date(Date.now() - 7200_000).toISOString(),
         statusCheckRollup: [{ __typename: "CheckRun", name: "build", status: "COMPLETED", conclusion: "SUCCESS" }, { __typename: "CheckRun", name: "test", status: "COMPLETED", conclusion: "FAILURE" }],
         comments: [{ author: { login: "teammate" }, body: "배포 전에 스테이지에서 한 번 돌려 볼게요.", createdAt: new Date(Date.now() - 3600_000).toISOString() }],

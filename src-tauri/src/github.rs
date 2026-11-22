@@ -45,7 +45,7 @@ pub fn gh_status() -> (bool, String) {
 #[tauri::command(async)]
 pub fn pr_view(repo: String, number: u64) -> Result<String, String> {
     check_repo(&repo)?;
-    let fields = "number,title,body,author,state,isDraft,baseRefName,headRefName,url,reviewDecision,statusCheckRollup,additions,deletions,changedFiles,comments,reviews,mergeable,createdAt";
+    let fields = "number,title,body,author,state,isDraft,baseRefName,headRefName,headRefOid,url,reviewDecision,statusCheckRollup,additions,deletions,changedFiles,comments,reviews,mergeable,createdAt";
     run(&["pr", "view", &number.to_string(), "-R", &repo, "--json", fields])
 }
 
@@ -61,6 +61,83 @@ pub fn pr_diff(repo: String, number: u64) -> Result<String, String> {
 pub fn pr_comments(repo: String, number: u64) -> Result<String, String> {
     check_repo(&repo)?;
     run(&["api", &format!("repos/{repo}/pulls/{number}/comments?per_page=100")])
+}
+
+// ── 쓰기: GitHub에 글이 올라가고 머지된다. 화면에서 내가 누른 것만 부른다 ──
+
+fn check_body(body: &str) -> Result<(), String> {
+    if body.trim().is_empty() { Err("쓸 말이 비었다".into()) } else { Ok(()) }
+}
+
+/// PR에 코멘트 하나 (대화에)
+#[tauri::command(async)]
+pub fn pr_comment(repo: String, number: u64, body: String) -> Result<(), String> {
+    check_repo(&repo)?;
+    check_body(&body)?;
+    run(&["pr", "comment", &number.to_string(), "-R", &repo, "--body", &body]).map(|_| ())
+}
+
+/// 코드 줄에 코멘트 하나. side는 RIGHT(바뀐 뒤 줄) 또는 LEFT(바뀌기 전 줄), commit은 PR의 지금 머리 커밋
+#[tauri::command(async)]
+pub fn pr_line_comment(repo: String, number: u64, commit: String, path: String, line: u64, side: String, body: String) -> Result<(), String> {
+    check_repo(&repo)?;
+    check_body(&body)?;
+    if commit.is_empty() || !commit.chars().all(|c| c.is_ascii_hexdigit()) || path.is_empty() || path.contains('\n') || !(side == "RIGHT" || side == "LEFT") {
+        return Err("줄 코멘트를 달 자리가 이상하다".into());
+    }
+    let api = format!("repos/{repo}/pulls/{number}/comments");
+    let fields = [format!("body={body}"), format!("commit_id={commit}"), format!("path={path}"), format!("side={side}")];
+    let line = format!("line={line}");
+    run(&["api", "-X", "POST", &api, "-f", &fields[0], "-f", &fields[1], "-f", &fields[2], "-f", &fields[3], "-F", &line]).map(|_| ())
+}
+
+/// 줄 코멘트 스레드에 답글
+#[tauri::command(async)]
+pub fn pr_reply(repo: String, number: u64, id: u64, body: String) -> Result<(), String> {
+    check_repo(&repo)?;
+    check_body(&body)?;
+    let field = format!("body={body}");
+    run(&["api", "-X", "POST", &format!("repos/{repo}/pulls/{number}/comments/{id}/replies"), "-f", &field]).map(|_| ())
+}
+
+/// 리뷰를 낸다. kind: approve(승인), request-changes(수정 요청), comment(의견만)
+#[tauri::command(async)]
+pub fn pr_review(repo: String, number: u64, kind: String, body: String) -> Result<(), String> {
+    check_repo(&repo)?;
+    let flag = match kind.as_str() {
+        "approve" => "--approve",
+        "request-changes" => "--request-changes",
+        "comment" => "--comment",
+        _ => return Err(format!("모르는 리뷰: {kind}")),
+    };
+    // 수정 요청과 의견에는 글이 있어야 한다. 승인은 글 없이도 된다
+    if kind != "approve" {
+        check_body(&body)?;
+    }
+    let n = number.to_string();
+    let mut args = vec!["pr", "review", &n, "-R", &repo, flag];
+    if !body.trim().is_empty() {
+        args.extend(["--body", &body]);
+    }
+    run(&args).map(|_| ())
+}
+
+/// 머지한다. method: squash, merge, rebase
+#[tauri::command(async)]
+pub fn pr_merge(repo: String, number: u64, method: String, delete_branch: bool) -> Result<(), String> {
+    check_repo(&repo)?;
+    let flag = match method.as_str() {
+        "squash" => "--squash",
+        "merge" => "--merge",
+        "rebase" => "--rebase",
+        _ => return Err(format!("모르는 머지 방식: {method}")),
+    };
+    let n = number.to_string();
+    let mut args = vec!["pr", "merge", &n, "-R", &repo, flag];
+    if delete_branch {
+        args.push("--delete-branch");
+    }
+    run(&args).map(|_| ())
 }
 
 /// 폴더의 원격이 GitHub이면 "소유자/레포"

@@ -711,9 +711,9 @@ body.dragging .pane-body { pointer-events: none; }
 .set-switch.yes span { color: var(--ink); }
 /* 여럿 가운데 하나 */
 .set-seg { display: inline-flex; border: 1px solid var(--line); border-radius: 7px; overflow: hidden; background: var(--surface); }
-.set-value .set-seg button { border: 0; border-left: 1px solid var(--line); border-radius: 0; background: none; padding: 5px 12px; font-size: 12px; color: var(--muted); cursor: pointer; }
-.set-value .set-seg button:first-child { border-left: 0; }
-.set-value .set-seg button.yes { background: var(--accent); color: var(--bg); font-weight: 600; }
+.set-value .set-seg button, .pr-merge .set-seg button { border: 0; border-left: 1px solid var(--line); border-radius: 0; background: none; padding: 5px 12px; font-size: 12px; color: var(--muted); cursor: pointer; }
+.set-value .set-seg button:first-child, .pr-merge .set-seg button:first-child { border-left: 0; }
+.set-value .set-seg button.yes, .pr-merge .set-seg button.yes { background: var(--accent); color: var(--bg); font-weight: 600; }
 /* 숫자 */
 .set-stepper { display: inline-flex; align-items: center; border: 1px solid var(--line); border-radius: 7px; overflow: hidden; background: var(--surface); }
 .set-value .set-stepper .set-step { width: 28px; height: 28px; border: 0; border-radius: 0; background: none; color: var(--muted); font-size: 14px; }
@@ -883,4 +883,35 @@ body.dragging .pane-body { pointer-events: none; }
 .rv-msg b { font-size: 13px; }
 .rv-msg small { color: var(--muted); font-family: ui-monospace, Menlo, monospace; font-size: 11px; }
 .rv-msg-body { white-space: pre-wrap; line-height: 1.5; color: color-mix(in srgb, var(--ink) 80%, var(--muted)); max-height: 30vh; overflow-y: auto; -webkit-user-select: text; user-select: text; }
-.pr-thread { max-width: 760px; position: sticky; left: 104px; }
+.rv-code { container-type: inline-size; }
+.pr-thread { max-width: min(760px, calc(100cqw - 120px)); position: sticky; left: 104px; box-sizing: border-box; }
+/* PR 화면의 쓰기: 줄 코멘트·답글 상자, 대화 칸 아래 코멘트·리뷰, 머지 */
+.pr-draft { padding: 6px 10px 8px; }
+.pr-draft textarea, .pr-say textarea { width: 100%; box-sizing: border-box; font: 13px/1.5 -apple-system, "Apple SD Gothic Neo", system-ui, sans-serif; color: var(--ink); background: var(--bg); border: 1px solid var(--line); border-radius: 6px; padding: 6px 9px; outline: none; resize: vertical; }
+.pr-draft textarea:focus, .pr-say textarea:focus { border-color: var(--accent); }
+.pr-acts { display: flex; gap: 6px; margin-top: 6px; }
+.pr-acts button, .pr-merge button, .pr-reply { font: inherit; font-size: 12px; color: var(--ink); background: var(--surface); border: 1px solid var(--line); border-radius: 6px; padding: 3px 10px; cursor: pointer; }
+.pr-acts button:disabled, .pr-merge button:disabled { opacity: 0.45; cursor: default; }
+.pr-acts .primary, .pr-merge .primary { background: var(--accent); border-color: var(--accent); color: var(--bg); font-weight: 600; }
+.pr-acts .ok { border-color: var(--ok); color: var(--ok); }
+.pr-acts .bad { border-color: var(--wait); color: var(--wait); }
+.pr-reply { margin: 0 10px 8px; font-size: 11.5px; color: var(--muted); }
+.pr-reply:hover { color: var(--ink); border-color: var(--accent); }
+.pr-say { position: sticky; bottom: 0; background: var(--bg); padding: 10px 4px 4px; border-top: 1px solid var(--line); margin-top: 6px; }
+.pr-merge { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; font-size: 12px; padding: 6px 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); }
+.pr-merge label { display: inline-flex; align-items: center; gap: 4px; color: var(--muted); }
+.pr-merge-btn { border-color: var(--ok) !important; color: var(--ok) !important; }
+/* PR 본문·코멘트의 마크다운 */
+.md p { margin: 0 0 6px; }
+.md h3, .md h4, .md h5, .md h6 { margin: 8px 0 4px; font-size: 13px; }
+.md h3 { font-size: 14px; }
+.md ul, .md ol { margin: 2px 0 6px; padding-left: 20px; }
+.md li { margin: 1px 0; }
+.md code { font-family: ui-monospace, Menlo, monospace; font-size: 11.5px; background: var(--surface); border: 1px solid var(--line); border-radius: 4px; padding: 0 4px; }
+.md pre { margin: 4px 0 8px; padding: 8px 10px; background: var(--surface); border: 1px solid var(--line); border-radius: 6px; overflow-x: auto; }
+.md pre code { border: 0; padding: 0; background: none; white-space: pre; }
+.md blockquote { margin: 2px 0 6px; padding-left: 8px; border-left: 2px solid var(--line); color: var(--muted); }
+.md a { color: var(--accent); text-decoration: none; }
+.md a:hover { text-decoration: underline; }
+.md > :last-child { margin-bottom: 0; }
+.pr-text.md { white-space: normal; }
