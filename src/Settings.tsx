@@ -21,7 +21,8 @@ const SECTIONS: { title: string; hint: string; rows: Row[] }[] = [
     rows: [
     { kind: "theme", label: "테마", note: "화면과 터미널의 색" },
     { kind: "number", key: "recentDays", label: "목록에 보이는 기간", note: "이보다 오래 안 쓴 잠든 세션은 목록에서 빼고 ⌘K로만 찾는다", step: 1, min: 1, max: 90, show: (n) => `${n}일` },
-    { kind: "toggle", key: "notify", label: "알림", note: "Julgi 창을 안 보고 있을 때 세션이 답을 끝내거나 확인을 물으면 macOS 알림을 띄운다" },
+    { kind: "toggle", key: "usage", label: "Claude 사용량 보기", note: "아래 상태 줄에 5시간 창과 주간 한도를 얼마나 썼는지 보여 준다. 켜면 Claude Code의 로그인 토큰을 키체인에서 읽어 Anthropic의 사용량 주소에만 보낸다(처음에 키체인이 허락을 묻는다). 문서에 없는 주소라 어느 날 안 나올 수 있다" },
+      { kind: "toggle", key: "notify", label: "알림", note: "Julgi 창을 안 보고 있을 때 세션이 답을 끝내거나 확인을 물으면 macOS 알림을 띄운다" },
     { kind: "toggle", key: "confirmClose", label: "닫기 전에 묻기", note: "⌘W나 ×로 세션을 닫을 때 한 번 묻는다" },
     { kind: "key", key: "hotkey", label: "창 꺼내기 키", note: "어느 앱에서든 Julgi 창을 꺼내고 다시 넣는 키. Enter를 누른 뒤 쓸 키 조합을 누른다. Backspace면 쓰지 않는다" },
     ],
@@ -32,7 +33,8 @@ const SECTIONS: { title: string; hint: string; rows: Row[] }[] = [
     rows: [
     { kind: "number", key: "hotTokens", label: "갈아타는 크기", note: "이보다 큰 세션에 보낼 때는 인계 글만 들고 새 세션으로 넘어간 뒤 보낸다. 대화 한도가 200k면 150k, 1M이면 500k쯤이 맞다", step: 50_000, min: 50_000, max: 2_000_000, show: (n) => kilo(n) },
     { kind: "number", key: "sleepHours", label: "알아서 재우기", note: "답까지 본 뒤 이 시간 넘게 쉰 세션을 재운다", step: 1, min: 0, max: 48, show: (n) => (n ? `${n}시간` : "안 재움") },
-    { kind: "toggle", key: "autoFill", label: "칸 알아서 관리", note: "내 차례인 세션을 칸에 올리고, 자리가 있으면 칸을 늘리고, 빈 칸은 없앤다" },
+    { kind: "number", key: "memoryLimitGb", label: "메모리 한도", note: "세션들이 쓰는 메모리 합계가 이만큼을 넘으면, 답까지 보고 10분 넘게 쉰 세션을 오래 쉰 것부터 재운다. 칸에 떠 있는 세션, 고정한 세션, 일하는 중인 세션은 건드리지 않는다", step: 1, min: 0, max: 64, show: (n) => (n ? `${n}GB` : "안 씀") },
+      { kind: "toggle", key: "autoFill", label: "칸 알아서 관리", note: "내 차례인 세션을 칸에 올리고, 자리가 있으면 칸을 늘리고, 빈 칸은 없앤다" },
     { kind: "pick", key: "skipPermissions", label: "허락 묻지 않기", note: "세션이 파일을 고치거나 명령을 돌릴 때 허락을 묻지 않게 띄운다(--dangerously-skip-permissions). \"내가 연 세션만\"은 Julgi가 알아서 띄운 세션(일감, 스킬 만들기, 폰이나 다른 세션이 던진 일)은 그대로 묻게 둔다. 이미 떠 있는 세션은 다시 열어야 바뀐다", options: [["off", "묻는다"], ["mine", "내가 연 세션만"], ["all", "전부"]] },
     { kind: "text", key: "defaultDir", label: "기본 폴더", note: "레포가 드러나지 않는 일을 여는 폴더", hint: "비우면 ~/julgi" },
     { kind: "text", key: "saveCommand", label: "⌘S가 보내는 말", note: "⌘S를 누르면 지금 세션에 이 말을 보낸다", hint: "예: /commit" },

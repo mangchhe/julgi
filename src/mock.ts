@@ -41,6 +41,14 @@ async function invoke(cmd: string, args: Record<string, unknown> = {}): Promise<
               ],
             }
           : null;
+    case "term_load":
+      return Object.fromEntries([1, 2, 3, 4, 5, 6].map((id) => [id, [260_000 + id * 61_000, id === 1 ? 14.2 : 0.1]]));
+    case "claude_usage":
+      return [
+        { name: "5시간", used: 24, resets: Math.floor(Date.now() / 1000) + 8820 },
+        { name: "주간", used: 64, resets: Math.floor(Date.now() / 1000) + 65_000 },
+        { name: "주간 Fable", used: 99, resets: Math.floor(Date.now() / 1000) + 65_000 },
+      ];
     case "last_reply":
       return "주문 다수 삭제 요청의 관련 테이블을 확인했습니다.\n\n- orders: 대상 132건\n- stock_count: 상품·옵션별 재고 카운터 41행이 같이 줄어야 합니다\n- 이력 테이블은 FK가 없어 그대로 둬도 됩니다\n\n삭제는 한 트랜잭션으로 묶었고, 실행 전에 같은 조건의 SELECT로 건수를 다시 확인하게 했습니다.\n\n이력 테이블의 행도 같이 지울까요, 아니면 감사용으로 남겨둘까요? 남기면 취소 사유 컬럼에 \"일괄 삭제\"를 적어 두겠습니다.";
     case "repo_commits":
@@ -56,7 +64,7 @@ async function invoke(cmd: string, args: Record<string, unknown> = {}): Promise<
     case "repo_diff":
       return flags.has("review") ? 'diff --git a/src/refund/RefundCalculator.kt b/src/refund/RefundCalculator.kt\nindex 1a2b3c4..5d6e7f8 100644\n--- a/src/refund/RefundCalculator.kt\n+++ b/src/refund/RefundCalculator.kt\n@@ -84,9 +84,12 @@ class RefundCalculator(private val policy: RefundPolicy) {\n     fun refund(order: Order): Money {\n         val paid = order.paidAmount\n-        val discount = order.coupons.sumOf { it.amount }\n-        return (paid - discount).roundToWon()\n+        // 쿠폰마다 따로 반올림한 뒤 더한다. 한꺼번에 반올림하면 1원이 어긋난다\n+        val discount = order.coupons.sumOf { it.amount.roundToWon() }\n+        val refund = paid - discount\n+        require(refund >= Money.ZERO) { "환불액이 음수다: $refund" }\n+        return refund\n     }\n \n     private fun Money.roundToWon(): Money = Money(amount.setScale(0, RoundingMode.HALF_UP))\ndiff --git a/src/refund/RefundCalculatorTest.kt b/src/refund/RefundCalculatorTest.kt\nnew file mode 100644\nindex 0000000..9f8e7d6\n--- /dev/null\n+++ b/src/refund/RefundCalculatorTest.kt\n@@ -0,0 +1,9 @@\n+class RefundCalculatorTest {\n+    @Test\n+    fun `쿠폰 두 개가 겹쳐도 1원이 어긋나지 않는다`() {\n+        val order = orderWith(paid = 10_000, coupons = listOf(333.3, 333.3))\n+\n+        assertEquals(Money(9_334), RefundCalculator(policy).refund(order))\n+    }\n+}\n+' : null;
     case "config_load":
-      return flags.has("theme") ? JSON.stringify({ theme: flags.get("theme") }) : null;
+      return JSON.stringify({ ...(flags.has("theme") ? { theme: flags.get("theme") } : {}), usage: flags.has("usage") });
     case "layout_load": {
       if (!flags.has("open")) return null;
       const sessions = await fetch("/mock-ledger.json").then((r) => r.json());

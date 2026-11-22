@@ -26,7 +26,7 @@ struct Seen {
 }
 
 /// "2026-11-22T08:09:33.123Z" → 초
-fn seconds(stamp: &str) -> Option<u64> {
+pub(crate) fn seconds(stamp: &str) -> Option<u64> {
     let num = |range: std::ops::Range<usize>| stamp.get(range)?.parse::<i64>().ok();
     let (y, m, d) = (num(0..4)?, num(5..7)?, num(8..10)?);
     let (h, min, s) = (num(11..13)?, num(14..16)?, num(17..19)?);

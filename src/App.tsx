@@ -6,6 +6,7 @@ import { listen } from "@tauri-apps/api/event";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import Help from "./Help";
 import Queue from "./Queue";
+import Status from "./Status";
 import History, { Act } from "./History";
 import Pane from "./Pane";
 import Palette, { Pick } from "./Palette";
@@ -995,6 +996,36 @@ export default function App() {
   };
   /** ⌘W: 지금 세션을 재운다. 일하는 중이면 한 번 더 눌러야 한다 */
   /** 설정 하나를 바꾸고 파일에 남긴다 */
+  // 아래 상태 줄: 세션마다 쓰는 메모리와 CPU, 그리고 Claude 구독 사용량
+  const [load, setLoad] = useState<Record<string, [number, number]>>({});
+  const loadRef = useRef<{ at: number; rows: Record<string, [number, number]>; sleptAt: number }>({ at: 0, rows: {}, sleptAt: 0 });
+  const [usage, setUsage] = useState<{ name: string; used: number; resets: number }[] | null>(null);
+  const [usageWhy, setUsageWhy] = useState("");
+  const [loadOpen, setLoadOpen] = useState(false);
+  const readLoad = () =>
+    void invoke<Record<string, [number, number]>>("term_load").then((raw) => {
+      const rows: Record<string, [number, number]> = {};
+      for (const o of live.current.open) {
+        const hit = raw[String(terms.idOf(o.key))];
+        if (hit) rows[o.key] = hit;
+      }
+      loadRef.current = { ...loadRef.current, at: Date.now(), rows };
+      setLoad(rows);
+    }, () => {});
+  const readUsage = () => {
+    if (!config.usage) return setUsage(null);
+    void invoke<{ name: string; used: number; resets: number }[]>("claude_usage").then(
+      (list) => (setUsage(list), setUsageWhy("")),
+      (why) => setUsageWhy(String(why)),
+    );
+  };
+  useEffect(() => {
+    readLoad();
+    const fast = setInterval(readLoad, 10_000);
+    const slow = setInterval(() => actions.current.readUsage(), 5 * 60_000);
+    return () => (clearInterval(fast), clearInterval(slow));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   // 폰용 화면. 켜면 주소를 받아 설정에 보여 주고, 끄면 받지 않게 한다
   const [remoteUrl, setRemoteUrl] = useState("");
   const applyRemote = () => {
@@ -1018,6 +1049,7 @@ export default function App() {
   const setConfig = (key: keyof typeof config, value: string | number | boolean) => {
     Object.assign(config, { [key]: value });
     if (key === "remote") applyRemote();
+    if (key === "usage") readUsage();
     if (key === "theme") applyTheme(String(value));
     // 창 꺼내기 키는 바꾸는 즉시 다시 건다. 다른 앱이 쓰는 키면 알려 준다
     if (key === "hotkey") void invoke("set_hotkey", { shortcut: String(value) }).catch((e) => say(`그 키는 쓸 수 없다: ${String(e).slice(0, 80)}`, 6000));
@@ -1446,6 +1478,22 @@ export default function App() {
         handoff(o.key);
       } else if (st?.state === "wait" && now - st.since > NOTE_AFTER_MS) void summarize(o.sessionId);
     }
+    // 메모리가 한도를 넘으면 시간을 기다리지 않고 재운다. 잰 값 하나에 하나씩만: 재운 것이 다음 잰 값에 반영된 뒤 다시 본다
+    const mem = loadRef.current;
+    const total = Object.values(mem.rows).reduce((sum, [rss]) => sum + rss, 0) / 1_048_576;
+    if (config.memoryLimitGb > 0 && total > config.memoryLimitGb && mem.at > mem.sleptAt && now - startedAt.current > 120_000) {
+      const idle = (o: Open) => Math.min(terms.idle(o.key), now - (shownAt.current[o.key] ?? 0));
+      const pick = open
+        .filter((o) => o.key.startsWith("c:") && !panes.includes(o.key) && !handing.includes(o.key) && !pinned.includes(o.key))
+        // 답까지 본 세션이거나, 켠 뒤로 한 번도 안 띄운 세션만
+        .filter((o) => (states[o.key] ? states[o.key].state === "wait" && seen.current[o.key] === states[o.key].since : true) && idle(o) > 600_000)
+        .sort((a, b) => idle(b) - idle(a))[0];
+      if (pick) {
+        mem.sleptAt = now;
+        record("재움", `"${nameOf(pick.key)}" · 세션들의 메모리가 ${total.toFixed(1)}GB로 한도 ${config.memoryLimitGb}GB를 넘어서 (이 세션 ${((mem.rows[pick.key]?.[0] ?? 0) / 1024).toFixed(0)}MB)`, pick.sessionId);
+        close(pick.key);
+      }
+    }
     if (config.sleepHours > 0)
       for (const o of open) {
         const st = states[o.key];
@@ -1507,8 +1555,8 @@ export default function App() {
     terms.paste(key, `[참고: 다른 세션 "${s.title}" (${s.repo}) 요약] ${summary} `);
   };
 
-  const actions = useRef({ publishRemote, say, dispatch, show, close, sleep, requestQuit, handoff, exited, newSession, newShell, nextWaiting, cycleFilter, openTerm, resize, split, unsplit, finishThread, move, togglePin, tend, serve, confirmClose, toggleReview });
-  actions.current = { publishRemote, say, dispatch, show, close, sleep, requestQuit, handoff, exited, newSession, newShell, nextWaiting, cycleFilter, openTerm, resize, split, unsplit, finishThread, move, togglePin, tend, serve, confirmClose, toggleReview };
+  const actions = useRef({ readUsage, publishRemote, say, dispatch, show, close, sleep, requestQuit, handoff, exited, newSession, newShell, nextWaiting, cycleFilter, openTerm, resize, split, unsplit, finishThread, move, togglePin, tend, serve, confirmClose, toggleReview });
+  actions.current = { readUsage, publishRemote, say, dispatch, show, close, sleep, requestQuit, handoff, exited, newSession, newShell, nextWaiting, cycleFilter, openTerm, resize, split, unsplit, finishThread, move, togglePin, tend, serve, confirmClose, toggleReview };
 
   useEffect(() => {
     const scan = () =>
@@ -1666,6 +1714,7 @@ export default function App() {
         if (json) Object.assign(config, JSON.parse(json));
         applyTheme(config.theme);
         applyRemote();
+        readUsage();
         setConfigTick((n) => n + 1);
         scan(); // 설정에 따라 달라지는 것(레포 이름 규칙, 작업 목록 명령)을 반영한다
       } catch {
@@ -2130,6 +2179,16 @@ export default function App() {
           </div>
         </div>
       )}
+      <Status
+        rows={open.map((o) => ({ key: o.key, name: nameOf(o.key), repo: repoOf(o.cwd), rss: load[o.key]?.[0] ?? 0, cpu: load[o.key]?.[1] ?? 0, state: states[o.key]?.state ?? "" }))}
+        limit={config.memoryLimitGb}
+        usage={config.usage ? usage : null}
+        usageWhy={config.usage ? usageWhy : ""}
+        open={loadOpen}
+        onToggle={() => setLoadOpen((v) => !v)}
+        onShow={(key) => (setLoadOpen(false), show(key))}
+        onRefresh={readUsage}
+      />
       {toast && <div className="toast">{toast}</div>}
     </div>
   );

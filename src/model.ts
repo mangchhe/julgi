@@ -284,6 +284,10 @@ export const config = {
   remotePort: 4747,
   /** 세션이 파일을 고치거나 명령을 돌릴 때 허락을 묻지 않게 띄운다(--dangerously-skip-permissions). off: 묻는다, mine: 내가 연 세션만 안 묻는다, all: Julgi가 알아서 띄운 세션(일감, 스킬, 폰에서 던진 일)까지 전부 */
   skipPermissions: "off",
+  /** 아래 상태 줄에 Claude 구독 사용량(5시간 창, 주간)을 보여 준다. Claude Code의 로그인 토큰을 읽어 Anthropic의 사용량 주소를 부른다 */
+  usage: false,
+  /** 세션들이 쓰는 메모리 합계가 이만큼(GB)을 넘으면, 답까지 보고 쉬는 세션을 오래 쉰 것부터 시간을 기다리지 않고 재운다. 0이면 안 한다 */
+  memoryLimitGb: 8,
   /** 세션을 닫기 전에 한 번 묻는다 */
   confirmClose: true,
   /** 화면 색. 설정(⌘,)에서 고른다 */

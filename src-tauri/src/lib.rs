@@ -2,6 +2,7 @@ mod habits;
 mod ledger;
 mod remote;
 mod skills;
+mod usage;
 mod work;
 
 use std::{
@@ -157,6 +158,40 @@ fn pty_kill(state: State<Ptys>, id: u32) {
 }
 
 /// 살아 있는 터미널마다 훅이 적어 둔 상태와 그 시각. 훅이 없는 터미널(셸)은 빠진다.
+/// 터미널마다 그 안에서 도는 프로세스 전부(셸, claude, 그 자식들)가 쓰는 메모리(KB)와 CPU(%)
+#[tauri::command(async)]
+fn term_load(state: State<Ptys>) -> HashMap<u32, (u64, f32)> {
+    let roots: Vec<(u32, u32)> = state.0.lock().unwrap().iter().filter_map(|(id, s)| Some((*id, s.child.process_id()?))).collect();
+    let Ok(out) = std::process::Command::new("ps").args(["-axo", "pid=,ppid=,rss=,pcpu="]).output() else { return HashMap::new() };
+    // pid → (부모, 메모리, CPU)
+    let mut rows: HashMap<u32, (u32, u64, f32)> = HashMap::new();
+    for line in String::from_utf8_lossy(&out.stdout).lines() {
+        let mut cols = line.split_whitespace();
+        let (Some(pid), Some(ppid), Some(rss), Some(cpu)) = (cols.next(), cols.next(), cols.next(), cols.next()) else { continue };
+        if let (Ok(pid), Ok(ppid)) = (pid.parse(), ppid.parse()) {
+            rows.insert(pid, (ppid, rss.parse().unwrap_or(0), cpu.parse().unwrap_or(0.0)));
+        }
+    }
+    let mut kids: HashMap<u32, Vec<u32>> = HashMap::new();
+    for (pid, (ppid, _, _)) in &rows {
+        kids.entry(*ppid).or_default().push(*pid);
+    }
+    let mut out = HashMap::new();
+    for (id, root) in roots {
+        let (mut rss, mut cpu) = (0u64, 0f32);
+        let mut stack = vec![root];
+        while let Some(pid) = stack.pop() {
+            if let Some((_, r, c)) = rows.get(&pid) {
+                rss += r;
+                cpu += c;
+            }
+            stack.extend(kids.get(&pid).into_iter().flatten().copied());
+        }
+        out.insert(id, (rss, cpu));
+    }
+    out
+}
+
 #[tauri::command]
 fn term_states(state: State<Ptys>) -> HashMap<u32, (String, u64)> {
     let mut out = HashMap::new();
@@ -723,7 +758,7 @@ pub fn run() {
             Ok(())
         })
         .manage(Ptys::default())
-        .invoke_handler(tauri::generate_handler![pty_spawn, pty_write, pty_resize, pty_kill, clipboard_paste, term_states, log_line, env_flag, home_dir, layout_load, layout_save, handoff_write, config_load, sessions_elsewhere, app_exit, data_read, data_write, data_append, data_remove, brain_load, notify, set_hotkey, repo_peek, repo_refs, repo_sync, git_siblings, route_ask, memory_load, inbox_take, default_dir, dirs_exist, ledger::last_reply, ledger::last_exchange, ledger::ledger_scan, remote::remote_start, remote::remote_stop, remote::remote_publish, habits::habits, habits::corrections, skills::skill_usage, skills::skills_list, skills::skill_apply, skills::skill_retire, work::worktree_add, work::worktree_drop, work::repo_changes, work::repo_stat, work::repo_has, work::repo_snapshot, work::repo_diff, work::repo_state, work::repo_mrs, work::repo_commits])
+        .invoke_handler(tauri::generate_handler![pty_spawn, pty_write, pty_resize, pty_kill, clipboard_paste, term_states, log_line, env_flag, home_dir, layout_load, layout_save, handoff_write, config_load, sessions_elsewhere, app_exit, data_read, data_write, data_append, data_remove, brain_load, notify, set_hotkey, repo_peek, repo_refs, repo_sync, git_siblings, route_ask, memory_load, inbox_take, default_dir, dirs_exist, ledger::last_reply, ledger::last_exchange, ledger::ledger_scan, remote::remote_start, remote::remote_stop, remote::remote_publish, usage::claude_usage, term_load, habits::habits, habits::corrections, skills::skill_usage, skills::skills_list, skills::skill_apply, skills::skill_retire, work::worktree_add, work::worktree_drop, work::repo_changes, work::repo_stat, work::repo_has, work::repo_snapshot, work::repo_diff, work::repo_state, work::repo_mrs, work::repo_commits])
         .build(tauri::generate_context!())
         .expect("error while running tauri application")
         .run(|app, event| {

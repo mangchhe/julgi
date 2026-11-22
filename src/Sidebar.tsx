@@ -70,10 +70,17 @@ export default function Sidebar({ open, items, threads, byId, states, tasks, cha
   return (
     <aside className="side">
       <div className="side-head">
-        <span>{filter ? `Julgi · ${filter}` : "Julgi"}</span>
-        <span className="side-head-right">
-          <span className={"waitcount" + (waitCount ? "" : " zero")}>{waitCount ? `내 차례 ${waitCount}` : "내 차례 없음"}</span>
+        {/* 앱 이름은 창 맨 윗줄에 있다. 여기에는 지금 형편을 숫자로 둔다 */}
+        <span className={"side-stat wait" + (waitCount ? "" : " zero")} title="내 답을 기다리는 세션 (⌘J)">
+          <i className="dot wait" />내 차례 <b>{waitCount}</b>
         </span>
+        <span className={"side-stat run" + (counts[1] ? "" : " zero")} title="일하는 중인 세션">
+          <i className="dot run" />일하는 중 <b>{counts[1]}</b>
+        </span>
+        <span className="side-stat zero" title="열려 있는 세션">
+          열림 <b>{open.length}</b>
+        </span>
+        {filter && <span className="side-filter" title="이 프로젝트만 보는 중 (⌘P)">{filter}</span>}
       </div>
       <div className="side-list">
         {open.length === 0 && (
@@ -149,7 +156,12 @@ export default function Sidebar({ open, items, threads, byId, states, tasks, cha
         ))}
       </div>
       <div className="side-foot">
-        <kbd>⌘L</kbd> 보내기 <kbd>⌘J</kbd> 내 차례 <kbd>⌘Y</kbd> 한 일 <kbd>⌘G</kbd> 줄기
+        {[["⌘L", "보내기"], ["⌘J", "내 차례"], ["⌘Y", "한 일"], ["⌘G", "줄기"]].map(([key, what]) => (
+          <span key={key}>
+            <kbd>{key}</kbd>
+            {what}
+          </span>
+        ))}
       </div>
     </aside>
   );
