@@ -1,4 +1,8 @@
 export default {
+  "남보라 바탕에 또렷한 파랑": "Indigo background with a clear blue",
+  "부드러운 파스텔 색의 어두운 바탕": "Dark background with soft pastels",
+  "보라와 분홍이 선명한 어두운 바탕": "Dark background with vivid purple and pink",
+  "차분한 청회색": "Calm blue-gray",
   "흑연": "Graphite",
   "회색조. 바탕은 더 검고 고른 줄은 파랑 대신 회색으로 뜬다": "Neutral grays. A blacker background, and selected rows lift in gray rather than blue",
   "남색": "Navy",

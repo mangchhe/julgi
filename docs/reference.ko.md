@@ -37,7 +37,7 @@
 | 값 | 기본 | 뜻 |
 |---|---|---|
 | `lang` | `auto` | 화면 글의 언어. `auto`는 시스템이 한국어면 한국어, 아니면 영어. `en`, `ko`. 다시 켜야 적용된다 |
-| `theme` | `ink` | 화면 색. `navy`, `graphite`, `forest`, `plum`, `sand`, `paper` |
+| `theme` | `ink` | 화면 색. `navy`, `graphite`, `forest`, `plum`, `sand`, `tokyo-night`, `catppuccin`, `dracula`, `nord`, `paper` |
 | `thinking` | `balanced` | 판단 모델의 수준. `light`(전부 Haiku), `balanced`, `deep` |
 | `hotTokens` | 150000 | 이보다 큰 세션에 보낼 때는 갈아탄 뒤 보낸다 |
 | `sleepHours` | 3 | 이 시간 넘게 쉰 세션을 재운다. 0이면 안 재운다 |
