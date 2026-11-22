@@ -348,6 +348,17 @@ pub fn repo_mrs(path: String, forge: String) -> Vec<(String, String, String, Str
         .collect()
 }
 
+/// 커밋 하나의 작성자와 메시지 전체(제목과 본문). 이력에서는 제목만 잘려 보여서 고르면 이것을 위에 편다
+#[tauri::command(async)]
+pub fn commit_message(path: String, sha: String) -> Option<(String, String)> {
+    if sha.is_empty() || !sha.chars().all(|c| c.is_ascii_hexdigit()) {
+        return None;
+    }
+    let out = git(&path, &["show", "-s", "--format=%an%x00%B", &sha])?;
+    let (author, body) = out.split_once('\0')?;
+    Some((author.to_owned(), body.trim().to_owned()))
+}
+
 /// 지금 커밋에서 거슬러 올라간 이력. 최근 것부터, 갈라지고 합쳐진 모양을 그릴 수 있게 부모를 전부 준다.
 /// 돌려주는 값: (커밋, 부모들(빈칸으로 나눔), 제목, 언제(초), 그 커밋에 붙은 브랜치·태그 이름들)
 #[tauri::command(async)]

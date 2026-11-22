@@ -338,6 +338,15 @@ export default function Review({ places, known, sessions, onSay, onClose }: Prop
   };
 
   const brief = change?.brief;
+  // 커밋을 골랐으면 그 커밋의 메시지 전체를 위에 편다
+  const [message, setMessage] = useState<[string, string] | null>(null);
+  useEffect(() => {
+    setMessage(null);
+    if (ver.kind !== "commit" || !ver.to || !place) return;
+    void invoke<[string, string] | null>("commit_message", { path: place.cwd, sha: ver.to }).then(setMessage, () => {});
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ver.key, place?.cwd]);
+  const chosen = ver.kind === "commit" ? commits.find(([sha]) => sha === ver.to) : undefined;
   return (
     <div className="rv" ref={box} tabIndex={-1} onKeyDown={onKey}>
       <div className="rv-top">
@@ -369,6 +378,18 @@ export default function Review({ places, known, sessions, onSay, onClose }: Prop
             ))}
           <span className="rv-hint">{sent > 0 ? `세션에 ${sent}번 말함 · ` : ""}⌘E 터미널로</span>
         </div>
+        {chosen && (
+          <div className="rv-msg">
+            <div>
+              <b>{(message?.[1] ?? chosen[2]).split("\n")[0]}</b>
+              <small>
+                {message?.[0] ? `${message[0]} · ` : ""}
+                {chosen[3] ? ago(chosen[3]) : ""} · {chosen[0].slice(0, 8)}
+              </small>
+            </div>
+            {message && message[1].includes("\n") && <div className="rv-msg-body">{message[1].split("\n").slice(1).join("\n").trim()}</div>}
+          </div>
+        )}
         {brief && (ver.key === "all" || ver.key === (turns.length ? "t:" + turns[turns.length - 1].to : "")) && (
           <div className="rv-brief">
             <b>{brief.line}</b>

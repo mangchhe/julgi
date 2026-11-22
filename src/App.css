@@ -500,7 +500,8 @@ body.dragging .pane-body { pointer-events: none; }
 .rv-code { overflow: auto; font-family: ui-monospace, Menlo, monospace; font-size: 12px; line-height: 1.5; -webkit-user-select: text; user-select: text; cursor: auto; }
 .rv-path { position: sticky; top: 0; z-index: 1; background: var(--surface); border-bottom: 1px solid var(--line); padding: 5px 12px; font-size: 12px; font-weight: 600; }
 .rv-path em { font-style: normal; font-weight: 400; color: var(--muted); }
-.rv-hunk { border-bottom: 1px dashed var(--line); padding: 4px 0; }
+/* 긴 줄을 옆으로 넘겨도 줄 배경(초록·빨강)이 끝까지 칠해지게 묶음 너비를 가장 긴 줄에 맞춘다 */
+.rv-hunk { border-bottom: 1px dashed var(--line); padding: 4px 0; width: max-content; min-width: 100%; box-sizing: border-box; }
 .rv-head { color: var(--accent); padding: 2px 12px; font-size: 11px; }
 .rv-line { display: grid; grid-template-columns: 44px 44px 16px minmax(0, 1fr); cursor: pointer; }
 .rv-line:hover { outline: 1px solid var(--line); }
@@ -843,3 +844,10 @@ body.dragging .pane-body { pointer-events: none; }
 .topbar-name { font-size: 13px; font-weight: 600; color: var(--ink); cursor: default; }
 .topbar-fill { flex: 1; align-self: stretch; }
 .topbar > .panel-btn { top: 1.25px; }
+
+/* 코드 검토에서 고른 커밋의 메시지 전체 */
+.rv-msg { display: flex; flex-direction: column; gap: 4px; font-size: 12.5px; border-left: 2px solid var(--accent); padding: 2px 10px; }
+.rv-msg > div:first-child { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
+.rv-msg b { font-size: 13px; }
+.rv-msg small { color: var(--muted); font-family: ui-monospace, Menlo, monospace; font-size: 11px; }
+.rv-msg-body { white-space: pre-wrap; line-height: 1.5; color: color-mix(in srgb, var(--ink) 80%, var(--muted)); max-height: 30vh; overflow-y: auto; -webkit-user-select: text; user-select: text; }
