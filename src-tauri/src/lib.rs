@@ -316,11 +316,10 @@ fn set_hotkey(app: AppHandle, shortcut: String) -> Result<(), String> {
 
 /// macOS 알림을 띄운다. 창을 안 보고 있을 때 내 차례가 온 것을 알리려는 것이다
 #[tauri::command(async)]
-fn notify(title: String, body: String) {
-    // AppleScript 문자열에 들어가므로 따옴표와 역슬래시를 뺀다
-    let clean = |s: &str| s.replace(['"', '\\'], "'").chars().take(180).collect::<String>();
-    let script = format!("display notification \"{}\" with title \"Julgi\" subtitle \"{}\"", clean(&body), clean(&title));
-    let _ = std::process::Command::new("/usr/bin/osascript").args(["-e", &script]).output();
+fn notify(app: tauri::AppHandle, title: String, body: String) {
+    // Julgi 이름으로 보낸다. osascript로 보내면 스크립트 편집기의 알림이 되어, 누르면 스크립트 편집기가 "무제" 문서로 열린다
+    use tauri_plugin_notification::NotificationExt;
+    let _ = app.notification().builder().title(title).body(body).show();
 }
 
 /// 레포 하나를 훑어본 것: README 앞머리, 맨 위 폴더와 파일, 최근 커밋. 지도를 그릴 재료다
@@ -658,6 +657,7 @@ pub fn run() {
     let _ = std::fs::create_dir_all(state_dir());
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
+        .plugin(tauri_plugin_notification::init())
         // 기본 메뉴에서 "창 닫기(⌘W)"를 빼고 종료는 화면에 먼저 묻는다.
         // 일하는 세션이 있는데 실수로 꺼 버리는 일을 막으려는 것이다.
         .menu(|app| {

@@ -129,6 +129,8 @@ export default function App() {
   const noted = useRef<Record<string, number>>({}); // 세션 → 요약을 남긴 때의 대화 기록 시각
   const noting = useRef(new Set<string>());
   const trustedOnce = useRef(new Set<string>()); // 폴더 믿음 물음에 대신 답해 준 터미널
+  // 마지막으로 알린 세션. macOS는 어느 알림을 눌렀는지 알려 주지 않아서, 알린 뒤 곧 창이 앞으로 오면 알림을 눌렀다고 보고 그 세션을 띄운다
+  const notified = useRef<{ key: string; at: number } | null>(null);
   const wantHandoff = useRef(new Set<string>()); // 세션이 스스로 갈아타 달라고 한 것. 답이 끝나면 한다
   const [acts, setActs] = useState<Act[]>([]); // Julgi가 알아서 한 일
   const [exists, setExists] = useState<Record<string, boolean>>({});
@@ -1351,7 +1353,10 @@ export default function App() {
       const is = states[o.key]?.state;
       // 일하다가 내 차례가 됐는데 내가 Julgi를 안 보고 있으면 알린다. 갈아타는 중의 인계 글은 내가 볼 것이 아니라 뺀다
       if (config.notify && was === "run" && (is === "wait" || is === "ask") && !document.hasFocus() && !handing.includes(o.key))
+      {
         void invoke("notify", { title: nameOf(o.key).slice(0, 60), body: is === "ask" ? "확인이 필요하다" : "답을 끝냈다. 내 차례다" });
+        notified.current = { key: o.key, at: now };
+      }
       // 답이 끝났으면 그 폴더에서 무엇이 바뀌었는지 센다. 변경이 달라졌으면 브리핑도 새로 만든다
       // 일을 시작할 때 그 폴더의 변경 상태를 적어 둔다. 끝났을 때 달라졌으면 이 세션이 고친 것이다
       if (was !== "run" && is === "run") {
@@ -1600,6 +1605,12 @@ export default function App() {
     scan();
     const scanTimer = setInterval(scan, 30_000);
     window.addEventListener("focus", scan);
+    const onFocusBack = () => {
+      const n = notified.current;
+      notified.current = null;
+      if (n && Date.now() - n.at < 10 * 60_000 && live.current.open.some((o) => o.key === n.key)) actions.current.show(n.key);
+    };
+    window.addEventListener("focus", onFocusBack);
 
     const stateTimer = setInterval(() => {
       if (config.remote) actions.current.publishRemote();
@@ -1851,6 +1862,7 @@ export default function App() {
       clearInterval(skillTimer);
       clearInterval(stateTimer);
       window.removeEventListener("focus", scan);
+      window.removeEventListener("focus", onFocusBack);
       window.removeEventListener("keydown", onKey, true);
     };
   }, []);
