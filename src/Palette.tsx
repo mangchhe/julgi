@@ -60,8 +60,8 @@ export default function Palette({ open, sessions, byId, cwd, onPick, onAttach, o
     }
     const has = (...parts: (string | undefined)[]) => parts.join(" ").toLowerCase().includes(q);
     const out: Row[] = [];
-    // "#1465"를 치면 맨 위에 그 PR 보기를 낸다 (지금 칸의 레포에서)
-    const prNo = query.trim().match(/^#(\d+)$/)?.[1];
+    // "#1465"나 "1465"를 치면 맨 위에 그 PR 보기를 낸다 (지금 칸의 레포에서)
+    const prNo = query.trim().match(/^#?(\d+)$/)?.[1];
     if (prNo) out.push({ pick: { kind: "pr", number: Number(prNo) }, title: `PR #${prNo} 보기`, meta: `${repoOf(cwd)} · Julgi 안에서`, isLink: true });
     const weak: Row[] = []; // 제목이 아니라 요약에서만 걸린 것은 뒤로 보낸다
     const openIds = new Set<string>();
