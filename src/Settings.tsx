@@ -1,10 +1,18 @@
 import qrcode from "qrcode-generator";
 import { useEffect, useRef, useState } from "react";
+import { invoke } from "@tauri-apps/api/core";
 import { config, kilo } from "./model";
 import { THEMES } from "./themes";
 
 type Key = keyof typeof config;
-type Props = { onChange: (key: Key, value: string | number | boolean) => void; onClose: () => void; /** 폰에서 열 주소. 폰에서 보기를 켰을 때만 온다 */ remoteUrl?: string };
+type Props = {
+  onChange: (key: Key, value: string | number | boolean) => void;
+  onClose: () => void;
+  /** 폰에서 열 주소. 폰에서 보기를 켰을 때만 온다 */
+  remoteUrl?: string;
+  /** GitHub 연결: 셸 칸에서 gh auth login을 돌린다 */
+  onConnect: () => void;
+};
 
 type Row =
   | { kind: "theme"; label: string; note: string }
@@ -12,7 +20,8 @@ type Row =
   | { kind: "toggle"; key: Key; label: string; note: string }
   | { kind: "pick"; key: Key; label: string; note: string; options: [string, string][] }
   | { kind: "key"; key: Key; label: string; note: string }
-  | { kind: "text"; key: Key; label: string; note: string; hint: string };
+  | { kind: "text"; key: Key; label: string; note: string; hint: string }
+  | { kind: "github"; label: string; note: string };
 
 /** 묶음마다 줄 몇 개. 왼쪽에서 묶음을 고르면 오른쪽에 그 줄들만 나온다 */
 const SECTIONS: { title: string; hint: string; rows: Row[] }[] = [
@@ -79,6 +88,13 @@ const SECTIONS: { title: string; hint: string; rows: Row[] }[] = [
     ],
   },
   {
+    title: "연결",
+    hint: "GitHub",
+    rows: [
+      { kind: "github", label: "GitHub", note: "연결하면 PR을 Julgi 안에서 본다. 터미널의 PR 링크를 ⌘ 클릭하거나 ⌘K에서 #번호를 친다. 로그인은 gh(GitHub CLI)가 하고 토큰도 gh가 키체인에 둔다. Julgi는 토큰을 보지 않는다" },
+    ],
+  },
+  {
     title: "밖에서",
     hint: "폰으로 보기",
     rows: [
@@ -108,8 +124,11 @@ const showKey = (combo: string) =>
     .join("");
 
 /** 설정 (⌘,). 바꾸는 즉시 적용되고 ~/.julgi/config.json에 남는다 */
-export default function Settings({ onChange, onClose, remoteUrl }: Props) {
+export default function Settings({ onChange, onClose, remoteUrl, onConnect }: Props) {
   const [at, setAt] = useState(0);
+  // gh가 있는가, 누구로 로그인했는가. undefined면 아직 보는 중
+  const [gh, setGh] = useState<[boolean, string] | undefined>(undefined);
+  useEffect(() => void invoke<[boolean, string]>("gh_status").then(setGh, () => setGh([false, ""])), []);
   const [taking, setTaking] = useState(false); // 키 조합을 받는 중
   const [, redraw] = useState(0);
   const box = useRef<HTMLDivElement>(null);
@@ -166,6 +185,7 @@ export default function Settings({ onChange, onClose, remoteUrl }: Props) {
       if (row.kind === "key") setTaking(true);
       else if (row.kind === "text") box.current?.querySelector<HTMLInputElement>(".set-row.on input")?.focus();
       else if (row.kind === "toggle") nudge(row, 1);
+      else if (row.kind === "github") onConnect();
       else onClose();
     } else return;
     e.preventDefault();
@@ -247,6 +267,21 @@ export default function Settings({ onChange, onClose, remoteUrl }: Props) {
                         <i />
                         <span>{config[row.key] ? "켜짐" : "꺼짐"}</span>
                       </button>
+                    )}
+                    {row.kind === "github" && (
+                      <span className="set-gh">
+                        {gh === undefined ? (
+                          <span className="set-note">보는 중</span>
+                        ) : !gh[0] ? (
+                          <span className="set-note">gh가 없다 · 터미널에서 brew install gh</span>
+                        ) : gh[1] ? (
+                          <span className="set-on">● {gh[1]}로 연결됨</span>
+                        ) : (
+                          <button type="button" tabIndex={-1} className="set-toggle" onClick={onConnect}>
+                            연결
+                          </button>
+                        )}
+                      </span>
                     )}
                     {row.kind === "text" && <input tabIndex={-1} value={config[row.key] as string} placeholder={row.hint} spellCheck={false} onFocus={() => setAt(i)} onChange={(e) => set(row.key, e.target.value)} />}
                   </div>

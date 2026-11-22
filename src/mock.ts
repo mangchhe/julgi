@@ -122,6 +122,27 @@ async function invoke(cmd: string, args: Record<string, unknown> = {}): Promise<
         ...(flags.has("stems") ? [{ id: "t3", name: "쿠폰 중복 환불", sessions: [sessions[2].id, sessions[1].id], created: 0 }, { id: "t4", name: "JDK 교체", sessions: [sessions[4].id], created: 0, done: true }] : []),
       ]);
     }
+    case "gh_status":
+      return [true, "me"];
+    case "repo_slug":
+      return "example/api-server";
+    case "pr_view":
+      return JSON.stringify({
+        number: 1852, title: "쿠폰 여러 장일 때 환불액 1원 어긋남 수정", body: "## 무엇을\n쿠폰마다 따로 반올림한 뒤 더한다.\n\n## 확인\n- RefundCalculatorTest 추가", author: { login: "me" },
+        state: "OPEN", isDraft: false, baseRefName: "develop", headRefName: "fix/refund-rounding", url: "https://github.com/example/api-server/pull/1852",
+        reviewDecision: "CHANGES_REQUESTED", additions: 14, deletions: 2, changedFiles: 2, createdAt: new Date(Date.now() - 7200_000).toISOString(),
+        statusCheckRollup: [{ __typename: "CheckRun", name: "build", status: "COMPLETED", conclusion: "SUCCESS" }, { __typename: "CheckRun", name: "test", status: "COMPLETED", conclusion: "FAILURE" }],
+        comments: [{ author: { login: "teammate" }, body: "배포 전에 스테이지에서 한 번 돌려 볼게요.", createdAt: new Date(Date.now() - 3600_000).toISOString() }],
+        reviews: [{ author: { login: "reviewer" }, body: "음수 환불은 예외 말고 0으로 막는 게 맞지 않을까요?", submittedAt: new Date(Date.now() - 1800_000).toISOString(), state: "CHANGES_REQUESTED" }],
+      });
+    case "pr_diff":
+      return (await invoke("repo_diff", {})) ?? "";
+    case "pr_comments":
+      return JSON.stringify([
+        { id: 1, path: "src/refund/RefundCalculator.kt", line: 90, side: "RIGHT", user: { login: "reviewer" }, body: "여기서 예외를 던지면 호출하는 배치가 멈춰요.", created_at: new Date(Date.now() - 1700_000).toISOString() },
+        { id: 2, path: "src/refund/RefundCalculator.kt", line: 90, side: "RIGHT", in_reply_to_id: 1, user: { login: "me" }, body: "배치 쪽에서 잡고 넘기게 할게요.", created_at: new Date(Date.now() - 1500_000).toISOString() },
+        { id: 3, path: "src/refund/RefundCalculator.kt", line: null, side: "RIGHT", user: { login: "teammate" }, body: "이전 버전에 단 코멘트", created_at: new Date(Date.now() - 5000_000).toISOString() },
+      ]);
     case "env_flag":
       return false;
     case "plugin:event|listen":
@@ -159,6 +180,7 @@ setTimeout(() => {
   if (flags.has("stems")) press("KeyG");
   if (flags.has("review")) press("KeyE");
   if (flags.has("hist")) press("KeyY");
+  if (flags.has("pr")) window.dispatchEvent(new CustomEvent("julgi:pr", { detail: { repo: "example/api-server", number: 1852 } }));
   // 세션 상태가 한 번 읽힌 뒤에 눌러야 내 차례인 세션이 잡힌다
   // 설정의 묶음을 넘긴다: ?settings&sec=6
   for (let i = 0; i < Number(flags.get("sec") ?? 0); i++) setTimeout(() => document.querySelector(".settings")?.dispatchEvent(new KeyboardEvent("keydown", { key: "Tab", bubbles: true })), 400 + i * 150);

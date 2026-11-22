@@ -17,6 +17,8 @@ import Threads from "./Threads";
 import { applyTheme } from "./themes";
 import { CHECK_SYSTEM, CORRECT_SYSTEM, prefsText, CAND_SYSTEM, Candidate as SkillCandidate, formatNote, indexLine, indexText, LEARN_SYSTEM, Note, parseNote, BRIEF_SYSTEM, MAP_SYSTEM, mapDomains, mapItems, recallText, stale, Stats, statOf, SWEEP_SYSTEM, TIDY_SYSTEM } from "./brain";
 import Sidebar from "./Sidebar";
+import PrView from "./PrView";
+import { openPr, prOf, PrTarget } from "./pr";
 import * as terms from "./terms";
 import { rank } from "./route";
 import { Brief, Change, Job, MAX_PARALLEL, setMapDirs, setPrefs, markAuto, isAuto, autoList, STATE_LABEL, ago, Item, modelFor, SkillInfo, SkillUse, aboutOf, buildFolders, buildItems, aliveElsewhere, config, elsewhere, enrich, markSlept, setAlive, handoffCommand, Ledger, Merge, mergeCandidates, mergeKey, newCommand, Open, repoOf, resumeCommand, Session, TermState, Thread, waiting, withPrompt } from "./model";
@@ -106,6 +108,7 @@ export default function App() {
   const [mapText, setMapText] = useState(""); // 레포 지도 (MAP.md)
   const [drawing, setDrawing] = useState(false);
   const [closing, setClosing] = useState(""); // 닫을지 묻고 있는 세션
+  const [prShown, setPrShown] = useState<PrTarget | null>(null); // 펴 둔 PR 화면
   const [reviews, setReviews] = useState<Review[]>([]); // 점검 기록. 판마다 값과 한 일이 남는다
   const [skillUses, setSkillUses] = useState<SkillUse[]>([]);
   const [skills, setSkills] = useState<SkillInfo[]>([]);
@@ -241,11 +244,11 @@ export default function App() {
     openTerm({ key: "c:" + id, label: `새 세션 · ${repoOf(cwd)}`, cwd, sessionId: id }, newCommand(id));
   };
   /** ⌘T: 셸은 보던 것 옆에 칸을 하나 더 내서 연다. 지금 칸이 비었거나 칸이 꽉 찼으면 지금 칸에 연다 */
-  const newShell = (cwd: string) => {
-    const o: Open = { key: "s:" + crypto.randomUUID(), label: `셸 · ${repoOf(cwd)}`, cwd };
+  const newShell = (cwd: string, command?: string, label?: string) => {
+    const o: Open = { key: "s:" + crypto.randomUUID(), label: label ?? `셸 · ${repoOf(cwd)}`, cwd };
     const { panes, focus } = live.current;
-    if (!panes[focus] || panes.length >= MAX_PANES) return openTerm(o);
-    terms.create({ key: o.key, cwd });
+    if (!panes[focus] || panes.length >= MAX_PANES) return openTerm(o, command);
+    terms.create({ key: o.key, cwd, command });
     setOpen((list) => [...list, o]);
     split(o.key);
   };
@@ -1553,8 +1556,15 @@ export default function App() {
     setOverlay(null);
     if (p.kind === "open") show(p.key);
     else if (p.kind === "session") openSession(p.session);
-    else if (p.kind === "link") void openUrl(p.url);
-    else newSession(p.cwd);
+    else if (p.kind === "link") {
+      const pr = prOf(p.url);
+      if (pr) openPr(pr);
+      else void openUrl(p.url);
+    } else if (p.kind === "pr") {
+      // "#번호": 지금 칸의 레포가 GitHub에 있을 때만 열 수 있다
+      const cwd = cwdOf(current);
+      void invoke<string | null>("repo_slug", { path: cwd }).then((repo) => (repo ? openPr({ repo, number: p.number }) : say(`${repoOf(cwd)}는 GitHub 레포가 아니다.`)));
+    } else newSession(p.cwd);
   };
   const join = (sessionId: string) => {
     setOverlay(null);
@@ -1588,6 +1598,9 @@ export default function App() {
       if (n && Date.now() - n.at < 10 * 60_000 && live.current.open.some((o) => o.key === n.key)) actions.current.show(n.key);
     };
     window.addEventListener("focus", onFocusBack);
+    // PR 링크는 어디서 눌러도 여기로 와서 Julgi 안의 PR 화면으로 열린다
+    const onPr = (e: Event) => setPrShown((e as CustomEvent<PrTarget>).detail);
+    window.addEventListener("julgi:pr", onPr);
 
     const stateTimer = setInterval(() => {
       if (config.remote) actions.current.publishRemote();
@@ -1840,6 +1853,7 @@ export default function App() {
       clearInterval(stateTimer);
       window.removeEventListener("focus", scan);
       window.removeEventListener("focus", onFocusBack);
+      window.removeEventListener("julgi:pr", onPr);
       window.removeEventListener("keydown", onKey, true);
     };
   }, []);
@@ -2156,10 +2170,16 @@ export default function App() {
       {overlay === "settings" && (
         <Settings
           remoteUrl={remoteUrl}
+          onConnect={() => {
+            // gh가 브라우저를 열고 일회용 코드를 보여 준다. 끝나면 셸 칸을 닫으면 된다
+            setOverlay(null);
+            newShell(cwdOf(current), "gh auth login --web --hostname github.com; echo; echo '끝났다. ⌘W로 이 칸을 닫는다.'; read -r _", "GitHub 연결");
+          }}
           onClose={() => setOverlay(null)}
           onChange={setConfig}
         />
       )}
+      {prShown && <PrView key={`${prShown.repo}#${prShown.number}`} target={prShown} onClose={() => setPrShown(null)} />}
       {overlay === "history" && (
         <History
           acts={acts}

@@ -11,6 +11,7 @@ import { SearchAddon } from "@xterm/addon-search";
 import { openPath, openUrl } from "@tauri-apps/plugin-opener";
 import "@xterm/xterm/css/xterm.css";
 import { config } from "./model";
+import { openPr, prOf } from "./pr";
 
 export type TermSpec = { key: string; cwd?: string; command?: string };
 
@@ -69,7 +70,11 @@ function openLink(e: MouseEvent, uri: string) {
     // file://host/path 형식이면 host를 버린다. 뒤에 붙은 :줄번호는 파일 이름이 아니다
     const path = decodeURIComponent(new URL(uri).pathname).replace(/:\d+(:\d+)?$/, "");
     void openPath(path).catch(() => {});
-  } else void openUrl(uri).catch(() => {});
+  } else {
+    const pr = prOf(uri);
+    if (pr) openPr(pr);
+    else void openUrl(uri).catch(() => {});
+  }
 }
 
 /** 화면 글에서 파일 경로를 찾는다: /절대/경로, ./상대, 폴더/파일.확장자, 파일.확장자 (뒤에 :줄:칸이 붙을 수 있다) */

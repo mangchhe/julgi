@@ -1,11 +1,14 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { ago, linkLabel, Open, repoOf, Session } from "./model";
+import { prOf } from "./pr";
 
 export type Pick =
   | { kind: "open"; key: string }
   | { kind: "session"; session: Session }
   | { kind: "new"; cwd: string }
-  | { kind: "link"; url: string };
+  | { kind: "link"; url: string }
+  /** 지금 칸의 레포에서 이 번호의 PR을 연다 */
+  | { kind: "pr"; number: number };
 
 type Row = { pick: Pick; title: string; meta: string; isNew?: boolean; isLink?: boolean; session?: Session };
 
@@ -57,6 +60,9 @@ export default function Palette({ open, sessions, byId, cwd, onPick, onAttach, o
     }
     const has = (...parts: (string | undefined)[]) => parts.join(" ").toLowerCase().includes(q);
     const out: Row[] = [];
+    // "#1465"를 치면 맨 위에 그 PR 보기를 낸다 (지금 칸의 레포에서)
+    const prNo = query.trim().match(/^#(\d+)$/)?.[1];
+    if (prNo) out.push({ pick: { kind: "pr", number: Number(prNo) }, title: `PR #${prNo} 보기`, meta: `${repoOf(cwd)} · Julgi 안에서`, isLink: true });
     const weak: Row[] = []; // 제목이 아니라 요약에서만 걸린 것은 뒤로 보낸다
     const openIds = new Set<string>();
     for (const o of open) {
@@ -80,7 +86,7 @@ export default function Palette({ open, sessions, byId, cwd, onPick, onAttach, o
         session: s,
       });
       // 찾는 말이 있으면 그 세션이 남긴 산출물도 바로 아래에 낸다. 세션을 열지 않고 링크로 간다
-      if (q && strong) for (const url of s.links.slice(-3)) out.push({ pick: { kind: "link", url }, title: `↳ ${linkLabel(url)}`, meta: "브라우저로 열기", isLink: true, session: s });
+      if (q && strong) for (const url of s.links.slice(-3)) out.push({ pick: { kind: "link", url }, title: `↳ ${linkLabel(url)}`, meta: prOf(url) ? "PR 보기" : "브라우저로 열기", isLink: true, session: s });
     }
     out.push(...weak);
     // 새 세션을 열 위치: 이름이 맞는 프로젝트가 있으면 그 폴더들, 없으면 지금 폴더

@@ -22,6 +22,7 @@ import typescript from "highlight.js/lib/languages/typescript";
 import xml from "highlight.js/lib/languages/xml";
 import yaml from "highlight.js/lib/languages/yaml";
 import { ago, Change } from "./model";
+import { openPr, prOf } from "./pr";
 
 // 자주 보는 언어만 싣는다. 확장자로 고르고, 모르는 것은 색 없이 보여 준다
 const LANGS = { bash, css, dart, go, groovy, java, javascript, json, kotlin, markdown, protobuf, python, ruby, rust, sql, swift, typescript, xml, yaml };
@@ -32,9 +33,9 @@ const BY_EXT: Record<string, keyof typeof LANGS> = {
   proto: "protobuf", py: "python", rb: "ruby", rs: "rust", sql: "sql", swift: "swift", ts: "typescript", tsx: "typescript",
   html: "xml", xml: "xml", svg: "xml", vue: "xml", yml: "yaml", yaml: "yaml", toml: "yaml",
 };
-const langOf = (path: string) => BY_EXT[path.split(".").pop()?.toLowerCase() ?? ""];
+export const langOf = (path: string) => BY_EXT[path.split(".").pop()?.toLowerCase() ?? ""];
 /** 한 줄을 색칠한 HTML로. 줄 단위로 칠하므로 여러 줄에 걸친 주석이나 문자열은 가운데 줄의 색이 어긋날 수 있다 */
-const paint = (text: string, lang?: string) => {
+export const paint = (text: string, lang?: string) => {
   if (!lang || text.length > 600) return undefined;
   try {
     return hljs.highlight(text, { language: lang, ignoreIllegals: true }).value;
@@ -56,8 +57,8 @@ type Props = {
   onClose: () => void;
 };
 
-type Line = { kind: "add" | "del" | "same"; text: string; oldNo?: number; newNo?: number };
-type Hunk = { head: string; lines: Line[] };
+export type Line = { kind: "add" | "del" | "same"; text: string; oldNo?: number; newNo?: number };
+export type Hunk = { head: string; lines: Line[] };
 /** 커밋, 부모들(빈칸으로 나눔), 제목, 언제(초), 붙은 브랜치·태그 이름들 */
 type Commit = [string, string, string, number, string];
 /** 이력 그래프의 한 줄. col: 이 커밋의 줄(레인), pass: 그냥 지나가는 줄들, top: 위에서 이 커밋의 줄로 내려오는 선이 있는가, into: 위에서 이 커밋으로 모이는 줄들, out: 이 커밋에서 부모로 내려가는 줄들 */
@@ -128,10 +129,10 @@ function labels(refs: string, base: string): { name: string; kind: "head" | "tag
 /** kind: 이력에서 어떻게 그릴지. all 전부, wip 커밋 안 한 것, turn 답 하나, commit 커밋 하나 */
 type Ver = { key: string; from: string | null; to: string | null; label: string; title: string; kind: "all" | "wip" | "turn" | "commit"; when: string };
 const NONE: Ver = { key: "all", from: "HEAD", to: null, label: "이 세션이 고친 것", title: "", kind: "all", when: "" };
-type FileDiff = { path: string; adds: number; dels: number; hunks: Hunk[]; note: string };
+export type FileDiff = { path: string; adds: number; dels: number; hunks: Hunk[]; note: string };
 
 /** git diff 글을 파일과 묶음, 줄로 나눈다. 줄마다 고치기 전과 뒤의 줄 번호를 붙인다 */
-function parse(diff: string): FileDiff[] {
+export function parse(diff: string): FileDiff[] {
   const files: FileDiff[] = [];
   let file: FileDiff | undefined;
   let hunk: Hunk | undefined;
@@ -362,7 +363,7 @@ export default function Review({ places, known, sessions, onSay, onClose }: Prop
             {git.ahead < 0 && <span>원격에 아직 없는 브랜치</span>}
             {git.behind > 0 && <span>원격보다 뒤 {git.behind}</span>}
             {mr && (
-              <button type="button" tabIndex={-1} onClick={() => void openUrl(mr[2])} title={mr[2]}>
+              <button type="button" tabIndex={-1} onClick={() => { const pr = prOf(mr[2]); if (pr) openPr(pr); else void openUrl(mr[2]); }} title={mr[2]}>
                 MR · {mr[1].slice(0, 40)} · {mr[3]}
                 {mr[4] && ` · CI ${mr[4]}`}
               </button>
