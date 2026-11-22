@@ -35,6 +35,7 @@ Change them in `⌘,`; they apply at once and are saved to `~/.julgi/config.json
 
 | Key | Default | Meaning |
 |---|---|---|
+| `lang` | `auto` | Interface language. `auto` follows the system (Korean if the system is Korean, otherwise English), or `en`, `ko`. Applies after restart |
 | `theme` | `ink` | Colors. `navy`, `forest`, `plum`, `sand`, `paper` |
 | `thinking` | `balanced` | Level of the judgment models. `light` (all Haiku), `balanced`, `deep` |
 | `hotTokens` | 150000 | Sessions larger than this are handed off to a fresh session before sending |
@@ -111,4 +112,5 @@ Everything is a text file under `~/.julgi/`. Conversations are not here; Claude 
 - The phone view does not route for you, has no notifications, and cannot answer permission prompts.
 - GitLab and Jira were built against the documented API shapes and have not been checked against live accounts.
 - Few automated tests: three check scripts under `scripts/`, Rust unit tests, and an in-app self-check (`JULGI_SELFTEST=1 npm run tauri dev`).
-- No English UI, no signed installer, macOS only.
+- The skills Julgi adds to sessions and the `julgi` command's output are still Korean.
+- No signed installer, macOS only.

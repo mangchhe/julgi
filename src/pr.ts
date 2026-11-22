@@ -1,3 +1,4 @@
+import { tr } from "./i18n.ts";
 /** GitHub PR 하나를 가리키는 것: "소유자/레포"와 번호 */
 export type PrTarget = { repo: string; number: number };
 
@@ -37,29 +38,29 @@ const failed = (ci: string) => ci === "FAILURE" || ci === "ERROR";
  * CI가 새로 깨졌거나, 남이 코멘트를 달았거나, 승인·수정 요청을 받았거나, 머지됐을 때다
  */
 export function newsOf(before: PrStatus, now: PrStatus): string {
-  if (now.state === "MERGED" && before.state !== "MERGED") return "머지됨";
+  if (now.state === "MERGED" && before.state !== "MERGED") return tr`머지됨`;
   // 닫기·다시 열기는 남(봇 포함)이 했을 때만 알린다. 내가 한 것은 내가 안다
-  if (now.state === "CLOSED" && before.state === "OPEN" && now.actor) return `닫힘 · ${now.actor}`;
-  if (now.state === "OPEN" && before.state === "CLOSED" && now.actor) return `다시 열림 · ${now.actor}`;
-  if (failed(now.ci) && !failed(before.ci)) return "CI 실패";
-  if (now.decision !== before.decision && now.decision === "CHANGES_REQUESTED") return "수정 요청";
-  if (now.decision !== before.decision && now.decision === "APPROVED") return "승인됨";
-  if (now.others > before.others) return `새 코멘트 ${now.others - before.others}`;
+  if (now.state === "CLOSED" && before.state === "OPEN" && now.actor) return tr`닫힘 · ${now.actor}`;
+  if (now.state === "OPEN" && before.state === "CLOSED" && now.actor) return tr`다시 열림 · ${now.actor}`;
+  if (failed(now.ci) && !failed(before.ci)) return tr`CI 실패`;
+  if (now.decision !== before.decision && now.decision === "CHANGES_REQUESTED") return tr`수정 요청`;
+  if (now.decision !== before.decision && now.decision === "APPROVED") return tr`승인됨`;
+  if (now.others > before.others) return tr`새 코멘트 ${now.others - before.others}`;
   return "";
 }
 
 /** 세션 줄에 붙일 짧은 글 조각들: [글, 눈에 띄게 할지] */
 export function prParts(s: PrStatus): [string, boolean][] {
   const out: [string, boolean][] = [];
-  if (s.state === "MERGED") out.push(["머지됨", false]);
-  else if (s.state === "CLOSED") out.push(["닫힘", false]);
+  if (s.state === "MERGED") out.push([tr`머지됨`, false]);
+  else if (s.state === "CLOSED") out.push([tr`닫힘`, false]);
   else {
-    if (failed(s.ci)) out.push(["CI 실패", true]);
-    else if (s.ci === "PENDING" || s.ci === "EXPECTED") out.push(["CI 도는 중", false]);
-    else if (s.ci === "SUCCESS") out.push(["CI 통과", false]);
-    if (s.decision === "CHANGES_REQUESTED") out.push(["수정 요청", true]);
-    else if (s.decision === "APPROVED") out.push(["승인됨", false]);
-    else if (s.decision === "REVIEW_REQUIRED") out.push(["리뷰 대기", false]);
+    if (failed(s.ci)) out.push([tr`CI 실패`, true]);
+    else if (s.ci === "PENDING" || s.ci === "EXPECTED") out.push([tr`CI 도는 중`, false]);
+    else if (s.ci === "SUCCESS") out.push([tr`CI 통과`, false]);
+    if (s.decision === "CHANGES_REQUESTED") out.push([tr`수정 요청`, true]);
+    else if (s.decision === "APPROVED") out.push([tr`승인됨`, false]);
+    else if (s.decision === "REVIEW_REQUIRED") out.push([tr`리뷰 대기`, false]);
   }
   return out;
 }

@@ -1,7 +1,7 @@
 /** 브레인: 일이 끝나도 남아야 하는 것. 노트 하나가 ~/.julgi/brain/<id>.md 하나다 */
 export type Note = { id: string; title: string; kind: string; repo: string; from: string; created: string; body: string };
 
-export const KINDS = ["결정", "함정", "사실", "선호"];
+export const KINDS = ["결정", "함정", "사실", "선호"]; // 노트 파일에 적히는 값. 보여 주는 곳에서 tr(kind)로 옮긴다 i18n-ok
 
 /** 파일 글 → 노트. 머리말이 없거나 깨졌으면 null */
 export function parseNote(id: string, text: string): Note | null {
@@ -13,7 +13,7 @@ export function parseNote(id: string, text: string): Note | null {
     if (at > 0) head[line.slice(0, at).trim()] = line.slice(at + 1).trim();
   }
   if (!head.title) return null;
-  return { id, title: head.title, kind: KINDS.includes(head.type) ? head.type : "사실", repo: head.repo ?? "", from: head.from ?? "", created: head.created ?? "", body: m[2].trim() };
+  return { id, title: head.title, kind: KINDS.includes(head.type) ? head.type : "사실", repo: head.repo ?? "", from: head.from ?? "", created: head.created ?? "", body: m[2].trim() }; // i18n-ok
 }
 
 const oneLine = (text: string) => text.replace(/\s+/g, " ").trim();
@@ -23,21 +23,21 @@ export const formatNote = (n: Note) => `---\ntitle: ${oneLine(n.title)}\ntype: $
 export const indexLine = (n: Note, i: number) => `b${i}. [${n.kind}] ${n.title}${n.repo ? ` (${n.repo})` : ""}`;
 
 /** 새 세션의 첫 글 앞에 붙이는 글 */
-export const recallText = (notes: Note[]) =>
+export const recallText = (notes: Note[]) => // 세션에 붙이는 글 i18n-ok
   `[Julgi 브레인: 전에 다른 일을 하며 알게 된 것이다. 참고만 하고, 지금 코드와 다르면 코드가 맞다]\n${notes.map((n) => `- (${n.kind}) ${n.title}: ${oneLine(n.body).slice(0, 600)}`).join("\n")}`;
 
 /** 내가 세션의 방식을 바로잡은 말에서 "선호" 노트를 뽑는다 */
-export const CORRECT_SYSTEM =
+export const CORRECT_SYSTEM = // i18n-ok
   '너는 한 사람이 AI 코딩 세션에게 한 말 가운데, 세션을 중간에 끊고 한 말과 "앞으로", "하지 마", "왜 자꾸"처럼 방식을 바로잡는 것으로 보이는 말들을 본다. 여기서 다음 세션들도 지켜야 할 "일하는 방식"만 골라 노트로 만든다. 고르는 것: 같은 종류의 바로잡기가 두 번 넘게 나온 것, 또는 한 번이라도 "항상", "앞으로", "하지 마"처럼 규칙으로 말한 것. 고르지 않는 것: 그 일에만 해당하는 지시(이 파일 말고 저 파일, 이 값으로 바꿔), 마음이 바뀌어 다른 일을 시킨 것, 단순히 멈춘 것, 하던 말을 이어서 한 것, 스크립트가 찍어 낸 시험용 지시문, 무슨 뜻인지 알 수 없는 것. 노트는 세션에게 하는 지시문으로 쓴다: title은 한 줄 규칙("~한다", "~하지 않는다"), body는 왜 그런지와 어떤 때 해당하는지 한두 문장. repo는 특정 레포에서만 해당하면 그 이름, 어디서나면 빈 글자. count는 근거가 된 말의 수. 이미 있는 선호 목록과 같은 내용이면 새로 만들지 말고 그 번호를 update에 적는다. 확실한 것만. 없으면 빈 배열. 많아도 4개. JSON 한 줄만 답한다: {"notes":[{"title":"","body":"","repo":"","count":2,"update":null}]}';
 
 /** 선호 노트를 세션의 시스템 프롬프트에 덧붙일 글로. 모든 Julgi 세션이 시작할 때 읽는다 */
 export function prefsText(notes: Note[]): string {
-  const prefs = notes.filter((n) => n.kind === "선호").slice(0, 12);
-  if (!prefs.length) return "";
+  const prefs = notes.filter((n) => n.kind === "선호").slice(0, 12); // i18n-ok
+  if (!prefs.length) return ""; // 아래는 시스템 프롬프트에 붙는 글 i18n-ok
   return `# 이 사용자가 일하는 방식 (Julgi가 지난 세션들에서 사용자가 바로잡은 말로 정리했다)\n\n${prefs.map((n) => `- ${n.repo ? `[${n.repo}에서] ` : ""}${n.title}. ${n.body}`).join("\n")}\n\n사용자의 지금 지시가 이것과 다르면 지금 지시를 따른다.\n`.slice(0, 3000);
 }
 
-export const LEARN_SYSTEM =
+export const LEARN_SYSTEM = // i18n-ok
   '너는 작업 기록에서 나중에 다른 일을 할 때도 쓸모 있는 지식만 골라 노트로 만든다. 고르는 기준: 코드만 읽어서는 알 수 없는 것. 종류는 셋이다. "결정"(무엇을 정했고 왜 그랬는지), "함정"(겪어 봐야 아는 것, 하면 안 되는 것과 그 이유), "사실"(업무 규칙, 히스토리, 누가 아는지, 환경의 특성). 고르지 않는 것: 이 작업의 진행 상황, 다음 할 일, 파일 목록, 코드에 그대로 적힌 것, 일반 상식. 노트 하나에는 한 가지만 담고, 이 기록을 못 본 사람도 이해하게 대상의 이름을 풀어서 쓴다. 본문은 두세 문장. 이미 있는 노트 목록과 같은 내용이면 새로 만들지 말고 그 번호를 update에 적어 본문을 더 정확하게 고친다. 고를 것이 없으면 빈 배열을 낸다. 많아도 5개. JSON 한 줄만 답한다: {"notes": [{"title": "한 줄 제목", "kind": "결정|함정|사실", "body": "본문", "update": 번호 또는 null}]}';
 
 /** 노트가 얼마나 쓰였나. out: 새 세션에 붙인 횟수, read: 세션이 찾아본 횟수, fixed: 고친 횟수, last: 마지막으로 쓰인 때(ms) */
@@ -71,10 +71,10 @@ export function shortlist(message: string, notes: Note[], stats: Stats, max = 60
 }
 
 /** 세션과 사람이 읽는 목차. 노트마다 한 줄 */
-export const indexText = (notes: Note[], stats: Stats) =>
+export const indexText = (notes: Note[], stats: Stats) => // 세션이 읽는 파일 i18n-ok
   `# 브레인 목차\n\n노트 ${notes.length}개. 형식: [id] (종류) 제목 · 레포 · 쓰인 횟수\n\n${notes.map((n) => `- [${n.id}] (${n.kind}) ${n.title} · ${n.repo || "공통"} · ${usedCount(statOf(stats, n.id))}`).join("\n")}\n`;
 
-export const TIDY_SYSTEM =
+export const TIDY_SYSTEM = // i18n-ok
   '너는 지식 노트 묶음을 정리한다. 두 가지만 찾는다. 첫째, 같은 사실을 말하는 노트 짝: keep에 남길 번호, drop에 없앨 번호, 그리고 둘의 내용을 빠짐없이 합친 title과 body를 적는다. 주제가 비슷한 것만으로는 합치지 않는다. 둘째, 서로 어긋나는 말을 하는 노트 짝: a, b와 어디가 어긋나는지 why에 적는다. 어느 쪽이 맞는지는 판단하지 않는다. 없으면 빈 배열. JSON 한 줄만 답한다: {"merge": [{"keep": 번호, "drop": 번호, "title": "...", "body": "..."}], "conflict": [{"a": 번호, "b": 번호, "why": "..."}]}';
 
 /** 지도의 레포 한 칸을 항목별로 나눈다. 들여 쓴 줄은 바로 위 항목에 딸린다 */
@@ -96,6 +96,8 @@ export function mapItems(section: string): [string, string][] {
 /** 레포 사이의 선 하나. from이 to를 부르거나 to에 기댄다. how는 어디서 그렇게 하는지 */
 export type Edge = { from: string; to: string; kind: string; how: string };
 
+// 선의 종류와 지도의 제목은 지도 파일에 적힌 값이다
+// i18n-off
 const edgeKind = (text: string) =>
   /API|호출|Feign/i.test(text) ? "API 호출" : /발행|메시지|publish/i.test(text) ? "메시지" : /생성/.test(text) ? "생성된 코드" : /의존/.test(text) ? "의존성" : /배포|gitops/i.test(text) ? "배포 설정" : "기타";
 
@@ -179,3 +181,4 @@ export const SWEEP_SYSTEM =
 export type Candidate = { name: string; what: string; count: number; sessions: string[]; found: string };
 export const CAND_SYSTEM =
   '너는 한 사람이 AI 코딩 세션에 시킨 일의 목록을 보고, 같은 종류의 일이 되풀이되는 것을 찾는다. 같은 종류란 절차가 같은 일이다(예: 배포 상태 확인, 할 일 정리, 릴리스 태그 따기). 같은 기능을 여러 세션에 걸쳐 만드는 것은 되풀이가 아니라 한 가지 일이니 넣지 않는다. 세 번 넘게 나온 것만 낸다. 이미 있는 스킬이 하는 일이면 내지 않는다. 사람이 일하다가 직접 시킨 일만 센다. 스크립트나 봇이 찍어 낸 지시문("너는 ~다"로 시작하는 역할 부여, "정확히 이 명령 하나만 실행하라" 같은 시험용 문장, 글자 그대로 되풀이되는 문장)은 사람이 되풀이한 일이 아니니 세지 않는다. name은 스킬 이름으로 쓸 짧은 영문 소문자와 하이픈, what은 그 스킬이 무엇을 대신해 줄지 한 문장, sessions는 해당하는 줄 번호들. 없으면 빈 배열. JSON 한 줄만 답한다: {"candidates": [{"name": "...", "what": "...", "sessions": [번호들]}]}';
+// i18n-on

@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import { adfToMd, JiraConn, openTicket, TicketFull } from "./jira";
+import { tr } from "./i18n";
 import { md } from "./md";
 import { ago } from "./model";
 import { openPr, prOf } from "./pr";
@@ -70,7 +71,7 @@ export default function TicketView({ ticketKey, conn, onClose, onStart, sessions
       setLoads((n) => n + 1);
       return true;
     } catch (e) {
-      setError(`${label} 실패: ${String(e)}`);
+      setError(tr`${label} 실패: ${String(e)}`);
       return false;
     } finally {
       setBusy("");
@@ -80,11 +81,11 @@ export default function TicketView({ ticketKey, conn, onClose, onStart, sessions
     if (moves) return setMoves(null);
     void invoke<Transition[]>("jira_transitions", { conn, key: ticketKey }).then(setMoves, (e) => setError(String(e)));
   };
-  const move = async (tr: Transition) => {
-    if (await send(`${tr.to}로 옮기기`, "jira_transition", { id: tr.id, comment: moveNote })) (setMoves(null), setMoveNote(""));
+  const move = async (step: Transition) => {
+    if (await send(tr`${step.to}로 옮기기`, "jira_transition", { id: step.id, comment: moveNote })) (setMoves(null), setMoveNote(""));
   };
   const comment = async () => {
-    if (say.trim() && (await send("코멘트", "jira_comment", { body: say }))) setSay("");
+    if (say.trim() && (await send(tr`코멘트`, "jira_comment", { body: say }))) setSay("");
   };
 
   const onKey = (e: React.KeyboardEvent) => {
@@ -113,59 +114,59 @@ export default function TicketView({ ticketKey, conn, onClose, onStart, sessions
         <div className="rv-top pr-top">
           <div className="pr-title">
             <span className="pr-no">{ticketKey}</span>
-            <b>{t?.title ?? (error ? "" : "읽는 중")}</b>
+            <b>{t?.title ?? (error ? "" : tr`읽는 중`)}</b>
           </div>
-          {error && <div className="pr-error">{/401|연결돼 있지/.test(error) ? "Jira에 연결돼 있지 않거나 토큰이 만료됐다. ⌘,의 연결에서 다시 연결한다." : error}</div>}
+          {error && <div className="pr-error">{/401|연결돼 있지/.test(error) ? tr`Jira에 연결돼 있지 않거나 토큰이 만료됐다. ⌘,의 연결에서 다시 연결한다.` : error}</div>}
           {t && (
             <div className="rv-git">
-              <button type="button" tabIndex={-1} className={"tk-status c-" + cat} onClick={openMoves} title="상태 옮기기 (s)">
+              <button type="button" tabIndex={-1} className={"tk-status c-" + cat} onClick={openMoves} title={tr`상태 옮기기 (s)`}>
                 {t.status} ▾
               </button>
               {t.type && <span>{t.type}</span>}
               {t.priority && <span>{t.priority}</span>}
               {t.sprint && <span>{t.sprint}</span>}
-              <span>담당 {t.assignee || "없음"}</span>
-              {t.reporter && <span>보고 {t.reporter}</span>}
+              <span>{t.assignee ? tr`담당 ${t.assignee}` : tr`담당 없음`}</span>
+              {t.reporter && <span>{tr`보고 ${t.reporter}`}</span>}
               {t.parent && (
                 <button type="button" tabIndex={-1} onClick={() => openTicket(t.parent)}>
-                  상위 {t.parent}
+                  {tr`상위 ${t.parent}`}
                 </button>
               )}
-              <span>{when(t.updated)} 수정</span>
+              <span>{tr`${when(t.updated)} 수정`}</span>
               {sessions.map((s) => (
-                <button key={s.id} type="button" tabIndex={-1} onClick={() => onOpenSession(s.id)} title="이 티켓과 이어진 세션 열기">
-                  세션 "{s.name.slice(0, 24)}"
+                <button key={s.id} type="button" tabIndex={-1} onClick={() => onOpenSession(s.id)} title={tr`이 티켓과 이어진 세션 열기`}>
+                  {tr`세션 "${s.name.slice(0, 24)}"`}
                 </button>
               ))}
-              <button type="button" tabIndex={-1} className="pr-merge-btn" onClick={() => onStart(t)} title="워크트리를 따고 이 티켓을 첫 지시로 새 세션을 연다 (Enter)">
-                이 티켓으로 시작
+              <button type="button" tabIndex={-1} className="pr-merge-btn" onClick={() => onStart(t)} title={tr`워크트리를 따고 이 티켓을 첫 지시로 새 세션을 연다 (Enter)`}>
+                {tr`이 티켓으로 시작`}
               </button>
               <button type="button" tabIndex={-1} onClick={() => void openUrl(t.url)}>
-                웹에서 열기
+                {tr`웹에서 열기`}
               </button>
             </div>
           )}
           {moves && (
             <div className="pr-merge">
-              <span className="sub">지금 고를 수 있는 전환</span>
-              {moves.length === 0 && <span className="sub">없다 (권한이나 워크플로를 확인한다)</span>}
+              <span className="sub">{tr`지금 고를 수 있는 전환`}</span>
+              {moves.length === 0 && <span className="sub">{tr`없다 (권한이나 워크플로를 확인한다)`}</span>}
               {moves.map((m) => (
                 <button key={m.id} type="button" tabIndex={-1} disabled={!!busy} onClick={() => void move(m)}>
                   → {m.to || m.name}
                 </button>
               ))}
-              <input className="pr-close-note" value={moveNote} placeholder="같이 남길 코멘트 (선택)" onChange={(e) => setMoveNote(e.target.value)} />
+              <input className="pr-close-note" value={moveNote} placeholder={tr`같이 남길 코멘트 (선택)`} onChange={(e) => setMoveNote(e.target.value)} />
             </div>
           )}
         </div>
         <div className="tk-main">
           <div className="tk-desc">
-            <div className="rv-hist-head">설명</div>
-            {t ? t.description ? <Md text={adfToMd(t.description)} /> : <div className="pr-text muted">(설명 없음)</div> : null}
+            <div className="rv-hist-head">{tr`설명`}</div>
+            {t ? t.description ? <Md text={adfToMd(t.description)} /> : <div className="pr-text muted">{tr`(설명 없음)`}</div> : null}
             {t && t.subtasks.length > 0 && (
               <>
                 <div className="rv-hist-head" style={{ marginTop: 16 }}>
-                  하위 작업 {t.subtasks.filter((s) => s.statusCategory === "done").length} / {t.subtasks.length}
+                  {tr`하위 작업 ${t.subtasks.filter((s) => s.statusCategory === "done").length} / ${t.subtasks.length}`}
                 </div>
                 {t.subtasks.map((s) => (
                   <button key={s.key} type="button" tabIndex={-1} className="tk-sub" onClick={() => openTicket(s.key)}>
@@ -176,7 +177,7 @@ export default function TicketView({ ticketKey, conn, onClose, onStart, sessions
             )}
           </div>
           <div className="rv-hist pr-talk">
-            <div className="rv-hist-head">코멘트 {t?.comments.length ?? ""}</div>
+            <div className="rv-hist-head">{tr`코멘트 ${t?.comments.length ?? ""}`}</div>
             {t?.comments.map((c, i) => (
               <div key={i} className="pr-item">
                 <div>
@@ -187,17 +188,17 @@ export default function TicketView({ ticketKey, conn, onClose, onStart, sessions
             ))}
             {t && (
               <div className="pr-say tk-say">
-                <textarea rows={3} value={say} placeholder="코멘트 · ⌘Enter로 올린다" onChange={(e) => setSay(e.target.value)} />
+                <textarea rows={3} value={say} placeholder={tr`코멘트 · ⌘Enter로 올린다`} onChange={(e) => setSay(e.target.value)} />
                 <div className="pr-acts">
                   <button type="button" tabIndex={-1} disabled={!say.trim() || !!busy} onClick={() => void comment()}>
-                    {busy || "코멘트"}
+                    {busy || tr`코멘트`}
                   </button>
                 </div>
               </div>
             )}
           </div>
         </div>
-        <div className="pal-foot">s 상태 옮기기 · c 코멘트 · Enter 이 티켓으로 시작 · o 웹에서 열기 · r 새로 읽기 · Esc</div>
+        <div className="pal-foot">{tr`s 상태 옮기기 · c 코멘트 · Enter 이 티켓으로 시작 · o 웹에서 열기 · r 새로 읽기 · Esc`}</div>
       </div>
     </div>
   );

@@ -1,3 +1,4 @@
+import { tr } from "./i18n";
 import { ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import { CATEGORY, Ticket } from "./jira";
 import PrView from "./PrView";
@@ -112,7 +113,7 @@ export default function Work({ groups, ticketGroups = [], loadTickets, ticketPan
   return (
     <div className="wk" ref={box} tabIndex={-1} onKeyDown={onKey}>
       <nav className="wk-nav">
-        <div className="wk-title">작업</div>
+        <div className="wk-title">{tr`작업`}</div>
         <div className="wk-sec">PR</div>
         {groups.map((g, n) => (
           <button key={g.id} type="button" tabIndex={-1} className={"wk-grp" + (n === groupAt ? " on" : "") + (g.rows.some((r) => r.news) ? " hot" : "")} onClick={() => switchGroup(n)} title={g.hint}>
@@ -120,13 +121,13 @@ export default function Work({ groups, ticketGroups = [], loadTickets, ticketPan
             <b>{g.rows.length}</b>
           </button>
         ))}
-        <div className="wk-sec">티켓</div>
+        <div className="wk-sec">{tr`티켓`}</div>
         {!ticketGroups.length && (
           <div className="wk-soon">
-            Jira를 연결하면 진행 중, 할 일, 이번 스프린트, 내가 보고한 것이 여기 온다
+            {tr`Jira를 연결하면 진행 중, 할 일, 이번 스프린트, 내가 보고한 것이 여기 온다`}
             {onConnectJira && (
               <button type="button" tabIndex={-1} className="wk-connect" onClick={onConnectJira}>
-                Jira 연결하기
+                {tr`Jira 연결하기`}
               </button>
             )}
           </div>
@@ -142,8 +143,8 @@ export default function Work({ groups, ticketGroups = [], loadTickets, ticketPan
           );
         })}
         <div className="wk-navfoot">
-          <button type="button" tabIndex={-1} onClick={onRefresh} title="PR과 리뷰 요청을 바로 다시 읽는다 (r)">
-            새로 읽기
+          <button type="button" tabIndex={-1} onClick={onRefresh} title={tr`PR과 리뷰 요청을 바로 다시 읽는다 (r)`}>
+            {tr`새로 읽기`}
           </button>
         </div>
       </nav>
@@ -152,9 +153,9 @@ export default function Work({ groups, ticketGroups = [], loadTickets, ticketPan
           <b>{(tgroup ?? group)?.title}</b>
           <small>{(tgroup ?? group)?.hint}</small>
         </div>
-        {tgroup && tickets === undefined && <div className="side-none">읽는 중</div>}
+        {tgroup && tickets === undefined && <div className="side-none">{tr`읽는 중`}</div>}
         {tgroup && typeof tickets === "string" && <div className="side-none">{tickets}</div>}
-        {tgroup && Array.isArray(tickets) && !tickets.length && <div className="side-none">이 묶음은 비었다</div>}
+        {tgroup && Array.isArray(tickets) && !tickets.length && <div className="side-none">{tr`이 묶음은 비었다`}</div>}
         {tlist.map((t, i) => (
           <button key={t.key} type="button" tabIndex={-1} className={"wk-row" + (i === at ? " on" : "")} onClick={() => pick(i)} onDoubleClick={enterPr}>
             <span className="wk-row-title">
@@ -165,12 +166,12 @@ export default function Work({ groups, ticketGroups = [], loadTickets, ticketPan
               {CATEGORY[t.statusCategory] ? `${t.status}` : t.status}
               {t.type && ` · ${t.type}`}
               {t.priority && ` · ${t.priority}`}
-              {` · ${t.assignee || "담당 없음"}`}
+              {` · ${t.assignee || tr`담당 없음`}`}
               {t.updated && ` · ${ago(Date.parse(t.updated) / 1000)}`}
             </span>
           </button>
         ))}
-        {!tgroup && !rows.length && <div className="side-none">{total ? "이 묶음은 비었다" : "챙기는 PR이 없다. ⌘,의 연결에서 GitHub를 연결하고 챙길 범위를 고른다"}</div>}
+        {!tgroup && !rows.length && <div className="side-none">{total ? tr`이 묶음은 비었다` : tr`챙기는 PR이 없다. ⌘,의 연결에서 GitHub를 연결하고 챙길 범위를 고른다`}</div>}
         {rows.map((r, i) => (
           <button key={idOf(r.target)} type="button" tabIndex={-1} className={"wk-row" + (i === at ? " on" : "")} onClick={() => pick(i)} onDoubleClick={enterPr}>
             <span className="wk-row-title">
@@ -186,7 +187,7 @@ export default function Work({ groups, ticketGroups = [], loadTickets, ticketPan
                 ))}
               {repoName(r.target.repo)}
               {r.by && ` · ${r.by}`}
-              {r.sleeping && " · 잠듦"}
+              {r.sleeping && ` · ${tr`잠듦`}`}
               {r.at && ` · ${ago(Date.parse(r.at) / 1000)}`}
             </span>
           </button>
@@ -198,13 +199,16 @@ export default function Work({ groups, ticketGroups = [], loadTickets, ticketPan
         ) : ticket && ticketPane ? (
           ticketPane(ticket.key)
         ) : (
-          <div className="wk-empty">왼쪽에서 {tgroup ? "티켓" : "PR"}을 고른다</div>
+          <div className="wk-empty">{tgroup ? tr`왼쪽에서 티켓을 고른다` : tr`왼쪽에서 PR을 고른다`}</div>
         )}
       </div>
       <div className="wk-foot">
-        Tab 묶음 · ↑↓ 고르기 · Enter·→ {tgroup ? "티켓" : "PR"} 화면으로 (Esc로 목록에 돌아옴) · {row?.sessionId ? "s 세션 열기 · " : ""}
-        {row?.ask ? "⌘Enter 세션에 리뷰 맡기기 · " : ""}
-        {ticket ? "⌘Enter 이 티켓으로 시작 · " : ""}r 새로 읽기 · Esc 닫기
+        {tgroup ? tr`Tab 묶음 · ↑↓ 고르기 · Enter·→ 티켓 화면으로 (Esc로 목록에 돌아옴)` : tr`Tab 묶음 · ↑↓ 고르기 · Enter·→ PR 화면으로 (Esc로 목록에 돌아옴)`}
+        {" · "}
+        {row?.sessionId ? tr`s 세션 열기` + " · " : ""}
+        {row?.ask ? tr`⌘Enter 세션에 리뷰 맡기기` + " · " : ""}
+        {ticket ? tr`⌘Enter 이 티켓으로 시작` + " · " : ""}
+        {tr`r 새로 읽기 · Esc 닫기`}
       </div>
     </div>
   );

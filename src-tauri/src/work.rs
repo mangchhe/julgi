@@ -1,6 +1,7 @@
 //! 세션이 코드를 고치는 자리를 안전하게 마련하고, 무엇을 고쳤는지 보여 준다.
 //! 일감을 맡은 세션은 레포의 작업 폴더가 아니라 따로 딴 워크트리에서 일한다.
 //! 기본 브랜치가 더럽혀지지 않고, 같은 레포의 일감 여럿이 서로 덮어쓰지 않는다.
+use crate::lang::say;
 use std::{path::PathBuf, process::Command};
 
 use serde::Serialize;
@@ -26,14 +27,14 @@ fn git(dir: &str, args: &[&str]) -> Option<String> {
 /// branch를 주면 그 이름으로, 원격 기본 브랜치(origin/HEAD)에서 딴다(티켓으로 시작할 때). 없으면 julgi/이름으로 지금 HEAD에서 딴다(일감)
 pub fn worktree_add(repo: String, name: String, branch: Option<String>) -> Result<String, String> {
     if !name.chars().all(|c| c.is_ascii_alphanumeric() || c == '-') || name.is_empty() {
-        return Err(format!("쓸 수 없는 이름: {name}"));
+        return Err(say(&format!("쓸 수 없는 이름: {name}"), &format!("Name not allowed: {name}")));
     }
     if let Some(b) = &branch {
         if b.is_empty() || b.starts_with('-') || !b.chars().all(|c| c.is_ascii_alphanumeric() || "-_/.".contains(c)) || b.contains("..") {
-            return Err(format!("쓸 수 없는 브랜치 이름: {b}"));
+            return Err(say(&format!("쓸 수 없는 브랜치 이름: {b}"), &format!("Branch name not allowed: {b}")));
         }
     }
-    let top = git(&repo, &["rev-parse", "--show-toplevel"]).ok_or("git 레포가 아니다")?;
+    let top = git(&repo, &["rev-parse", "--show-toplevel"]).ok_or_else(|| say("git 레포가 아니다", "Not a git repository"))?;
     let folder = PathBuf::from(&top).file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_default();
     let dir = home().join(".julgi/worktrees").join(folder).join(&name);
     if let Some(parent) = dir.parent() {

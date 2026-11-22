@@ -2,6 +2,7 @@
 //! 토큰은 macOS 키체인에만 둔다. 명령줄 인자에 실리지 않게 키체인에는 `security -i`의 표준 입력으로,
 //! HTTP에는 curl 설정을 표준 입력으로 넘긴다. 화면에는 토큰을 돌려주지 않는다.
 
+use crate::lang::say;
 use std::{
     io::Write,
     process::{Command, Stdio},
@@ -23,13 +24,13 @@ pub struct Conn {
 
 fn check_site(site: &str) -> Result<(), String> {
     let ok = site.starts_with("https://") && site.len() > 8 && !site.chars().any(|c| c.is_whitespace() || "\"'\\<>".contains(c));
-    if ok { Ok(()) } else { Err("사이트 주소는 https://로 시작해야 한다".into()) }
+    if ok { Ok(()) } else { Err(say("사이트 주소는 https://로 시작해야 한다", "The site address must start with https://")) }
 }
 
 fn check_key(key: &str) -> Result<(), String> {
-    let (p, n) = key.split_once('-').ok_or("티켓 키가 이상하다")?;
+    let (p, n) = key.split_once('-').ok_or_else(|| say("티켓 키가 이상하다", "Invalid ticket key"))?;
     let ok = !p.is_empty() && p.chars().next().is_some_and(|c| c.is_ascii_uppercase()) && p.chars().all(|c| c.is_ascii_uppercase() || c.is_ascii_digit() || c == '_') && !n.is_empty() && n.chars().all(|c| c.is_ascii_digit());
-    if ok { Ok(()) } else { Err(format!("티켓 키가 이상하다: {key}")) }
+    if ok { Ok(()) } else { Err(say(&format!("티켓 키가 이상하다: {key}"), &format!("Invalid ticket key: {key}"))) }
 }
 
 fn token(site: &str) -> Option<String> {
@@ -40,14 +41,14 @@ fn token(site: &str) -> Option<String> {
 /// 키체인에 넣는다. `security -i`가 표준 입력에서 명령을 읽으므로 토큰이 프로세스 목록에 보이지 않는다
 fn save_token(site: &str, token: &str) -> Result<(), String> {
     if token.chars().any(|c| c == '"' || c == '\\' || c.is_whitespace()) {
-        return Err("토큰에 쓸 수 없는 글자가 있다".into());
+        return Err(say("토큰에 쓸 수 없는 글자가 있다", "The token contains a character that is not allowed"));
     }
     let mut child = Command::new("security").arg("-i").stdin(Stdio::piped()).stdout(Stdio::null()).stderr(Stdio::piped()).spawn().map_err(|e| e.to_string())?;
     if let Some(mut stdin) = child.stdin.take() {
         writeln!(stdin, "add-generic-password -U -s {SERVICE} -a \"{site}\" -w \"{token}\"").map_err(|e| e.to_string())?;
     }
     let out = child.wait_with_output().map_err(|e| e.to_string())?;
-    if out.status.success() { Ok(()) } else { Err(format!("키체인에 넣지 못했다: {}", String::from_utf8_lossy(&out.stderr).trim())) }
+    if out.status.success() { Ok(()) } else { Err({ let why = String::from_utf8_lossy(&out.stderr); let why = why.trim(); say(&format!("키체인에 넣지 못했다: {why}"), &format!("Could not save to the keychain: {why}")) }) }
 }
 
 fn b64(input: &[u8]) -> String {
@@ -99,23 +100,23 @@ fn call_with(conn: &Conn, token: &str, method: &str, path: &str, body: Option<&V
     let (body, code) = text.rsplit_once('\n').unwrap_or(("", &text));
     let code: u16 = code.trim().parse().unwrap_or(0);
     if code == 0 {
-        return Err(format!("Jira에 닿지 못했다: {}", String::from_utf8_lossy(&out.stderr).trim()));
+        return Err({ let why = String::from_utf8_lossy(&out.stderr); let why = why.trim(); say(&format!("Jira에 닿지 못했다: {why}"), &format!("Could not reach Jira: {why}")) });
     }
     let v: Value = if body.trim().is_empty() { Value::Null } else { serde_json::from_str(body).unwrap_or_else(|_| json!({ "raw": body })) };
     if code >= 400 {
         let msg = v["errorMessages"].as_array().and_then(|a| a.first()).and_then(|m| m.as_str()).map(str::to_owned).or_else(|| v["message"].as_str().map(str::to_owned)).unwrap_or_default();
         return Err(match code {
-            401 => "Jira 토큰이 맞지 않거나 만료됐다 (401)".into(),
-            403 => format!("권한이 없다 (403) {msg}"),
-            404 => format!("찾지 못했다 (404) {msg}"),
-            _ => format!("Jira 오류 {code} {msg}"),
+            401 => say("Jira 토큰이 맞지 않거나 만료됐다 (401)", "The Jira token is wrong or expired (401)"),
+            403 => say(&format!("권한이 없다 (403) {msg}"), &format!("Permission denied (403) {msg}")),
+            404 => say(&format!("찾지 못했다 (404) {msg}"), &format!("Not found (404) {msg}")),
+            _ => say(&format!("Jira 오류 {code} {msg}"), &format!("Jira error {code} {msg}")),
         });
     }
     Ok(v)
 }
 
 fn call(conn: &Conn, method: &str, path: &str, body: Option<&Value>) -> Result<Value, String> {
-    let t = token(&conn.site).ok_or("Jira에 연결돼 있지 않다")?;
+    let t = token(&conn.site).ok_or_else(|| say("Jira에 연결돼 있지 않다", "Jira is not connected"))?;
     call_with(conn, &t, method, path, body)
 }
 
@@ -258,7 +259,7 @@ fn body_of(conn: &Conn, text: &str) -> Value {
 pub fn jira_transition(conn: Conn, key: String, id: String, comment: String) -> Result<(), String> {
     check_key(&key)?;
     if id.is_empty() || !id.chars().all(|c| c.is_ascii_digit()) {
-        return Err("전환 id가 이상하다".into());
+        return Err(say("전환 id가 이상하다", "Invalid transition id"));
     }
     let mut body = json!({ "transition": { "id": id } });
     if !comment.trim().is_empty() {
@@ -271,7 +272,7 @@ pub fn jira_transition(conn: Conn, key: String, id: String, comment: String) -> 
 pub fn jira_comment(conn: Conn, key: String, body: String) -> Result<(), String> {
     check_key(&key)?;
     if body.trim().is_empty() {
-        return Err("쓸 말이 비었다".into());
+        return Err(say("쓸 말이 비었다", "Nothing to post: the text is empty"));
     }
     call(&conn, "POST", &format!("/issue/{key}/comment"), Some(&json!({ "body": body_of(&conn, body.trim()) }))).map(|_| ())
 }

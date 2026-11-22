@@ -1,5 +1,6 @@
 //! 스킬이 실제로 얼마나 쓰이는지 센다. 판단의 바탕은 숫자여야 한다.
 //! 쓰임은 Claude Code의 대화 기록에서 Skill 도구를 부른 줄을 찾아 세고, 파일마다 결과를 적어 둬 다시 읽지 않는다.
+use crate::lang::say;
 use std::{
     collections::HashMap,
     fs,
@@ -137,16 +138,16 @@ fn plain(name: &str) -> bool {
 #[tauri::command(async)]
 pub fn skill_apply(name: String) -> Result<String, String> {
     if !plain(&name) {
-        return Err("스킬 이름이 이상하다".into());
+        return Err(say("스킬 이름이 이상하다", "Invalid skill name"));
     }
     let revised = home().join(".julgi/grown/revised").join(&name).join("SKILL.md");
-    let text = fs::read_to_string(&revised).map_err(|_| "고친 글이 없다".to_string())?;
+    let text = fs::read_to_string(&revised).map_err(|_| say("고친 글이 없다", "The revised text is missing"))?;
     if !text.starts_with("---") || !text.contains(&format!("name: {name}")) {
-        return Err("고친 글에 frontmatter(name)가 없다".into());
+        return Err(say("고친 글에 frontmatter(name)가 없다", "The revised text has no frontmatter (name)"));
     }
-    let dir = [".julgi/grown/skills", ".claude/skills"].iter().map(|d| home().join(d).join(&name)).find(|d| d.join("SKILL.md").is_file()).ok_or("그런 스킬이 없다")?;
+    let dir = [".julgi/grown/skills", ".claude/skills"].iter().map(|d| home().join(d).join(&name)).find(|d| d.join("SKILL.md").is_file()).ok_or_else(|| say("그런 스킬이 없다", "No such skill"))?;
     if fs::symlink_metadata(&dir).map_or(true, |m| m.file_type().is_symlink()) {
-        return Err("링크로 건 스킬은 고치지 않는다".into());
+        return Err(say("링크로 건 스킬은 고치지 않는다", "Symlinked skills are not edited"));
     }
     let keep = home().join(".julgi/skill-history").join(&name);
     fs::create_dir_all(&keep).map_err(|e| e.to_string())?;
@@ -161,11 +162,11 @@ pub fn skill_apply(name: String) -> Result<String, String> {
 #[tauri::command(async)]
 pub fn skill_retire(name: String) -> Result<String, String> {
     if !plain(&name) {
-        return Err("스킬 이름이 이상하다".into());
+        return Err(say("스킬 이름이 이상하다", "Invalid skill name"));
     }
     let from = home().join(".julgi/grown/skills").join(&name);
     if !from.join("SKILL.md").is_file() {
-        return Err("Julgi가 만든 스킬이 아니다".into());
+        return Err(say("Julgi가 만든 스킬이 아니다", "Not a skill Julgi made"));
     }
     let to = home().join(".julgi/grown/retired");
     fs::create_dir_all(&to).map_err(|e| e.to_string())?;

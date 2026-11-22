@@ -10,6 +10,7 @@ import { WebLinksAddon } from "@xterm/addon-web-links";
 import { SearchAddon } from "@xterm/addon-search";
 import { openPath, openUrl } from "@tauri-apps/plugin-opener";
 import "@xterm/xterm/css/xterm.css";
+import { tr } from "./i18n";
 import { config } from "./model";
 import { openPr, prOf } from "./pr";
 import { findKeys, keyOfUrl, openTicket } from "./jira";
@@ -404,7 +405,7 @@ function open(entry: Entry) {
     t.write(data instanceof ArrayBuffer ? new Uint8Array(data) : Uint8Array.from(data));
   };
   void invoke("pty_spawn", { id, cols: t.cols, rows: t.rows, cwd: spec.cwd, command: spec.command, stripEnv: config.stripEnv, fallbackDir: config.defaultDir || null, onData: channel }).catch(
-    (e) => t.write(`\r\n터미널을 띄우지 못했다: ${e}\r\n`),
+    (e) => t.write(`\r\n${tr`터미널을 띄우지 못했다: ${e}`}\r\n`),
   );
   t.onData((data) => {
     // 창 포커스가 오갈 때 터미널이 알아서 보내는 것은 내가 친 게 아니다

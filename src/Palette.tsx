@@ -3,6 +3,7 @@ import { ago, linkLabel, Open, repoOf, Session } from "./model";
 import { invoke } from "@tauri-apps/api/core";
 import { prNo, prOf, repoName, ReviewAsk } from "./pr";
 import { CATEGORY, JiraConn, Ticket } from "./jira";
+import { tr } from "./i18n";
 
 export type Pick =
   | { kind: "open"; key: string }
@@ -84,8 +85,8 @@ export default function Palette({ open, sessions, byId, cwd, onPick, onAttach, o
   const prs = useMemo(() => {
     const out: PrRow[] = [];
     const add = (p: PrRow) => out.some((x) => x.repo === p.repo && x.number === p.number) || out.push(p);
-    for (const a of asks) add({ repo: a.repository.nameWithOwner, number: a.number, title: a.title, author: a.author.login, branch: "", tag: "리뷰 요청", draft: a.isDraft, at: a.updatedAt });
-    for (const m of mine) add({ repo: m.repository.nameWithOwner, number: m.number, title: m.title, author: m.author.login, branch: "", tag: "내 PR", draft: m.isDraft, at: m.updatedAt });
+    for (const a of asks) add({ repo: a.repository.nameWithOwner, number: a.number, title: a.title, author: a.author.login, branch: "", tag: "리뷰 요청", draft: a.isDraft, at: a.updatedAt }); // i18n-ok
+    for (const m of mine) add({ repo: m.repository.nameWithOwner, number: m.number, title: m.title, author: m.author.login, branch: "", tag: "내 PR", draft: m.isDraft, at: m.updatedAt }); // i18n-ok
     for (const p of repoPrs) add(p);
     return out;
   }, [asks, mine, repoPrs]);
@@ -94,20 +95,20 @@ export default function Palette({ open, sessions, byId, cwd, onPick, onAttach, o
   const rows = useMemo<Row[]>(() => {
     // "jira" 또는 "티켓"으로 시작하면 티켓만 찾는다: 키를 쳤으면 그 티켓, 내 티켓(진행 중 → 할 일), Jira 전체 검색 결과
     if (jiraQuery) {
-      if (!jira) return [{ pick: { kind: "ticket", key: "" }, title: "Jira에 연결돼 있지 않다", meta: "⌘,의 연결에서 연결한다", isLink: true }];
+      if (!jira) return [{ pick: { kind: "ticket", key: "" }, title: tr`Jira에 연결돼 있지 않다`, meta: tr`⌘,의 연결에서 연결한다`, isLink: true }];
       const out: Row[] = [];
       const key = jiraText.toUpperCase();
-      if (/^[A-Z][A-Z0-9_]+-\d+$/.test(key)) out.push({ pick: { kind: "ticket", key }, title: `${key} 보기`, meta: "티켓 화면", isLink: true });
+      if (/^[A-Z][A-Z0-9_]+-\d+$/.test(key)) out.push({ pick: { kind: "ticket", key }, title: tr`${key} 보기`, meta: tr`티켓 화면`, isLink: true });
       const low = jiraText.toLowerCase();
       const fit = (t: Ticket) => !low || t.key.toLowerCase().startsWith(low) || t.title.toLowerCase().includes(low);
       const rank = (t: Ticket) => (t.statusCategory === "indeterminate" ? 0 : t.statusCategory === "new" ? 1 : 2);
       const seen = new Set<string>();
       for (const t of tickets.filter(fit).sort((a, b) => rank(a) - rank(b))) {
         seen.add(t.key);
-        out.push({ pick: { kind: "ticket", key: t.key }, title: `${t.key} ${t.title}`, meta: [CATEGORY[t.statusCategory] ?? t.status, t.status, t.type, t.priority].filter(Boolean).join(" · "), isLink: true });
+        out.push({ pick: { kind: "ticket", key: t.key }, title: `${t.key} ${t.title}`, meta: [CATEGORY[t.statusCategory] ? tr(CATEGORY[t.statusCategory]) : t.status, t.status, t.type, t.priority].filter(Boolean).join(" · "), isLink: true });
       }
-      for (const t of hits.filter((h) => !seen.has(h.key))) out.push({ pick: { kind: "ticket", key: t.key }, title: `${t.key} ${t.title}`, meta: ["검색", t.status, t.assignee || "담당 없음"].join(" · "), isLink: true });
-      if (!out.length) out.push({ pick: { kind: "ticket", key: "" }, title: jiraText.length >= 2 ? "찾는 중이거나 맞는 티켓이 없다" : "내게 배정된 티켓이 없다", meta: "jira 뒤에 키나 낱말을 친다", isLink: true });
+      for (const t of hits.filter((h) => !seen.has(h.key))) out.push({ pick: { kind: "ticket", key: t.key }, title: `${t.key} ${t.title}`, meta: [tr`검색`, t.status, t.assignee || tr`담당 없음`].join(" · "), isLink: true });
+      if (!out.length) out.push({ pick: { kind: "ticket", key: "" }, title: jiraText.length >= 2 ? tr`찾는 중이거나 맞는 티켓이 없다` : tr`내게 배정된 티켓이 없다`, meta: tr`jira 뒤에 키나 낱말을 친다`, isLink: true });
       return out;
     }
     // "pr"이나 "#"으로 시작하면 PR만 찾는다. 뒤에 붙인 글로 번호 앞자리나 제목·브랜치를 거른다
@@ -118,17 +119,17 @@ export default function Palette({ open, sessions, byId, cwd, onPick, onAttach, o
       const numeric = /^\d+$/.test(rest);
       const fits = (number: number, text: string) => !rest || (numeric ? String(number).startsWith(rest) : text.toLowerCase().includes(rest));
       // 열린 PR: 리뷰 요청 → 내 PR → 이 레포의 나머지, 묶음 안에서는 번호가 큰(최근) 것부터
-      const group = (p: PrRow) => (p.tag === "리뷰 요청" ? 0 : p.tag === "내 PR" ? 1 : 2);
+      const group = (p: PrRow) => (p.tag === "리뷰 요청" ? 0 : p.tag === "내 PR" ? 1 : 2); // i18n-ok
       const hits = prs.filter((p) => fits(p.number, `${p.title} ${p.branch} ${p.author}`)).sort((a, b) => group(a) - group(b) || b.number - a.number);
       for (const p of hits.slice(0, 30))
         prRows.push({
           pick: { kind: "pr", number: p.number, repo: p.repo },
           title: `${prNo({ repo: p.repo, number: p.number })} ${p.title}`,
-          meta: [p.tag, p.draft ? "초안" : "", repoName(p.repo), p.author, p.branch].filter(Boolean).join(" · "),
+          meta: [p.tag && tr(p.tag), p.draft ? tr`초안` : "", repoName(p.repo), p.author, p.branch].filter(Boolean).join(" · "),
           isLink: true,
         });
       // 목록에 없는 번호(닫힌 옛 PR 등)를 정확히 쳤으면 그 번호로 바로 연다
-      if (/^\d+$/.test(rest) && !hits.some((p) => String(p.number) === rest)) prRows.push({ pick: { kind: "pr", number: Number(rest) }, title: `PR #${rest} 보기`, meta: `${repoOf(cwd)} · 열린 PR 목록에 없는 번호`, isLink: true });
+      if (/^\d+$/.test(rest) && !hits.some((p) => String(p.number) === rest)) prRows.push({ pick: { kind: "pr", number: Number(rest) }, title: tr`PR #${rest} 보기`, meta: `${repoOf(cwd)} · ${tr`열린 PR 목록에 없는 번호`}`, isLink: true });
       // 세션이 남긴 PR 링크 (닫히거나 머지된 것도). 열린 목록에 이미 있는 것은 빼고, 같은 PR은 한 번, 번호가 큰 것부터
       const seen = new Set(hits.map((p) => `${p.repo}#${p.number}`));
       const left: { url: string; repo: string; number: number; s: Session }[] = [];
@@ -141,8 +142,8 @@ export default function Palette({ open, sessions, byId, cwd, onPick, onAttach, o
           left.push({ url, ...pr, s });
         }
       left.sort((a, b) => b.number - a.number);
-      for (const l of left.slice(0, 30)) prRows.push({ pick: { kind: "pr", number: l.number, repo: l.repo }, title: `${repoName(l.repo)} PR ${prNo(l)}`, meta: `세션이 남긴 PR · ${l.s.title.slice(0, 40)} · ${ago(l.s.mtime)}`, isLink: true, session: l.s });
-      if (!prRows.length) prRows.push({ pick: { kind: "pr", number: 0 }, title: prs.length ? "맞는 PR이 없다" : "열린 PR이 없거나 아직 읽는 중", meta: "pr 뒤에 번호나 제목을 친다", isLink: true });
+      for (const l of left.slice(0, 30)) prRows.push({ pick: { kind: "pr", number: l.number, repo: l.repo }, title: `${repoName(l.repo)} PR ${prNo(l)}`, meta: `${tr`세션이 남긴 PR`} · ${l.s.title.slice(0, 40)} · ${ago(l.s.mtime)}`, isLink: true, session: l.s });
+      if (!prRows.length) prRows.push({ pick: { kind: "pr", number: 0 }, title: prs.length ? tr`맞는 PR이 없다` : tr`열린 PR이 없거나 아직 읽는 중`, meta: tr`pr 뒤에 번호나 제목을 친다`, isLink: true });
       return prRows;
     }
     // "아티팩트 환불"처럼 치면 산출물만 찾는다: 종류를 가리키는 낱말은 떼고 나머지로 세션을 찾아, 그 세션이 남긴 링크를 낸다
@@ -164,7 +165,7 @@ export default function Palette({ open, sessions, byId, cwd, onPick, onAttach, o
     for (const o of open) {
       const s = o.sessionId ? byId.get(o.sessionId) : undefined;
       if (o.sessionId) openIds.add(o.sessionId);
-      const row: Row = { pick: { kind: "open", key: o.key }, title: s?.title ?? o.label, meta: `열림 · ${s?.repo ?? repoOf(o.cwd)}`, session: s };
+      const row: Row = { pick: { kind: "open", key: o.key }, title: s?.title ?? o.label, meta: `${tr`열림`} · ${s?.repo ?? repoOf(o.cwd)}`, session: s };
       if (!q || has(s?.title ?? o.label, s?.said, s?.group, s?.repo, s?.branch)) out.push(row);
       else if (has(s?.recap)) weak.push(row);
     }
@@ -182,7 +183,7 @@ export default function Palette({ open, sessions, byId, cwd, onPick, onAttach, o
         session: s,
       });
       // 찾는 말이 있으면 그 세션이 남긴 산출물도 바로 아래에 낸다. 세션을 열지 않고 링크로 간다
-      if (q && strong) for (const url of s.links.slice(-3)) out.push({ pick: { kind: "link", url }, title: `↳ ${linkLabel(url)}`, meta: prOf(url) ? "PR 보기" : "브라우저로 열기", isLink: true, session: s });
+      if (q && strong) for (const url of s.links.slice(-3)) out.push({ pick: { kind: "link", url }, title: `↳ ${linkLabel(url)}`, meta: prOf(url) ? tr`PR 보기` : tr`브라우저로 열기`, isLink: true, session: s });
     }
     out.push(...weak);
     // 새 세션을 열 위치: 이름이 맞는 프로젝트가 있으면 그 폴더들, 없으면 지금 폴더
@@ -195,7 +196,7 @@ export default function Palette({ open, sessions, byId, cwd, onPick, onAttach, o
     }
     if (!folders.length) folders.push(cwd);
     for (const folder of folders)
-      out.push({ pick: { kind: "new", cwd: folder }, title: `+ 새 세션 · ${repoOf(folder)}`, meta: folder.replace(/^\/Users\/[^/]+/, "~"), isNew: true });
+      out.push({ pick: { kind: "new", cwd: folder }, title: tr`+ 새 세션 · ${repoOf(folder)}`, meta: folder.replace(/^\/Users\/[^/]+/, "~"), isNew: true });
     return out;
   }, [query, open, sessions, byId, cwd, prs, tickets, hits, !!jira]);
 
@@ -229,7 +230,7 @@ export default function Palette({ open, sessions, byId, cwd, onPick, onAttach, o
         <input
           ref={input}
           value={query}
-          placeholder={'이름을 친다. 하던 세션이 먼저 나온다 · "아티팩트", "MR"을 넣으면 산출물을 찾는다'}
+          placeholder={tr`이름을 친다. 하던 세션이 먼저 나온다 · "아티팩트", "MR"을 넣으면 산출물을 찾는다`}
           onChange={(e) => {
             setQuery(e.target.value);
             setSel(0);
@@ -246,11 +247,11 @@ export default function Palette({ open, sessions, byId, cwd, onPick, onAttach, o
         </div>
         {rows[at]?.session && (
           <div className="pal-peek">
-            {rows[at].session!.recap || "요약이 아직 없다"}
-            {rows[at].session!.links.length > 0 && <span> · 링크 {rows[at].session!.links.length}개</span>}
+            {rows[at].session!.recap || tr`요약이 아직 없다`}
+            {rows[at].session!.links.length > 0 && <span> · {tr`링크 ${rows[at].session!.links.length}개`}</span>}
           </div>
         )}
-        <div className="pal-foot">Enter 열기 (↳ 산출물은 브라우저로) · Tab 요약만 붙이기 · ⌥Enter 지금 세션과 한 줄기로 · ↑ 새 세션 · Esc</div>
+        <div className="pal-foot">{tr`Enter 열기 (↳ 산출물은 브라우저로) · Tab 요약만 붙이기 · ⌥Enter 지금 세션과 한 줄기로 · ↑ 새 세션 · Esc`}</div>
       </div>
     </div>
   );

@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { ago } from "./model";
 import { PrTarget, ReviewAsk, prNo, repoName } from "./pr";
+import { tr } from "./i18n";
 
 /** news: PR에 생긴 일(CI 실패, 새 코멘트 등). 있으면 답을 기다리는 게 아니라 PR 때문에 올라온 것이다 */
 /** pr: 이 세션이 올린 PR. ⌥Enter로 PR 화면을 연다. state가 sleep이면 잠든 세션이다(고르면 깨운다) */
@@ -119,13 +120,13 @@ export default function Queue({ rows, asks, mine, tickets, onTicket, onStartTick
     <div className="pal-back wide" onMouseDown={onClose}>
       <div className="qu" ref={box} tabIndex={-1} onMouseDown={(e) => e.stopPropagation()} onKeyDown={onKey}>
         <div className="qu-list">
-          {list.length > 0 && <div className="qu-head">내 차례 {list.length}</div>}
+          {list.length > 0 && <div className="qu-head">{tr`내 차례`} {list.length}</div>}
           {list.map((r, i) => (
             <button key={r.key} type="button" tabIndex={-1} className={"qu-row" + (r.key === row?.key ? " on" : "")} onClick={() => (setAt(i), setText(""))}>
               <b>{r.name}</b>
               <small>
-                {r.repo} · {r.state === "sleep" ? "잠듦 · " : ""}
-                {r.news ? <em className="qu-news">PR{r.pr ? ` #${r.pr.number}` : ""} · {r.news}</em> : r.state === "ask" ? "확인이 필요함" : "답함"}
+                {r.repo} · {r.state === "sleep" ? tr`잠듦` + " · " : ""}
+                {r.news ? <em className="qu-news">PR{r.pr ? ` #${r.pr.number}` : ""} · {r.news}</em> : r.state === "ask" ? tr`확인이 필요함` : tr`답함`}
                 {r.since > 0 && ` · ${ago(r.since / 1000)}`}
               </small>
             </button>
@@ -134,7 +135,7 @@ export default function Queue({ rows, asks, mine, tickets, onTicket, onStartTick
             <>
             {(i === 0 || askList[i - 1].kind !== a.kind) && (
               <div key={"h-" + a.kind} className="qu-head">
-                {a.kind === "mine" ? "내 PR" : a.kind === "ticket" ? "티켓" : "리뷰 요청"} {askList.filter((x) => x.kind === a.kind).length}
+                {a.kind === "mine" ? tr`내 PR` : a.kind === "ticket" ? tr`티켓` : tr`리뷰 요청`} {askList.filter((x) => x.kind === a.kind).length}
               </div>
             )}
             <button key={a.url} type="button" tabIndex={-1} className={"qu-row" + (a.url === ask?.url ? " on" : "")} onClick={() => (setAt(list.length + i), setText(""))}>
@@ -164,37 +165,37 @@ export default function Queue({ rows, asks, mine, tickets, onTicket, onStartTick
                   {ask.title}
                 </pre>
                 {ask.kind === "ticket" ? (
-                  <small>티켓에 일이 생겼다: {ask.news} · Enter로 티켓 화면, ⌘Enter로 이 티켓으로 시작</small>
+                  <small>{tr`티켓에 일이 생겼다: ${ask.news} · Enter로 티켓 화면, ⌘Enter로 이 티켓으로 시작`}</small>
                 ) : ask.kind === "mine" ? (
-                  <small>내 PR에 일이 생겼다: {ask.news} · Enter로 PR 화면에서 본다</small>
+                  <small>{tr`내 PR에 일이 생겼다: ${ask.news} · Enter로 PR 화면에서 본다`}</small>
                 ) : (
                 <small>
-                  {ask.author.login}이 리뷰를 부탁했다{ask.isDraft ? " · 초안" : ""} · 빈 채로 Enter면 PR 화면에서 본다. 세션에 맡기면 새 세션이 PR을 읽고 짚을 곳을 정리한다(GitHub에 직접 올리지는 않는다)
+                  {tr`${ask.author.login}이 리뷰를 부탁했다`}{ask.isDraft ? " · " + tr`초안` : ""} · {tr`빈 채로 Enter면 PR 화면에서 본다. 세션에 맡기면 새 세션이 PR을 읽고 짚을 곳을 정리한다(GitHub에 직접 올리지는 않는다)`}
                 </small>
                 )}
               </div>
-              {ask.kind === "review" && <textarea ref={input} rows={2} value={text} placeholder="세션에 맡길 때 덧붙일 말 (예: 트랜잭션 위주로) · Enter 맡기기 · 빈 채로 Enter면 PR 화면 · ⌘Enter 바로 맡기기" onChange={(e) => setText(e.target.value)} />}
+              {ask.kind === "review" && <textarea ref={input} rows={2} value={text} placeholder={tr`세션에 맡길 때 덧붙일 말 (예: 트랜잭션 위주로) · Enter 맡기기 · 빈 채로 Enter면 PR 화면 · ⌘Enter 바로 맡기기`} onChange={(e) => setText(e.target.value)} />}
             </>
           )}
           {row && (
             <>
               <div className="qu-reply">
-                {reply === undefined && <small>읽는 중</small>}
-                {reply === "" && <small>마지막 답을 읽지 못했다. Enter로 세션을 연다.</small>}
+                {reply === undefined && <small>{tr`읽는 중`}</small>}
+                {reply === "" && <small>{tr`마지막 답을 읽지 못했다. Enter로 세션을 연다.`}</small>}
                 {rest && <pre className="qu-rest">{rest.split("\n").slice(-40).join("\n")}</pre>}
                 {asked && <pre className="qu-asked">{asked}</pre>}
-                {reply && !asked && <small>묻는 말로 끝나지 않았다. 답을 다 한 것일 수 있다.</small>}
+                {reply && !asked && <small>{tr`묻는 말로 끝나지 않았다. 답을 다 한 것일 수 있다.`}</small>}
               </div>
               <textarea
                 ref={input}
                 rows={2}
                 value={text}
-                placeholder={row.state === "ask" ? "허락을 묻고 있다. Enter로 세션을 열어 고른다" : row.state === "sleep" ? "잠든 세션이다. 빈 채로 Enter면 깨워서 열고, 답을 치면 그 글을 들고 깨운다" + (row.pr ? " · ⌥Enter PR 보기" : "") : "여기에 답을 치고 Enter · 빈 채로 Enter면 세션을 연다" + (row.pr ? " · ⌥Enter PR 보기" : "")}
+                placeholder={row.state === "ask" ? tr`허락을 묻고 있다. Enter로 세션을 열어 고른다` : (row.state === "sleep" ? tr`잠든 세션이다. 빈 채로 Enter면 깨워서 열고, 답을 치면 그 글을 들고 깨운다` : tr`여기에 답을 치고 Enter · 빈 채로 Enter면 세션을 연다`) + (row.pr ? " · " + tr`⌥Enter PR 보기` : "")}
                 onChange={(e) => setText(e.target.value)}
               />
             </>
           )}
-          <div className="pal-foot">{ask ? "↑↓ 고르기 · Enter PR 화면 (글이 있으면 세션에 맡기기) · ⌘Enter 세션에 맡기기 · Esc" : "↑↓ 고르기 · Enter 답 보내기 (빈 채면 세션 열기) · ⌘Enter 세션 열기 · ⇧Enter 줄바꿈 · Esc"}</div>
+          <div className="pal-foot">{ask ? tr`↑↓ 고르기 · Enter PR 화면 (글이 있으면 세션에 맡기기) · ⌘Enter 세션에 맡기기 · Esc` : tr`↑↓ 고르기 · Enter 답 보내기 (빈 채면 세션 열기) · ⌘Enter 세션 열기 · ⇧Enter 줄바꿈 · Esc`}</div>
         </div>
       </div>
     </div>

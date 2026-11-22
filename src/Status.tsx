@@ -1,4 +1,5 @@
 import { useEffect, useRef } from "react";
+import { tr } from "./i18n";
 
 type Row = { key: string; name: string; repo: string; rss: number; cpu: number; state: string };
 type Limit = { name: string; used: number; resets: number };
@@ -20,6 +21,8 @@ type Props = {
 };
 
 const size = (kb: number) => (kb >= 1_048_576 ? `${(kb / 1_048_576).toFixed(1)}GB` : `${Math.round(kb / 1024)}MB`);
+/** 한도 이름은 뒷단이 한국어로 준다("5시간", "주간", "주간 Fable"). 보여 줄 때만 옮긴다 */
+const limitName = (name: string) => (name.startsWith("주간 ") ? tr`주간 ${name.slice(3)}` : tr(name)); // i18n-ok
 /** 다시 찰 때까지: "2h 27m" */
 const left = (at: number) => {
   const s = at - Date.now() / 1000;
@@ -60,8 +63,8 @@ export default function Status({ rows, limit, usage, usageWhy, open, onToggle, o
       {open && (
         <div className="status-pop">
           <div className="status-pop-head">
-            <b>세션이 쓰는 자원</b>
-            <span>{limit ? `합계가 ${limit}GB를 넘으면 쉬는 세션부터 재운다` : "메모리 한도 없음"}</span>
+            <b>{tr("세션이 쓰는 자원")}</b>
+            <span>{limit ? tr`합계가 ${limit}GB를 넘으면 쉬는 세션부터 재운다` : tr("메모리 한도 없음")}</span>
           </div>
           {[...live]
             .sort((a, b) => b.rss - a.rss)
@@ -74,15 +77,15 @@ export default function Status({ rows, limit, usage, usageWhy, open, onToggle, o
                 <span className="status-num">{size(r.rss)}</span>
               </button>
             ))}
-          {live.length === 0 && <div className="side-none">떠 있는 세션이 없다</div>}
+          {live.length === 0 && <div className="side-none">{tr("떠 있는 세션이 없다")}</div>}
         </div>
       )}
       {/* 한도 막대들은 한 묶음이다. 어디를 눌러도 사용량 화면이 열린다 */}
       {usage && usage.length > 0 && (
-      <span className="status-usegrp" title="누르면 모델·프로젝트·세션별 사용량 (⌘⇧U)" onClick={onUsage}>
+      <span className="status-usegrp" title={tr("누르면 모델·프로젝트·세션별 사용량 (⌘⇧U)")} onClick={onUsage}>
       {usage.map((l) => (
-        <span key={l.name} className={"status-use" + (l.used >= 90 ? " high" : l.used >= 70 ? " mid" : "")} title={`${l.name} 한도의 ${l.used.toFixed(0)}%를 썼다${left(l.resets) ? ` · ${left(l.resets)} 뒤에 다시 찬다` : ""}`}>
-          <small>{l.name}</small>
+        <span key={l.name} className={"status-use" + (l.used >= 90 ? " high" : l.used >= 70 ? " mid" : "")} title={left(l.resets) ? tr`${limitName(l.name)} 한도의 ${l.used.toFixed(0)}%를 썼다 · ${left(l.resets)} 뒤에 다시 찬다` : tr`${limitName(l.name)} 한도의 ${l.used.toFixed(0)}%를 썼다`}>
+          <small>{limitName(l.name)}</small>
           <i>
             <u style={{ width: `${Math.min(100, l.used)}%` }} />
           </i>
@@ -92,23 +95,23 @@ export default function Status({ rows, limit, usage, usageWhy, open, onToggle, o
       ))}
       </span>
       )}
-      {usageWhy && !usage && <span className="status-why" title={usageWhy}>사용량을 못 받았다</span>}
+      {usageWhy && !usage && <span className="status-why" title={usageWhy}>{tr("사용량을 못 받았다")}</span>}
       {(usage || usageWhy) && (
-        <button type="button" tabIndex={-1} className="status-refresh" title="사용량 다시 받기" onClick={onRefresh}>
+        <button type="button" tabIndex={-1} className="status-refresh" title={tr("사용량 다시 받기")} onClick={onRefresh}>
           ⟳
         </button>
       )}
       <span className="status-gap" />
-      <button type="button" tabIndex={-1} className={"status-load" + (over ? " over" : "")} title="Julgi가 띄운 세션들이 쓰는 메모리와 CPU. 누르면 세션별로 본다" onClick={onToggle}>
-        세션 {live.length} · <b>{size(total)}</b>
+      <button type="button" tabIndex={-1} className={"status-load" + (over ? " over" : "")} title={tr("Julgi가 띄운 세션들이 쓰는 메모리와 CPU. 누르면 세션별로 본다")} onClick={onToggle}>
+        {tr`세션 ${live.length}`} · <b>{size(total)}</b>
         {limit > 0 && <small> / {limit}GB</small>}
         {cpu >= 1 && <span> · CPU {cpu.toFixed(0)}%</span>}
       </button>
-      <button type="button" tabIndex={-1} className="status-keys" title="모델·프로젝트·세션별 토큰 사용량 (⌘⇧U)" onClick={onUsage}>
-        토큰
+      <button type="button" tabIndex={-1} className="status-keys" title={tr("모델·프로젝트·세션별 토큰 사용량 (⌘⇧U)")} onClick={onUsage}>
+        {tr("토큰")}
       </button>
-      <button type="button" tabIndex={-1} className="status-keys" title="단축키 보기" onClick={onHelp}>
-        <kbd>⌘/</kbd> 키
+      <button type="button" tabIndex={-1} className="status-keys" title={tr("단축키 보기")} onClick={onHelp}>
+        <kbd>⌘/</kbd> {tr("키")}
       </button>
     </div>
   );

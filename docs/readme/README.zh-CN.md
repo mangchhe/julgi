@@ -21,7 +21,7 @@
 *Julgi*（줄기，读作“jool-gi”）在韩语里是植物的茎。在这个应用里，**茎（stem）** 指一件工作，以及接力完成它的一串会话。
 
 > [!NOTE]
-> 界面目前只有韩语，并且只在 macOS 上用过。没有签名的安装包，需要自己构建（一个脚本即可）。
+> 界面有英语和韩语（跟随系统语言，可在 `⌘,` 里更改）。只在 macOS 上用过。没有签名的安装包，需要自己构建（一个脚本即可）。
 
 ## 功能
 
@@ -122,11 +122,11 @@ scripts/install.sh --open    # 检查工具 → 构建 → /Applications/Julgi.a
 
 更新时运行同一条命令。`scripts/install.sh --check` 只检查工具。想改代码：`npm install && npm run tauri dev`。
 
-集成需要额外的东西：GitHub 用 [`gh`](https://cli.github.com)，GitLab 用 [`glab`](https://gitlab.com/gitlab-org/cli)，Jira 需要一个 API token。在 `⌘,` → 连接（연결）里接入。
+集成需要额外的东西：GitHub 用 [`gh`](https://cli.github.com)，GitLab 用 [`glab`](https://gitlab.com/gitlab-org/cli)，Jira 需要一个 API token。在 `⌘,` → Connections 里接入。
 
 ## 快速上手
 
-1. 打开 Julgi，按 `⌘,` → 地图（지도），指定存放仓库的文件夹。
+1. 打开 Julgi，按 `⌘,` → Map，指定存放仓库的文件夹。
 2. 按 `⌘L`，输入想做的事，按 Enter。
 3. 会话需要你时会移到“轮到我”。按 `⌘J` 回答。
 

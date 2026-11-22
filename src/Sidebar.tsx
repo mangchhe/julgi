@@ -1,9 +1,10 @@
 import { openPr, prParts, PrStatus, PrTarget } from "./pr";
 import { openTicket } from "./jira";
+import { tr } from "./i18n";
 import { Change, Job, ago, config, elsewhere, hot, Item, kilo, Open, Session, STATE_LABEL, TermState, Thread, waiting } from "./model";
 
 /** 이름을 붙였거나 세션이 이어진 줄기는 폴더와 상관없이 이 묶음으로 맨 위에 모은다 */
-const THREADS = "줄기";
+const THREADS = "줄기"; // 묶음의 열쇠다. 보여 줄 때만 옮긴다 i18n-ok
 
 const PER_GROUP = 6;
 
@@ -84,23 +85,23 @@ export default function Sidebar({ open, items, threads, byId, states, tasks, cha
     <aside className="side">
       <div className="side-head">
         {/* 숫자는 아래 묶음 제목에 있다. 여기는 찾기 하나만 둔다 */}
-        <button type="button" className="side-search" onClick={onSearch} title="세션·줄기·산출물 찾기, 새로 열기">
+        <button type="button" className="side-search" onClick={onSearch} title={tr`세션·줄기·산출물 찾기, 새로 열기`}>
           <svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="7" cy="7" r="4.5" /><path d="M10.5 10.5 14 14" /></svg>
-          <span>찾기</span>
+          <span>{tr`찾기`}</span>
           <kbd>⌘K</kbd>
         </button>
       </div>
       {/* 작업 페이지(⌘U): PR을 묶음별로 둘러본다 */}
-      <button type="button" className={"side-work" + (work.news ? " hot" : "")} onClick={onWork} title="작업: PR을 묶음별로 둘러본다 (⌘U)">
+      <button type="button" className={"side-work" + (work.news ? " hot" : "")} onClick={onWork} title={tr`작업: PR을 묶음별로 둘러본다 (⌘U)`}>
         <svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="4" cy="4" r="2" /><circle cx="4" cy="12" r="2" /><circle cx="12" cy="12" r="2" /><path d="M4 6v4M12 10V7a3 3 0 0 0-3-3H7" /></svg>
-        <span>작업</span>
-        <small>{[work.prs ? `PR ${work.prs}` : "", work.asks ? `리뷰 ${work.asks}` : "", work.news ? `새 소식 ${work.news}` : ""].filter(Boolean).join(" · ") || "⌘U"}</small>
+        <span>{tr`작업`}</span>
+        <small>{[work.prs ? `PR ${work.prs}` : "", work.asks ? tr`리뷰 ${work.asks}` : "", work.news ? tr`새 소식 ${work.news}` : ""].filter(Boolean).join(" · ") || "⌘U"}</small>
       </button>
       <div className="side-list">
         {open.length === 0 && (
           <>
-            <div className="grp">열림</div>
-            <div className="side-none">열린 세션이 없다</div>
+            <div className="grp">{tr`열림`}</div>
+            <div className="side-none">{tr`열린 세션이 없다`}</div>
           </>
         )}
         {ranked.map(({ o, i, rank, job, head }) => {
@@ -111,7 +112,7 @@ export default function Sidebar({ open, items, threads, byId, states, tasks, cha
             <div key={o.key}>
               {head && (
                 <div className={"grp g" + rank}>
-                  <span>{["내 차례", "일하는 중", "열려 있음"][rank]}</span>
+                  <span>{[tr`내 차례`, tr`일하는 중`, tr`열려 있음`][rank]}</span>
                   <span className="n">{rank < 2 ? counts[rank] : tops.filter((r) => r.rank === 2).length}</span>
                 </div>
               )}
@@ -125,10 +126,10 @@ export default function Sidebar({ open, items, threads, byId, states, tasks, cha
               <div className="row-body">
                 <div className="row-title">{job ? `${job.repo} · ${job.ask.split("\n")[0].replace(/^배경:\s*/, "").slice(0, 40)}` : (threadOf(o.sessionId)?.name ?? s?.title ?? o.label)}</div>
                 <div className={"row-meta" + (!job && st?.state === "ask" ? " wait" : "")}>
-                  {job
-                    ? [`일감 ${job.status}`, job.redo ? `다시 ${job.redo}번` : "", pane >= 0 ? "화면에 있음" : ""].filter(Boolean).join(" · ")
-                    : [st?.state === "hold" ? `일감 기다리는 중 · ${tasks.filter((t) => t.lead === o.sessionId && (t.status === "대기" || t.status === "하는 중")).length}개` : st?.state === "ask" || st?.state === "dead" ? STATE_LABEL[st.state] : "", s?.repo ?? "", s?.branch ?? "", pinned.includes(o.key) ? "고정" : ""].filter(Boolean).join(" · ")}
-                  {s && hot(s.tokens) && <span className="hot" title="세션이 크다. 다음에 보낼 때 갈아탄다"> · {kilo(s.tokens)}</span>}
+                  {job // 일감의 상태는 저장된 값이다 i18n-ok
+                    ? [tr`일감 ${tr(job.status)}`, job.redo ? tr`다시 ${job.redo}번` : "", pane >= 0 ? tr`화면에 있음` : ""] // i18n-ok.filter(Boolean).join(" · ")
+                    : [st?.state === "hold" ? tr`일감 기다리는 중 · ${tasks.filter((t) => t.lead === o.sessionId && (t.status === "대기" || t.status === "하는 중")).length}개` : st?.state === "ask" || st?.state === "dead" ? STATE_LABEL[st.state] : "", s?.repo ?? "", s?.branch ?? "", pinned.includes(o.key) ? tr`고정` : ""].filter(Boolean).join(" · ")}
+                  {s && hot(s.tokens) && <span className="hot" title={tr`세션이 크다. 다음에 보낼 때 갈아탄다`}> · {kilo(s.tokens)}</span>}
                 </div>
                 {(() => {
                   const pr = job ? undefined : prOf(o.key);
@@ -136,7 +137,7 @@ export default function Sidebar({ open, items, threads, byId, states, tasks, cha
                   return (
                     <div
                       className={"row-meta pr-line" + (pr.news ? " news" : "")}
-                      title="PR 화면 열기"
+                      title={tr`PR 화면 열기`}
                       onClick={(e) => {
                         e.stopPropagation();
                         openPr(pr.target);
@@ -149,7 +150,8 @@ export default function Sidebar({ open, items, threads, byId, states, tasks, cha
                           · {text}
                         </span>
                       ))}
-                      {pr.news?.startsWith("새 코멘트") && <span className="loud"> · {pr.news}</span>}
+                      {/* 소식 글은 pr.ts가 지금 언어로 만든다. 같은 열쇠로 앞머리를 견준다 */}
+                      {pr.news?.startsWith(tr("새 코멘트 {0}", "")) && <span className="loud"> · {pr.news}</span>}
                     </div>
                   );
                 })()}
@@ -159,7 +161,7 @@ export default function Sidebar({ open, items, threads, byId, states, tasks, cha
                   return (
                     <div
                       className={"row-meta pr-line" + (tk.news ? " news" : "")}
-                      title="티켓 화면 열기"
+                      title={tr`티켓 화면 열기`}
                       onClick={(e) => {
                         e.stopPropagation();
                         openTicket(tk.key);
@@ -172,18 +174,18 @@ export default function Sidebar({ open, items, threads, byId, states, tasks, cha
                   );
                 })()}
                 {changes[o.cwd]?.files > 0 && changes[o.cwd].by === o.sessionId && (
-                  <div className="row-meta delta" title={changes[o.cwd].brief?.line ?? "이 세션이 고친 것"}>
-                    <span className="lbl">고침 · </span>파일 {changes[o.cwd].files} <b>+{changes[o.cwd].adds}</b> <i>−{changes[o.cwd].dels}</i>
+                  <div className="row-meta delta" title={changes[o.cwd].brief?.line ?? tr`이 세션이 고친 것`}>
+                    <span className="lbl">{tr`고침`} · </span>{tr`파일 ${changes[o.cwd].files}`} <b>+{changes[o.cwd].adds}</b> <i>−{changes[o.cwd].dels}</i>
                     {changes[o.cwd].brief && changes[o.cwd].brief!.watch.length > 0 && (
-                      <em title="브리핑이 눈여겨보라고 한 곳">
+                      <em title={tr`브리핑이 눈여겨보라고 한 곳`}>
                         {" "}
-                        · <span className="lbl">눈여겨</span>볼 곳 {changes[o.cwd].brief!.watch.length}
+                        · <span className="lbl">{tr`눈여겨`}</span>{tr`볼 곳 ${changes[o.cwd].brief!.watch.length}`}
                       </em>
                     )}
                     {(changes[o.cwd].brief?.found?.length ?? 0) > 0 && (
-                      <em title="다른 모델이 걸러 읽고 짚은 곳">
+                      <em title={tr`다른 모델이 걸러 읽고 짚은 곳`}>
                         {" "}
-                        · 짚은 곳 {changes[o.cwd].brief!.found!.length}
+                        · {tr`짚은 곳 ${changes[o.cwd].brief!.found!.length}`}
                       </em>
                     )}
                   </div>
@@ -192,7 +194,7 @@ export default function Sidebar({ open, items, threads, byId, states, tasks, cha
               <button
                 type="button"
                 className="row-x"
-                title="재우기"
+                title={tr`재우기`}
                 onClick={(e) => {
                   e.stopPropagation();
                   onClose(o.key);
@@ -205,12 +207,12 @@ export default function Sidebar({ open, items, threads, byId, states, tasks, cha
           );
         })}
 
-        {loading && <div className="side-none">대화 기록을 읽는 중</div>}
-        {!loading && groups.size === 0 && <div className="side-none">최근 세션이 없다</div>}
+        {loading && <div className="side-none">{tr`대화 기록을 읽는 중`}</div>}
+        {!loading && groups.size === 0 && <div className="side-none">{tr`최근 세션이 없다`}</div>}
         {[...groups].map(([group, list]) => (
           <div key={group}>
             <div className={"grp" + (group === THREADS ? "" : " repo")}>
-              <span>{group}</span>
+              <span>{group === THREADS ? tr`줄기` : group}</span>
               <span className="n">{list.length}</span>
             </div>
             {list.slice(0, group === THREADS ? PER_GROUP * 2 : PER_GROUP).map(({ session: s, name, thread }) => (
@@ -220,18 +222,18 @@ export default function Sidebar({ open, items, threads, byId, states, tasks, cha
                 <div className="row-body">
                   <div className="row-title">{name}</div>
                   <div className="row-meta">
-                    {[elsewhere(s) ? "다른 곳에서 열림" : "", ago(s.mtime), s.work || thread ? s.repo : "", s.branch, thread && thread.sessions.length > 1 ? `세션 ${thread.sessions.length}` : ""].filter(Boolean).join(" · ")}
+                    {[elsewhere(s) ? tr`다른 곳에서 열림` : "", ago(s.mtime), s.work || thread ? s.repo : "", s.branch, thread && thread.sessions.length > 1 ? tr`세션 ${thread.sessions.length}` : ""].filter(Boolean).join(" · ")}
                     {hot(s.tokens) && <span className="hot"> · {kilo(s.tokens)}</span>}
                   </div>
                   {sleepNews[s.id] && (
-                    <div className="row-meta pr-line news" title="눌러서 깨운다. PR 화면은 ⌘J에서 ⌥Enter">
+                    <div className="row-meta pr-line news" title={tr`눌러서 깨운다. PR 화면은 ⌘J에서 ⌥Enter`}>
                       PR #{sleepNews[s.id].pr.number} · <span className="loud">{sleepNews[s.id].news}</span>
                     </div>
                   )}
                 </div>
               </div>
             ))}
-            {list.length > (group === THREADS ? PER_GROUP * 2 : PER_GROUP) && <div className="side-more">외 {list.length - (group === THREADS ? PER_GROUP * 2 : PER_GROUP)}개 · ⌘K로 찾기</div>}
+            {list.length > (group === THREADS ? PER_GROUP * 2 : PER_GROUP) && <div className="side-more">{tr`외 ${list.length - (group === THREADS ? PER_GROUP * 2 : PER_GROUP)}개 · ⌘K로 찾기`}</div>}
           </div>
         ))}
       </div>

@@ -21,7 +21,7 @@
 *Julgi* (줄기, "jool-gi") is Korean for a plant's stem. In this app a **stem** is one piece of work and the chain of sessions that carried it.
 
 > [!NOTE]
-> The UI is Korean only for now, and it has only been used on macOS. There is no signed installer; you build it yourself (one script).
+> The UI comes in English and Korean (it follows the system language; change it in `⌘,`). It has only been used on macOS. There is no signed installer; you build it yourself (one script).
 
 ## Features
 

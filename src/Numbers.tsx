@@ -4,6 +4,7 @@ import { Candidate, KINDS, Note, stale, statOf, Stats, usedCount } from "./brain
 import { Act } from "./History";
 import { Metrics, Review } from "./review";
 import { Job, hot, Open, Session, SkillInfo, SkillUse, Thread } from "./model";
+import { getLang, tr } from "./i18n";
 
 type Props = { acts: Act[]; tasks: Job[]; reviews: Review[]; sessions: Session[]; threads: Thread[]; open: Open[]; notes: Note[]; stats: Stats; skills: SkillInfo[]; skillUses: SkillUse[]; candidates: Candidate[]; named: number };
 type Said = [number, number, number, boolean, boolean];
@@ -12,16 +13,20 @@ type Route = { at: string; top: string | null; asked: string | null; chosen: str
 const DAY = 86_400_000;
 /** 점검 기록 표에 판마다 나란히 놓는 값 */
 const COLS: [string, (m: Metrics) => number][] = [
-  ["보냄", (m) => m.sends],
-  ["1등 맞음 %", (m) => (m.judged ? Math.round((100 * m.hit) / m.judged) : 0)],
-  ["옮김", (m) => m.moved],
-  ["노트", (m) => m.notes],
-  ["쓰인 노트", (m) => m.usedNotes],
-  ["스킬 부름", (m) => m.uses30],
-  ["쓰인 스킬", (m) => m.usedSkills],
-  ["낡은 스킬", (m) => m.oldSkills],
+  [tr("보냄"), (m) => m.sends],
+  [tr("1등 맞음 %"), (m) => (m.judged ? Math.round((100 * m.hit) / m.judged) : 0)],
+  [tr("옮김"), (m) => m.moved],
+  [tr("노트"), (m) => m.notes],
+  [tr("쓰인 노트"), (m) => m.usedNotes],
+  [tr("스킬 부름"), (m) => m.uses30],
+  [tr("쓰인 스킬"), (m) => m.usedSkills],
+  [tr("낡은 스킬"), (m) => m.oldSkills],
 ];
 const pct = (a: number, b: number) => (b ? `${Math.round((100 * a) / b)}%` : "–");
+/** 점검의 종류를 화면 글로 */
+const kindOf = (r: Review) => tr(r.kind ?? "매주"); // i18n-ok
+/** 날짜를 적는 방식 */
+const locale = () => (getLang() === "ko" ? "ko-KR" : "en-US");
 
 /** 큰 숫자 하나와 그 뜻 */
 const Tile = ({ n, label, sub }: { n: string | number; label: string; sub?: string }) => (
@@ -50,9 +55,9 @@ const Bars = ({ rows }: { rows: [string, number][] }) => {
 const Days = ({ counts, label }: { counts: number[]; label: string }) => {
   const max = Math.max(1, ...counts);
   return (
-    <div className="nm-days" role="img" aria-label={`${label}: 최근 ${counts.length}일, 합 ${counts.reduce((a, b) => a + b, 0)}`}>
+    <div className="nm-days" role="img" aria-label={tr`${label}: 최근 ${counts.length}일, 합 ${counts.reduce((a, b) => a + b, 0)}`}>
       {counts.map((n, i) => (
-        <i key={i} title={`${counts.length - 1 - i}일 전: ${n}`} style={{ height: `${Math.max(4, (100 * n) / max)}%`, opacity: n ? 1 : 0.25 }} />
+        <i key={i} title={tr`${counts.length - 1 - i}일 전: ${n}`} style={{ height: `${Math.max(4, (100 * n) / max)}%`, opacity: n ? 1 : 0.25 }} />
       ))}
     </div>
   );
@@ -69,9 +74,9 @@ const perDay = (times: number[], days = 14) => {
   return out;
 };
 /** 초를 읽기 좋게 */
-const clock = (s: number) => (s < 60 ? `${Math.round(s)}초` : s < 3600 ? `${Math.round(s / 60)}분` : `${(s / 3600).toFixed(1)}시간`);
+const clock = (s: number) => (s < 60 ? tr`${Math.round(s)}초` : s < 3600 ? tr`${Math.round(s / 60)}분` : tr`${(s / 3600).toFixed(1)}시간`);
 /** 최근 7일과 그 앞 7일의 비율을 견준다 */
-const trend = (a: number, an: number, b: number, bn: number) => (an && bn ? `최근 7일 ${Math.round((100 * a) / an)}% ← 그 앞 ${Math.round((100 * b) / bn)}%` : "견줄 만큼 쌓이지 않음");
+const trend = (a: number, an: number, b: number, bn: number) => (an && bn ? tr`최근 7일 ${Math.round((100 * a) / an)}% ← 그 앞 ${Math.round((100 * b) / bn)}%` : tr("견줄 만큼 쌓이지 않음"));
 
 /** 통계 (⌘G의 넷째 탭). Julgi가 알아서 한 일이 제대로 돌고 있는지를 세어서 보여 준다 */
 export default function Numbers({ acts, tasks, reviews, sessions, threads, open, notes, stats, skills, skillUses, candidates, named }: Props) {
@@ -120,8 +125,9 @@ export default function Numbers({ acts, tasks, reviews, sessions, threads, open,
     const week = acts.filter((a) => now - a.at < 7 * DAY);
     const kinds = new Map<string, number>();
     for (const a of week) kinds.set(a.kind, (kinds.get(a.kind) ?? 0) + 1);
-    const sent = acts.filter((a) => a.kind === "보냄");
-    const by = (word: string) => sent.filter((a) => a.text.includes(word)).length;
+    const sent = acts.filter((a) => a.kind === "보냄"); // i18n-ok
+    // 기록 글은 쓴 때의 언어로 남는다. 한국어 낱말과 지금 언어의 낱말을 둘 다 센다
+    const by = (word: string) => sent.filter((a) => a.text.includes(word) || a.text.includes(tr(word))).length;
     const judged = routes.filter((r) => r.top);
     const recent = sessions.filter((s) => !s.auto && now / 1000 - s.mtime < 14 * 86400);
     const uses30 = skillUses.filter((u) => now - (Date.parse(u.at) || 0) < 30 * DAY);
@@ -133,18 +139,18 @@ export default function Numbers({ acts, tasks, reviews, sessions, threads, open,
       judged: judged.length,
       newStem: routes.filter((r) => r.chosen === "new").length,
       who: [
-        ["모델이 고름", by("모델이 고름")],
-        ["글자로 맞음", by("글자로 맞음")],
-        ["내가 고름", by("내가 고름")],
-        ["이어 갈 줄기가 없어서 새로", by("이어 갈 줄기가 없어서")],
-        ["세션이 넘김", by("이 넘김")],
+        [tr("모델이 고름"), by("모델이 고름")], // i18n-ok
+        [tr("글자로 맞음"), by("글자로 맞음")], // i18n-ok
+        [tr("내가 고름"), by("내가 고름")], // i18n-ok
+        [tr("이어 갈 줄기가 없어서 새로"), by("이어 갈 줄기가 없어서")], // i18n-ok
+        [tr("세션이 넘김"), by("이 넘김")], // i18n-ok
       ] as [string, number][],
       kinds: [...kinds].sort((a, b) => b[1] - a[1]),
       weekTotal: week.length,
-      needCheck: week.filter((a) => a.kind === "확인 필요").length,
+      needCheck: week.filter((a) => a.kind === "확인 필요").length, // i18n-ok
       recent: recent.length,
       big: recent.filter((s) => hot(s.tokens)).length,
-      noteKinds: KINDS.map((k) => [k, notes.filter((n) => n.kind === k).length]) as [string, number][],
+      noteKinds: KINDS.map((k) => [tr(k), notes.filter((n) => n.kind === k).length]) as [string, number][],
       usedNotes: notes.filter((n) => usedCount(statOf(stats, n.id)) > 0).length,
       staleNotes: notes.filter((n) => stale(n, statOf(stats, n.id))).length,
       out: notes.reduce((a, n) => a + statOf(stats, n.id).out, 0),
@@ -161,21 +167,21 @@ export default function Numbers({ acts, tasks, reviews, sessions, threads, open,
   return (
     <div className="nm">
       <section>
-        <h3>점검 기록 · 무엇을 내리고 고쳤는가</h3>
-        {reviews.length === 0 && <small>아직 없다. 매일 낮 12시 뒤에 한 번, 월요일 낮에는 전부를 보는 점검을 한다.</small>}
+        <h3>{tr("점검 기록 · 무엇을 내리고 고쳤는가")}</h3>
+        {reviews.length === 0 && <small>{tr("아직 없다. 매일 낮 12시 뒤에 한 번, 월요일 낮에는 전부를 보는 점검을 한다.")}</small>}
         {last && (
           <div className="nm-review now">
             <div className="nm-rv-head">
               <b>
-                {last.v}판 · {last.kind ?? "매주"} 점검
+                {tr`${last.v}판 · ${kindOf(last)} 점검`}
               </b>
-              <span>{new Date(last.at).toLocaleDateString("ko-KR")}</span>
-              <span>매일 낮 12시 뒤에 최근 일주일의 세션을, 월요일 낮에 전부를 본다</span>
+              <span>{new Date(last.at).toLocaleDateString(locale())}</span>
+              <span>{tr("매일 낮 12시 뒤에 최근 일주일의 세션을, 월요일 낮에 전부를 본다")}</span>
             </div>
             <div className="nm-rv-cols">
               <div>
-                <small>눈에 띈 것 · 손봐야 할 곳</small>
-                {last.seen.length === 0 && <p className="ok">문턱을 넘은 문제가 없다</p>}
+                <small>{tr("눈에 띈 것 · 손봐야 할 곳")}</small>
+                {last.seen.length === 0 && <p className="ok">{tr("문턱을 넘은 문제가 없다")}</p>}
                 {last.seen.map((line) => (
                   <p key={line} className="warn">
                     {line}
@@ -183,8 +189,8 @@ export default function Numbers({ acts, tasks, reviews, sessions, threads, open,
                 ))}
               </div>
               <div>
-                <small>Julgi가 손댄 것</small>
-                {last.did.length === 0 && <p>손댈 것이 없었다</p>}
+                <small>{tr("Julgi가 손댄 것")}</small>
+                {last.did.length === 0 && <p>{tr("손댈 것이 없었다")}</p>}
                 {last.did.map((line) => (
                   <p key={line}>{line}</p>
                 ))}
@@ -195,20 +201,20 @@ export default function Numbers({ acts, tasks, reviews, sessions, threads, open,
         {reviews.length > 0 && (
           <div className="nm-table">
             <div className="nm-tr head">
-              <span>판</span>
-              <span>종류</span>
-              <span>날짜</span>
+              <span>{tr("판")}</span>
+              <span>{tr("종류")}</span>
+              <span>{tr("날짜")}</span>
               {COLS.map(([label]) => (
                 <span key={label}>{label}</span>
               ))}
-              <span>손댄 것</span>
-              <span>눈에 띈 것</span>
+              <span>{tr("손댄 것")}</span>
+              <span>{tr("눈에 띈 것")}</span>
             </div>
             {[...reviews].reverse().slice(0, 12).map((r, i, all) => (
               <div key={r.v} className="nm-tr">
                 <span>{r.v}</span>
-                <span>{r.kind ?? "매주"}</span>
-                <span>{new Date(r.at).toLocaleDateString("ko-KR", { month: "numeric", day: "numeric" })}</span>
+                <span>{kindOf(r)}</span>
+                <span>{new Date(r.at).toLocaleDateString(locale(), { month: "numeric", day: "numeric" })}</span>
                 {COLS.map(([label, get]) => {
                   const now = get(r.metrics);
                   const prev = all[i + 1] ? get(all[i + 1].metrics) : now;
@@ -227,91 +233,91 @@ export default function Numbers({ acts, tasks, reviews, sessions, threads, open,
         )}
       </section>
       <section>
-        <h3>내 손 · 세션이 나를 얼마나 붙잡는가</h3>
-        {said === null && <small>대화 기록을 세는 중. 처음에는 조금 걸린다.</small>}
+        <h3>{tr("내 손 · 세션이 나를 얼마나 붙잡는가")}</h3>
+        {said === null && <small>{tr("대화 기록을 세는 중. 처음에는 조금 걸린다.")}</small>}
         {said !== null && (
           <>
             <div className="nm-tiles">
-              <Tile n={pct(hands.all.asked, hands.all.after)} label="질문으로 끝난 답" sub={`${hands.all.asked} / ${hands.all.after} · ${trend(hands.week.asked, hands.week.after, hands.before.asked, hands.before.after)}`} />
-              <Tile n={pct(hands.all.ok, hands.all.replies)} label="승인만 한 내 말" sub={`${hands.all.ok} / ${hands.all.replies} · "ㅇㅇ", "ㄱㄱ", "continue" · ${trend(hands.week.ok, hands.week.replies, hands.before.ok, hands.before.replies)}`} />
-              <Tile n={hands.all.cuts} label="중간에 끊음" sub={`Esc · 최근 7일 ${hands.week.cuts}, 그 앞 7일 ${hands.before.cuts}`} />
-              <Tile n={clock(hands.all.median)} label="답 뒤 돌아오기까지" sub={`중간값 · 5분 넘김 ${pct(hands.all.slow, hands.all.after)} · 30분 넘김 ${pct(hands.all.gone, hands.all.after)}`} />
+              <Tile n={pct(hands.all.asked, hands.all.after)} label={tr("질문으로 끝난 답")} sub={`${hands.all.asked} / ${hands.all.after} · ${trend(hands.week.asked, hands.week.after, hands.before.asked, hands.before.after)}`} />
+              <Tile n={pct(hands.all.ok, hands.all.replies)} label={tr("승인만 한 내 말")} sub={`${hands.all.ok} / ${hands.all.replies} · "ㅇㅇ", "ㄱㄱ", "continue" · ${trend(hands.week.ok, hands.week.replies, hands.before.ok, hands.before.replies)}`} />
+              <Tile n={hands.all.cuts} label={tr("중간에 끊음")} sub={tr`Esc · 최근 7일 ${hands.week.cuts}, 그 앞 7일 ${hands.before.cuts}`} />
+              <Tile n={clock(hands.all.median)} label={tr("답 뒤 돌아오기까지")} sub={tr`중간값 · 5분 넘김 ${pct(hands.all.slow, hands.all.after)} · 30분 넘김 ${pct(hands.all.gone, hands.all.after)}`} />
             </div>
             <div className="nm-split">
               <div>
-                <small>하루에 내가 한 말 · 최근 30일 {hands.all.replies}번</small>
-                <Days counts={hands.days} label="하루에 내가 한 말" />
+                <small>{tr`하루에 내가 한 말 · 최근 30일 ${hands.all.replies}번`}</small>
+                <Days counts={hands.days} label={tr("하루에 내가 한 말")} />
               </div>
               <div>
-                <small>몇 시에 말하는가</small>
-                <Days counts={hands.hours} label="시각별로 내가 한 말" />
+                <small>{tr("몇 시에 말하는가")}</small>
+                <Days counts={hands.hours} label={tr("시각별로 내가 한 말")} />
               </div>
             </div>
-            <small>최근 30일의 대화 기록에서 센다. Julgi가 띄운 세션(일감, 스킬 만들기)과 갈아타며 물려받은 앞 대화는 뺀다. 질문으로 끝났는지는 답의 끝 글자로 본다.</small>
+            <small>{tr("최근 30일의 대화 기록에서 센다. Julgi가 띄운 세션(일감, 스킬 만들기)과 갈아타며 물려받은 앞 대화는 뺀다. 질문으로 끝났는지는 답의 끝 글자로 본다.")}</small>
           </>
         )}
       </section>
       <section>
-        <h3>보내기 · 던진 말이 맞는 곳으로 가는가</h3>
+        <h3>{tr("보내기 · 던진 말이 맞는 곳으로 가는가")}</h3>
         <div className="nm-tiles">
-          <Tile n={v.sendTotal} label="보낸 횟수" sub="지금까지" />
-          <Tile n={pct(v.hit, v.judged)} label="1등이 맞은 비율" sub={`${v.hit} / ${v.judged} · 글자로 꼽은 1등으로 실제로 간 것`} />
-          <Tile n={v.newStem} label="새 줄기로 연 것" sub={pct(v.newStem, v.sendTotal)} />
+          <Tile n={v.sendTotal} label={tr("보낸 횟수")} sub={tr("지금까지")} />
+          <Tile n={pct(v.hit, v.judged)} label={tr("1등이 맞은 비율")} sub={tr`${v.hit} / ${v.judged} · 글자로 꼽은 1등으로 실제로 간 것`} />
+          <Tile n={v.newStem} label={tr("새 줄기로 연 것")} sub={pct(v.newStem, v.sendTotal)} />
         </div>
         <div className="nm-split">
           <div>
-            <small>최근 14일, 하루에 보낸 수</small>
-            <Days counts={v.sendDays} label="하루에 보낸 수" />
+            <small>{tr("최근 14일, 하루에 보낸 수")}</small>
+            <Days counts={v.sendDays} label={tr("하루에 보낸 수")} />
           </div>
           <div>
-            <small>누가 골랐나</small>
+            <small>{tr("누가 골랐나")}</small>
             <Bars rows={v.who} />
           </div>
         </div>
       </section>
       <section>
-        <h3>Julgi가 알아서 한 일 · 최근 7일</h3>
+        <h3>{tr("Julgi가 알아서 한 일 · 최근 7일")}</h3>
         <div className="nm-tiles">
-          <Tile n={v.weekTotal} label="한 일" sub="⌘Y에 남은 것" />
-          <Tile n={v.needCheck} label="확인 필요" sub="Julgi가 혼자 못 푼 것" />
-          <Tile n={`${open.length} / ${v.recent}`} label="열린 세션 / 최근 14일 세션" />
-          <Tile n={pct(named, v.recent)} label="이름을 붙인 세션" sub={`${named}개 · 요약에서 지은 이름`} />
-          <Tile n={v.big} label="갈아탈 만큼 큰 세션" sub={`줄기 ${threads.length}개`} />
+          <Tile n={v.weekTotal} label={tr("한 일")} sub={tr("⌘Y에 남은 것")} />
+          <Tile n={v.needCheck} label={tr("확인 필요")} sub={tr("Julgi가 혼자 못 푼 것")} />
+          <Tile n={`${open.length} / ${v.recent}`} label={tr("열린 세션 / 최근 14일 세션")} />
+          <Tile n={pct(named, v.recent)} label={tr("이름을 붙인 세션")} sub={tr`${named}개 · 요약에서 지은 이름`} />
+          <Tile n={v.big} label={tr("갈아탈 만큼 큰 세션")} sub={tr`줄기 ${threads.length}개`} />
         </div>
-        <Bars rows={v.kinds} />
+        <Bars rows={v.kinds.map(([kind, n]) => [tr(kind), n])} />
       </section>
       <section>
-        <h3>조율 · 맡긴 일감이 한 번에 끝나는가</h3>
+        <h3>{tr("조율 · 맡긴 일감이 한 번에 끝나는가")}</h3>
         <div className="nm-tiles">
-          <Tile n={tasks.length} label="맡긴 일감" sub="최근 2주" />
-          <Tile n={pct(tasks.filter((t) => t.status === "끝남").length, tasks.length)} label="끝난 비율" sub={`${tasks.filter((t) => t.status === "끝남").length} / ${tasks.length}`} />
-          <Tile n={tasks.filter((t) => t.status === "실패").length} label="실패" />
-          <Tile n={tasks.reduce((a, t) => a + t.redo, 0)} label="다시 시킨 횟수" sub="결과가 모자라 이어서 시킨 것" />
-          <Tile n={tasks.filter((t) => t.status === "대기" || t.status === "하는 중").length} label="지금 도는 것" />
+          <Tile n={tasks.length} label={tr("맡긴 일감")} sub={tr("최근 2주")} />
+          <Tile n={pct(tasks.filter((t) => t.status === "끝남").length, tasks.length)} label={tr("끝난 비율")} sub={`${tasks.filter((t) => t.status === "끝남").length} / ${tasks.length}`} /> {/* i18n-ok */}
+          <Tile n={tasks.filter((t) => t.status === "실패").length} label={tr("실패")} /> {/* i18n-ok */}
+          <Tile n={tasks.reduce((a, t) => a + t.redo, 0)} label={tr("다시 시킨 횟수")} sub={tr("결과가 모자라 이어서 시킨 것")} />
+          <Tile n={tasks.filter((t) => t.status === "대기" || t.status === "하는 중").length} label={tr("지금 도는 것")} /> {/* i18n-ok */}
         </div>
       </section>
       <section>
-        <h3>브레인 · 담은 것이 쓰이는가</h3>
+        <h3>{tr("브레인 · 담은 것이 쓰이는가")}</h3>
         <div className="nm-tiles">
-          <Tile n={notes.length} label="노트" />
-          <Tile n={pct(v.usedNotes, notes.length)} label="한 번이라도 쓰인 노트" sub={`${v.usedNotes} / ${notes.length}`} />
-          <Tile n={v.out} label="새 세션에 붙인 횟수" />
-          <Tile n={v.read} label="세션이 찾아본 횟수" />
-          <Tile n={v.fixed} label="고친 횟수" />
-          <Tile n={v.staleNotes} label="석 달 넘게 안 쓰인 노트" />
+          <Tile n={notes.length} label={tr("노트")} />
+          <Tile n={pct(v.usedNotes, notes.length)} label={tr("한 번이라도 쓰인 노트")} sub={`${v.usedNotes} / ${notes.length}`} />
+          <Tile n={v.out} label={tr("새 세션에 붙인 횟수")} />
+          <Tile n={v.read} label={tr("세션이 찾아본 횟수")} />
+          <Tile n={v.fixed} label={tr("고친 횟수")} />
+          <Tile n={v.staleNotes} label={tr("석 달 넘게 안 쓰인 노트")} />
         </div>
         <Bars rows={v.noteKinds} />
       </section>
       <section>
-        <h3>스킬 · 있는 것이 쓰이는가</h3>
+        <h3>{tr("스킬 · 있는 것이 쓰이는가")}</h3>
         <div className="nm-tiles">
-          <Tile n={v.uses30} label="부른 횟수" sub="최근 30일" />
-          <Tile n={pct(v.usedSkills, skills.length)} label="쓰인 스킬" sub={`${v.usedSkills} / ${skills.length} · 깔린 것 가운데`} />
-          <Tile n={v.oldSkills} label="낡은 스킬" sub="안 쓰이고 석 달 넘게 안 고침" />
-          <Tile n={candidates.length} label="스킬 후보" sub="세 번 넘게 되풀이한 일" />
+          <Tile n={v.uses30} label={tr("부른 횟수")} sub={tr("최근 30일")} />
+          <Tile n={pct(v.usedSkills, skills.length)} label={tr("쓰인 스킬")} sub={tr`${v.usedSkills} / ${skills.length} · 깔린 것 가운데`} />
+          <Tile n={v.oldSkills} label={tr("낡은 스킬")} sub={tr("안 쓰이고 석 달 넘게 안 고침")} />
+          <Tile n={candidates.length} label={tr("스킬 후보")} sub={tr("세 번 넘게 되풀이한 일")} />
         </div>
-        <small>최근 30일, 하루에 부른 수</small>
-        <Days counts={v.skillDays} label="하루에 스킬을 부른 수" />
+        <small>{tr("최근 30일, 하루에 부른 수")}</small>
+        <Days counts={v.skillDays} label={tr("하루에 스킬을 부른 수")} />
       </section>
     </div>
   );

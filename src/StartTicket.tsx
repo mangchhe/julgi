@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { adfToMd, slugOf, TicketFull } from "./jira";
+import { tr } from "./i18n";
 
 type Props = {
   ticket: TicketFull;
@@ -17,6 +18,7 @@ type Props = {
 export function promptOf(t: TicketFull) {
   const desc = adfToMd(t.description).trim();
   const subs = t.subtasks.filter((s) => s.statusCategory !== "done").map((s) => `- ${s.key} ${s.title} (${s.status})`);
+  // i18n-off
   return [
     `[${t.key}] ${t.title}`,
     `티켓: ${t.url}`,
@@ -28,6 +30,7 @@ export function promptOf(t: TicketFull) {
   ]
     .filter((l) => l !== undefined)
     .join("\n");
+  // i18n-on
 }
 
 /** 이 티켓으로 시작: 레포·브랜치·첫 지시를 한 번 보고 띄운다 */
@@ -55,11 +58,11 @@ export default function StartTicket({ ticket, repos, remembered, startTransition
         }}
       >
         <div className="st-head">
-          <b>이 티켓으로 시작</b> <span className="sub">{ticket.key} · {ticket.title}</span>
+          <b>{tr`이 티켓으로 시작`}</b> <span className="sub">{ticket.key} · {ticket.title}</span>
         </div>
         <div className="st-body">
           <label className="st-field">
-            <span>레포</span>
+            <span>{tr`레포`}</span>
             <select value={repo} onChange={(e) => setRepo(e.target.value)}>
               {repos.map((r) => (
                 <option key={r.cwd} value={r.repo}>
@@ -67,30 +70,30 @@ export default function StartTicket({ ticket, repos, remembered, startTransition
                 </option>
               ))}
             </select>
-            {remembered === repo && <small>{ticket.key.split("-")[0]} → {repo} 기억함</small>}
+            {remembered === repo && <small>{tr`${ticket.key.split("-")[0]} → ${repo} 기억함`}</small>}
           </label>
-          {!repos.length && <div className="pr-error">지도에 레포가 없다. ⌘,의 지도에서 레포가 모인 폴더를 정한다.</div>}
+          {!repos.length && <div className="pr-error">{tr`지도에 레포가 없다. ⌘,의 지도에서 레포가 모인 폴더를 정한다.`}</div>}
           <label className="st-field">
-            <span>브랜치</span>
+            <span>{tr`브랜치`}</span>
             <input value={branch} spellCheck={false} onChange={(e) => setBranch(e.target.value.trim())} />
-            <small>원격 기본 브랜치에서 딴다</small>
+            <small>{tr`원격 기본 브랜치에서 딴다`}</small>
           </label>
           <label className="st-field top">
-            <span>첫 지시</span>
+            <span>{tr`첫 지시`}</span>
             <textarea rows={12} value={prompt} onChange={(e) => setPrompt(e.target.value)} />
           </label>
           {startTransition && (
             <label className="st-check">
-              <input type="checkbox" checked={move} onChange={(e) => setMove(e.target.checked)} /> 시작하면 {startTransition}로 옮기기 (지금 {ticket.status})
+              <input type="checkbox" checked={move} onChange={(e) => setMove(e.target.checked)} /> {tr`시작하면 ${startTransition}로 옮기기 (지금 ${ticket.status})`}
             </label>
           )}
         </div>
         <div className="st-foot">
           <button type="button" className="primary" disabled={!ok} onClick={() => target && onStart({ cwd: target.cwd, repo, branch, prompt, transition: move })}>
-            시작 ⌘Enter
+            {tr`시작 ⌘Enter`}
           </button>
           <button type="button" onClick={onClose}>
-            그만
+            {tr`그만`}
           </button>
         </div>
       </div>

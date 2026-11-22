@@ -3,6 +3,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { aboutOf, ago, Folder, hot, Item, kilo, modelFor, repoOf } from "./model";
 import { Candidate, confident, rank, rankFolders } from "./route";
 import { indexLine, Note, shortlist, Stats } from "./brain";
+import { tr } from "./i18n";
 
 /** join이 있으면 새 세션을 그 줄기에 더한다 (같은 일인데 레포가 다를 때) */
 export type Target = { kind: "item"; item: Item } | { kind: "new"; cwd: string; join?: Item };
@@ -39,7 +40,7 @@ type Props = {
 };
 
 const MAX = 6;
-const ASK_SYSTEM =
+const ASK_SYSTEM = // 모델에 보내는 글 i18n-ok
   '너는 분류기다. 사용자가 쓴 글이 아래 후보 작업 가운데 하나를 이어서 하는 이야기인지 판정한다. 그 작업이 하던 일의 연속이거나 같은 대상을 다룰 때만 그 후보를 고른다. 같은 레포이거나 주제가 비슷하다는 것만으로는 고르지 않는다. 새로운 요청이면 pick을 "new"로 하고, 글이 어느 레포의 일인지 드러나면 repo에 아래 레포 목록 가운데 하나를 적는다(드러나지 않으면 빈 문자열). 브레인 노트 목록이 있으면, 이 글의 일을 할 때 알고 시작해야 할 노트의 번호(b 뒤의 숫자)를 notes에 최대 4개 적는다. 확실히 관련된 것만 고르고 없으면 빈 배열로 둔다. 새로운 요청이고, 그 일을 끝내려면 레포 두 곳 넘게를 고치거나 조사해야 하면 span에 그 레포 이름들을 레포 목록에 있는 이름 그대로 적는다(영역별 묶음이 있으면 그것을 보고 고른다). 한 레포 안에서 끝나는 일이거나 확실하지 않으면 span은 빈 배열로 둔다. span이 둘 넘으면 size에 일의 크기를 적는다. "작음"은 한 세션이 레포들을 오가며 금방 끝낼 일이다: 필드 하나 추가, 문구나 값 수정, 읽기만 하는 조사, 한쪽을 조금 고치고 다른 쪽에 반영하는 일. "큼"은 레포마다 따로 설계하고 구현하고 확인해야 하는 덩어리가 둘 넘게 있고, 그 덩어리들을 나란히 진행할 수 있는 일이다: 새 기능을 서버와 앱과 어드민에 걸쳐 만드는 일, 계약을 바꾸고 여러 쪽을 따라 고치는 일. 확실하지 않으면 "작음"으로 한다. JSON 한 줄만 답한다: {"pick": 번호 또는 "new", "repo": "레포 이름 또는 빈 문자열", "span": ["레포 이름들"], "size": "작음 또는 큼", "notes": [숫자들], "why": "짧은 한 문장"}';
 
 /** 보내기 상자. 할 말을 먼저 치면 어느 줄기 이야기인지 맞춰서 보여 주고, Enter로 거기에 보낸다. */
@@ -47,7 +48,7 @@ export default function Send({ items, openIds, cwd, folders, base, notes, misses
   const [message, setMessage] = useState(initial ?? "");
   const [sel, setSel] = useState(0);
   const [asking, setAsking] = useState(false);
-  const [asked, setAsked] = useState<{ item?: Item; why: string; cwd?: string } | null>(null);
+  const [asked, setAsked] = useState<{ item?: Item; why: string; cwd?: string; failed?: boolean } | null>(null);
   const [record, setRecord] = useState("");
   // 내가 후보를 직접 골랐는가. 안 골랐으면 Enter는 "알아서 보내라"는 뜻이다
   const [touched, setTouched] = useState(false);
@@ -66,7 +67,7 @@ export default function Send({ items, openIds, cwd, folders, base, notes, misses
         .map((line) => JSON.parse(line) as { top: string | null; rank: number })
         .filter((row) => row.top)
         .slice(-50);
-      if (rows.length) setRecord(`최근 ${rows.length}번 중 ${rows.filter((row) => row.rank === 0).length}번 1등이 맞았다`);
+      if (rows.length) setRecord(tr`최근 ${rows.length}번 중 ${rows.filter((row) => row.rank === 0).length}번 1등이 맞았다`);
     });
   }, []);
 
@@ -85,12 +86,12 @@ export default function Send({ items, openIds, cwd, folders, base, notes, misses
     const top = shown[0]?.item;
     const rows: { cwd: string; label: string; join?: Item }[] = [];
     // 줄기는 맞는데 글이 다른 레포를 가리키면, 그 줄기에 그 레포의 세션을 더할 수 있다
-    if (best && top && best.repo !== top.session.repo) rows.push({ cwd: best.cwd, label: `+ "${top.name}" 줄기에 ${best.repo} 세션 더하기`, join: top });
+    if (best && top && best.repo !== top.session.repo) rows.push({ cwd: best.cwd, label: tr`+ "${top.name}" 줄기에 ${best.repo} 세션 더하기`, join: top });
     const seen = new Set<string>();
     for (const [dir, label] of [
-      [best?.cwd, `+ 새 줄기 · ${best?.repo}`],
-      [base, "+ 새 줄기 · 기본 폴더"],
-      [cwd, `+ 새 줄기 · ${repoOf(cwd)}`],
+      [best?.cwd, tr`+ 새 줄기 · ${best?.repo}`],
+      [base, tr`+ 새 줄기 · 기본 폴더`],
+      [cwd, tr`+ 새 줄기 · ${repoOf(cwd)}`],
     ] as [string | undefined, string][]) {
       if (!dir || seen.has(dir)) continue;
       seen.add(dir);
@@ -107,7 +108,7 @@ export default function Send({ items, openIds, cwd, folders, base, notes, misses
   const send = (handoff: boolean) => {
     const text = message.trim();
     if (!text) return;
-    const note: RouteNote = { top: ranked[0]?.item.session.id, rank: picked ? ranked.indexOf(picked) : -1, asked: asked?.item?.session.id, by: "내가 고름" };
+    const note: RouteNote = { top: ranked[0]?.item.session.id, rank: picked ? ranked.indexOf(picked) : -1, asked: asked?.item?.session.id, by: tr`내가 고름` };
     if (picked) onSend({ kind: "item", item: picked.item }, text, note, handoff);
     else onSend({ kind: "new", cwd: fresh[at - shown.length].cwd, join: fresh[at - shown.length].join }, text, note, false);
   };
@@ -127,8 +128,10 @@ export default function Send({ items, openIds, cwd, folders, base, notes, misses
       const repos = folders.slice(0, 40).map((f) => f.repo).join(", ");
       // 노트가 많으면 글자가 겹치는 것과 많이 쓰인 것을 먼저 추려 보여 준다
       const shelf = shortlist(text, notes, stats);
+      // 모델에 보내는 글 i18n-off
       const brainPart = shelf.length ? `\n\n브레인 노트:\n${shelf.map(indexLine).join("\n")}` : "";
       const raw = await invoke<string>("route_ask", { model: modelFor("route"), system: ASK_SYSTEM, prompt: `후보:\n${lines.join("\n")}\n\n레포 목록: ${repos}${areas ? `\n\n영역별 묶음:\n${areas}` : ""}${brainPart}${misses ? `\n\n전에 틀렸던 판단(사용자가 직접 바로잡은 것. 비슷한 글이면 같은 실수를 하지 않는다):\n${misses}` : ""}\n\n글: ${text}\n` });
+      // i18n-on
       const answer = JSON.parse(raw.slice(raw.indexOf("{"), raw.lastIndexOf("}") + 1)) as { pick: number | string; repo?: string; why?: string; notes?: number[]; span?: string[]; size?: string };
       const item = typeof answer.pick === "number" ? pool[answer.pick] : undefined;
       const cwd = item ? undefined : folders.find((f) => f.repo === answer.repo)?.cwd;
@@ -138,10 +141,10 @@ export default function Send({ items, openIds, cwd, folders, base, notes, misses
       const brain = (answer.notes ?? []).map((n) => shelf[n]).filter(Boolean).slice(0, 4);
       picked4.current = brain;
       span.current = item ? [] : (answer.span ?? []).filter((name) => folders.some((f) => f.repo === name));
-      big.current = answer.size === "큼";
+      big.current = answer.size === "큼"; // 모델의 답에서 읽는 값 i18n-ok
       return { item, cwd, brain };
     } catch (e) {
-      setAsked({ why: `묻지 못했다: ${String(e).slice(0, 80)}` });
+      setAsked({ why: tr`묻지 못했다: ${String(e).slice(0, 80)}`, failed: true });
       setAsking(false);
       return null;
     }
@@ -169,7 +172,7 @@ export default function Send({ items, openIds, cwd, folders, base, notes, misses
       viaModel = !!answer?.item;
       cwd = answer?.cwd;
     }
-    const note: RouteNote = { top: ranked[0]?.item.session.id, rank: item ? ranked.findIndex((c) => c.item === item) : -1, asked: viaModel ? item?.session.id : undefined, by: viaModel ? "모델이 고름" : item ? "글자로 맞음" : "이어 갈 줄기가 없어서", brain: picked4.current, span: span.current, big: big.current };
+    const note: RouteNote = { top: ranked[0]?.item.session.id, rank: item ? ranked.findIndex((c) => c.item === item) : -1, asked: viaModel ? item?.session.id : undefined, by: viaModel ? tr`모델이 고름` : item ? tr`글자로 맞음` : tr`이어 갈 줄기가 없어서`, brain: picked4.current, span: span.current, big: big.current };
     if (item) return onSend({ kind: "item", item }, text, note, hot(item.session.tokens), late);
     // 새 줄기를 열 곳: 모델이 짚은 레포, 없으면 글자로 맞은 레포, 그것도 없으면 기본 폴더
     const place = fresh.find((row) => !row.join) ?? fresh[0];
@@ -194,20 +197,20 @@ export default function Send({ items, openIds, cwd, folders, base, notes, misses
   };
 
   const head = !message.trim()
-    ? "보낼 곳"
+    ? tr`보낼 곳`
     : asking
-      ? "모델에게 묻는 중…"
+      ? tr`모델에게 묻는 중…`
       : asked
         ? asked.item
-          ? `모델이 고름 · ${asked.why}`
-          : asked.why.startsWith("묻지")
+          ? tr`모델이 고름 · ${asked.why}`
+          : asked.failed
             ? asked.why
-            : `모델: 맞는 줄기가 없다 · ${asked.why}`
+            : tr`모델: 맞는 줄기가 없다 · ${asked.why}`
         : shown.length === 0
-          ? "글자로 맞는 줄기가 없다. Enter를 누르면 모델에게 물어 보고 보낸다"
+          ? tr`글자로 맞는 줄기가 없다. Enter를 누르면 모델에게 물어 보고 보낸다`
           : sure
-            ? "보낼 곳 · 글이 이 줄기를 콕 집었다. Enter를 누르면 맨 위로 보낸다"
-            : "글자가 겹친 후보 · Enter를 누르면 상자를 닫고, 모델이 읽고 정해서 보낸다";
+            ? tr`보낼 곳 · 글이 이 줄기를 콕 집었다. Enter를 누르면 맨 위로 보낸다`
+            : tr`글자가 겹친 후보 · Enter를 누르면 상자를 닫고, 모델이 읽고 정해서 보낸다`;
 
   return (
     <div className="pal-back" onMouseDown={onClose}>
@@ -216,7 +219,7 @@ export default function Send({ items, openIds, cwd, folders, base, notes, misses
           ref={input}
           value={message}
           rows={Math.min(6, Math.max(2, message.split("\n").length))}
-          placeholder="할 말을 그대로 친다. 어느 줄기 이야기인지는 Julgi가 찾는다"
+          placeholder={tr`할 말을 그대로 친다. 어느 줄기 이야기인지는 Julgi가 찾는다`}
           onChange={(e) => {
             setMessage(e.target.value);
             setSel(0);
@@ -237,13 +240,13 @@ export default function Send({ items, openIds, cwd, folders, base, notes, misses
               <span>
                 {c.item.name}
                 {c.reasons.length > 0 && <span className="send-why"> · {c.reasons.map((r) => `"${r}"`).join(" ")}</span>}
-                {asked?.item === c.item && <span className="send-why"> · 모델</span>}
+                {asked?.item === c.item && <span className="send-why"> · {tr`모델`}</span>}
               </span>
               <span className="pal-meta">
                 {[
-                  c.item.thread ? `줄기 ${c.item.thread.sessions.length}` : "",
+                  c.item.thread ? `${tr`줄기`} ${c.item.thread.sessions.length}` : "",
                   c.item.session.repo,
-                  openIds.has(c.item.session.id) ? "열림" : ago(c.item.session.mtime),
+                  openIds.has(c.item.session.id) ? tr`열림` : ago(c.item.session.mtime),
                 ]
                   .filter(Boolean)
                   .join(" · ")}
@@ -262,14 +265,14 @@ export default function Send({ items, openIds, cwd, folders, base, notes, misses
             </div>
           ))}
         </div>
-        {!lit && message.trim() && <div className="pal-peek">아직 고른 곳이 없다. Enter를 누르면 상자는 바로 닫히고 Julgi가 뒤에서 모델에게 물어, 이어 갈 줄기가 있으면 거기로, 없으면 새 줄기로 보낸다. 아래는 글자가 겹친 후보일 뿐이다.</div>}
+        {!lit && message.trim() && <div className="pal-peek">{tr`아직 고른 곳이 없다. Enter를 누르면 상자는 바로 닫히고 Julgi가 뒤에서 모델에게 물어, 이어 갈 줄기가 있으면 거기로, 없으면 새 줄기로 보낸다. 아래는 글자가 겹친 후보일 뿐이다.`}</div>}
         {lit && picked && (
           <div className="pal-peek">
-            {picked.item.memory.replace(/\s+/g, " ").slice(0, 220) || picked.item.session.recap || "요약이 아직 없다"}
-            {hot(picked.item.session.tokens) && <span> · 세션이 크다. ⌘Enter로 갈아탄 뒤 보낼 수 있다</span>}
+            {picked.item.memory.replace(/\s+/g, " ").slice(0, 220) || picked.item.session.recap || tr`요약이 아직 없다`}
+            {hot(picked.item.session.tokens) && <span> · {tr`세션이 크다. ⌘Enter로 갈아탄 뒤 보낼 수 있다`}</span>}
           </div>
         )}
-        <div className="pal-foot">Enter 알아서 보내기 · ↑↓로 고르면 고른 곳으로 · Tab 모델에게 미리 묻기 · ⌘Enter 갈아탄 뒤 보내기 · ⇧Enter 줄바꿈 · Esc</div>
+        <div className="pal-foot">{tr`Enter 알아서 보내기 · ↑↓로 고르면 고른 곳으로 · Tab 모델에게 미리 묻기 · ⌘Enter 갈아탄 뒤 보내기 · ⇧Enter 줄바꿈 · Esc`}</div>
       </div>
     </div>
   );

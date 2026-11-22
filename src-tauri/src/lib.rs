@@ -2,6 +2,7 @@ mod github;
 mod gitlab;
 mod habits;
 mod jira;
+mod lang;
 mod ledger;
 mod remote;
 mod skills;
@@ -9,6 +10,7 @@ mod tokens;
 mod usage;
 mod work;
 
+use lang::say;
 use std::{
     collections::HashMap,
     io::{Read, Write},
@@ -139,7 +141,7 @@ fn pty_spawn(
 #[tauri::command]
 fn pty_write(state: State<Ptys>, id: u32, data: String) -> Result<(), String> {
     let mut map = state.0.lock().unwrap();
-    let session = map.get_mut(&id).ok_or("세션 없음")?;
+    let session = map.get_mut(&id).ok_or_else(|| say("세션 없음", "No such session"))?;
     session.writer.write_all(data.as_bytes()).map_err(err)?;
     session.writer.flush().map_err(err)
 }
@@ -147,7 +149,7 @@ fn pty_write(state: State<Ptys>, id: u32, data: String) -> Result<(), String> {
 #[tauri::command]
 fn pty_resize(state: State<Ptys>, id: u32, cols: u16, rows: u16) -> Result<(), String> {
     let map = state.0.lock().unwrap();
-    let session = map.get(&id).ok_or("세션 없음")?;
+    let session = map.get(&id).ok_or_else(|| say("세션 없음", "No such session"))?;
     session
         .master
         .resize(PtySize { rows, cols, pixel_width: 0, pixel_height: 0 })
@@ -246,7 +248,7 @@ fn handoff_write(id: String, text: String) -> Result<String, String> {
 /// ~/.julgi 아래의 파일만 가리키게 한다 (줄기 목록, 줄기 기억, 보낼 글, 보낸 기록).
 fn data_file(name: &str) -> Result<PathBuf, String> {
     if name.starts_with('/') || name.split('/').any(|part| part.is_empty() || part == "..") {
-        return Err(format!("쓸 수 없는 이름: {name}"));
+        return Err(say(&format!("쓸 수 없는 이름: {name}"), &format!("Name not allowed: {name}")));
     }
     Ok(data_dir().join(name))
 }
@@ -511,6 +513,12 @@ fn data_append(name: String, line: String) -> Result<(), String> {
 fn route_ask(system: String, prompt: String, model: Option<String>) -> Result<String, String> {
     // 모델 이름은 셸 명령에 들어가므로 글자와 숫자, 몇 가지 기호만 받는다
     let model = model.filter(|m| !m.is_empty() && m.chars().all(|c| c.is_ascii_alphanumeric() || "-._[]".contains(c))).unwrap_or_else(|| "haiku".into());
+    // 지시문은 한국어로 두고, 영어일 때는 답만 영어로 쓰게 한다. 정해 둔 형식과 열쇠말은 그대로여야 화면이 읽는다
+    let system = if lang::is_ko() {
+        system
+    } else {
+        format!("{system}\n\nWrite every natural-language part of your answer in English. Keep any required format, labels, keywords and JSON keys exactly as the instructions specify, even where they are Korean.")
+    };
     use std::process::{Command, Stdio};
     let dir = data_dir().join("router");
     std::fs::create_dir_all(&dir).map_err(err)?;
@@ -529,7 +537,7 @@ fn route_ask(system: String, prompt: String, model: Option<String>) -> Result<St
         }
     }
     let mut child = cmd.spawn().map_err(err)?;
-    child.stdin.take().ok_or("입력을 열지 못했다")?.write_all(prompt.as_bytes()).map_err(err)?;
+    child.stdin.take().ok_or_else(|| say("입력을 열지 못했다", "Could not open stdin"))?.write_all(prompt.as_bytes()).map_err(err)?;
     let out = child.wait_with_output().map_err(err)?;
     if !out.status.success() {
         return Err(String::from_utf8_lossy(&out.stderr).trim().to_owned());
@@ -660,13 +668,14 @@ fn clipboard_paste() -> Result<String, String> {
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     let _ = std::fs::create_dir_all(state_dir());
+    lang::init(config_load());
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_notification::init())
         // 기본 메뉴에서 "창 닫기(⌘W)"를 빼고 종료는 화면에 먼저 묻는다.
         // 일하는 세션이 있는데 실수로 꺼 버리는 일을 막으려는 것이다.
         .menu(|app| {
-            let quit = MenuItem::with_id(app, "quit", "Julgi 종료", true, Some("CmdOrCtrl+Q"))?;
+            let quit = MenuItem::with_id(app, "quit", say("Julgi 종료", "Quit Julgi"), true, Some("CmdOrCtrl+Q"))?;
             Menu::with_items(
                 app,
                 &[
@@ -685,7 +694,7 @@ pub fn run() {
                     )?,
                     &Submenu::with_items(
                         app,
-                        "편집",
+                        say("편집", "Edit"),
                         true,
                         &[
                             &PredefinedMenuItem::undo(app, None)?,
@@ -699,7 +708,7 @@ pub fn run() {
                     )?,
                     &Submenu::with_items(
                         app,
-                        "창",
+                        say("창", "Window"),
                         true,
                         &[&PredefinedMenuItem::minimize(app, None)?, &PredefinedMenuItem::fullscreen(app, None)?],
                     )?,
@@ -715,8 +724,8 @@ pub fn run() {
         // 창을 닫아도 메뉴 막대에 남아서 세션이 계속 돈다. 완전히 끄는 건 종료(⌘Q)뿐이다.
         .setup(|app| {
             install_assets();
-            let open = MenuItem::with_id(app, "tray-open", "Julgi 열기", true, None::<&str>)?;
-            let quit = MenuItem::with_id(app, "tray-quit", "종료", true, None::<&str>)?;
+            let open = MenuItem::with_id(app, "tray-open", say("Julgi 열기", "Open Julgi"), true, None::<&str>)?;
+            let quit = MenuItem::with_id(app, "tray-quit", say("종료", "Quit"), true, None::<&str>)?;
             let menu = Menu::with_items(app, &[&open, &PredefinedMenuItem::separator(app)?, &quit])?;
             let mut tray = TrayIconBuilder::with_id("main").menu(&menu).tooltip("Julgi").on_menu_event(|app, event| {
                 show_window(app);
@@ -763,7 +772,7 @@ pub fn run() {
             Ok(())
         })
         .manage(Ptys::default())
-        .invoke_handler(tauri::generate_handler![pty_spawn, pty_write, pty_resize, pty_kill, clipboard_paste, term_states, log_line, env_flag, home_dir, layout_load, layout_save, handoff_write, config_load, sessions_elsewhere, app_exit, data_read, data_write, data_append, data_remove, brain_load, notify, set_hotkey, repo_peek, repo_refs, repo_sync, git_siblings, route_ask, memory_load, inbox_take, default_dir, dirs_exist, ledger::last_reply, ledger::last_exchange, ledger::ledger_scan, remote::remote_start, remote::remote_stop, remote::remote_publish, usage::claude_usage, jira::jira_connect, jira::jira_disconnect, jira::jira_me, jira::jira_search, jira::jira_mine, jira::jira_projects, jira::jira_view, jira::jira_transitions, jira::jira_transition, jira::jira_comment, tokens::token_usage, github::gh_status, github::glab_status, github::pr_view, github::pr_diff, github::pr_comments, github::repo_slug, github::pr_status, github::pr_review_requests, github::pr_mine, github::pr_list, github::pr_comment, github::pr_line_comment, github::pr_reply, github::pr_review, github::pr_merge, github::pr_close, github::pr_reopen, term_load, habits::habits, habits::corrections, skills::skill_usage, skills::skills_list, skills::skill_apply, skills::skill_retire, work::worktree_add, work::worktree_drop, work::repo_changes, work::repo_stat, work::repo_has, work::repo_snapshot, work::repo_diff, work::repo_state, work::repo_mrs, work::repo_commits, work::commit_message])
+        .invoke_handler(tauri::generate_handler![lang::set_lang, pty_spawn, pty_write, pty_resize, pty_kill, clipboard_paste, term_states, log_line, env_flag, home_dir, layout_load, layout_save, handoff_write, config_load, sessions_elsewhere, app_exit, data_read, data_write, data_append, data_remove, brain_load, notify, set_hotkey, repo_peek, repo_refs, repo_sync, git_siblings, route_ask, memory_load, inbox_take, default_dir, dirs_exist, ledger::last_reply, ledger::last_exchange, ledger::ledger_scan, remote::remote_start, remote::remote_stop, remote::remote_publish, usage::claude_usage, jira::jira_connect, jira::jira_disconnect, jira::jira_me, jira::jira_search, jira::jira_mine, jira::jira_projects, jira::jira_view, jira::jira_transitions, jira::jira_transition, jira::jira_comment, tokens::token_usage, github::gh_status, github::glab_status, github::pr_view, github::pr_diff, github::pr_comments, github::repo_slug, github::pr_status, github::pr_review_requests, github::pr_mine, github::pr_list, github::pr_comment, github::pr_line_comment, github::pr_reply, github::pr_review, github::pr_merge, github::pr_close, github::pr_reopen, term_load, habits::habits, habits::corrections, skills::skill_usage, skills::skills_list, skills::skill_apply, skills::skill_retire, work::worktree_add, work::worktree_drop, work::repo_changes, work::repo_stat, work::repo_has, work::repo_snapshot, work::repo_diff, work::repo_state, work::repo_mrs, work::repo_commits, work::commit_message])
         .build(tauri::generate_context!())
         .expect("error while running tauri application")
         .run(|app, event| {

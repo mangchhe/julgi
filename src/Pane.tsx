@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import Info, { Member, ThreadOps } from "./Info";
 import Review from "./CodeReview";
+import { tr } from "./i18n";
 import { Change, hot, kilo, repoOf, Session, STATE_LABEL, Thread } from "./model";
 import * as terms from "./terms";
 
@@ -66,21 +67,21 @@ export default function Pane({ termKey, focused, active, label, cwd, session, th
           <>
             <span className={"dot " + state} />
             <b>{thread?.name ?? session?.title ?? label}</b>
-            {thread && <span>줄기 {thread.sessions.length}</span>}
+            {thread && <span>{tr`줄기`} {thread.sessions.length}</span>}
             {[session?.work?.key, session?.repo ?? repoOf(cwd), session?.branch].filter(Boolean).map((m) => (
               <span key={m}>{m}</span>
             ))}
             <span className="pane-right">
-              <button type="button" className={"pin" + (pinned ? " on" : "")} title="고정하면 이 세션을 재우지 않고, 이 칸을 다른 세션으로 바꾸지도 않는다 (⌘⇧P)" onClick={onPin}>
-                {pinned ? "고정됨" : "고정"}
+              <button type="button" className={"pin" + (pinned ? " on" : "")} title={tr`고정하면 이 세션을 재우지 않고, 이 칸을 다른 세션으로 바꾸지도 않는다 (⌘⇧P)`} onClick={onPin}>
+                {pinned ? tr`고정됨` : tr`고정`}
               </button>
-              {handing && <span className="wait">갈아타는 중</span>}
+              {handing && <span className="wait">{tr`갈아타는 중`}</span>}
               {!handing && STATE_LABEL[state] && <span className={state}>{STATE_LABEL[state]}</span>}
               {tokens > 0 && <span className={hot(tokens) ? "hot" : ""}>{kilo(tokens)}</span>}
             </span>
           </>
         ) : (
-          <span>빈 칸</span>
+          <span>{tr`빈 칸`}</span>
         )}
       </div>
       <div className="pane-body" ref={body} />
@@ -88,9 +89,9 @@ export default function Pane({ termKey, focused, active, label, cwd, session, th
       {!termKey && (
         <div className="pane-empty">
           <p className="pane-empty-main">
-            <kbd>⌘L</kbd> 할 말을 치면 Julgi가 맞는 세션을 찾아 보낸다
+            <kbd>⌘L</kbd> {tr`할 말을 치면 Julgi가 맞는 세션을 찾아 보낸다`}
           </p>
-          <p>내 차례인 세션이 생기면 이 칸에 알아서 올라온다. 비어 있으면 잠시 뒤 칸이 없어진다.</p>
+          <p>{tr`내 차례인 세션이 생기면 이 칸에 알아서 올라온다. 비어 있으면 잠시 뒤 칸이 없어진다.`}</p>
         </div>
       )}
       {info && termKey && !finding && <Info session={session} cwd={cwd} thread={thread} memory={memory} members={members} ops={thread_ops} change={change} />}
@@ -99,7 +100,7 @@ export default function Pane({ termKey, focused, active, label, cwd, session, th
           <input
             autoFocus
             value={query}
-            placeholder="화면에서 찾기"
+            placeholder={tr`화면에서 찾기`}
             // 입력기에 따라 조합 중의 Esc는 누를 때 다른 키로 보이기도 한다. 뗄 때는 제대로 보인다
             onKeyUp={(e) => e.key === "Escape" && onFindClose()}
             onChange={(e) => {
@@ -120,14 +121,14 @@ export default function Pane({ termKey, focused, active, label, cwd, session, th
               e.preventDefault();
             }}
           />
-          <b className={"find-count" + (query && found?.count === 0 ? " none" : "")}>{!query ? "" : !found ? "…" : found.count === 0 ? "없음" : `${found.at + 1} / ${found.count}`}</b>
-          <button type="button" tabIndex={-1} title="위쪽(이전) 것 · Enter" onClick={() => terms.find(termKey, query, true)}>
+          <b className={"find-count" + (query && found?.count === 0 ? " none" : "")}>{!query ? "" : !found ? "…" : found.count === 0 ? tr`없음` : `${found.at + 1} / ${found.count}`}</b>
+          <button type="button" tabIndex={-1} title={tr`위쪽(이전) 것 · Enter`} onClick={() => terms.find(termKey, query, true)}>
             ↑
           </button>
-          <button type="button" tabIndex={-1} title="아래쪽(다음) 것 · Shift+Enter" onClick={() => terms.find(termKey, query, false)}>
+          <button type="button" tabIndex={-1} title={tr`아래쪽(다음) 것 · Shift+Enter`} onClick={() => terms.find(termKey, query, false)}>
             ↓
           </button>
-          <span>⏎ 위로 · ⇧⏎ 아래로 · Esc</span>
+          <span>{tr`⏎ 위로 · ⇧⏎ 아래로 · Esc`}</span>
         </div>
       )}
     </div>

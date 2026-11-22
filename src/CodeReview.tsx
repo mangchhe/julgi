@@ -22,6 +22,7 @@ import typescript from "highlight.js/lib/languages/typescript";
 import xml from "highlight.js/lib/languages/xml";
 import yaml from "highlight.js/lib/languages/yaml";
 import { ago, Change } from "./model";
+import { tr } from "./i18n";
 import { openPr, prOf } from "./pr";
 
 // 자주 보는 언어만 싣는다. 확장자로 고르고, 모르는 것은 색 없이 보여 준다
@@ -128,7 +129,7 @@ function labels(refs: string, base: string): { name: string; kind: "head" | "tag
 /** 볼 수 있는 판 하나. from에서 to까지 바뀐 것을 본다. 둘 다 없으면 기본 브랜치에서 지금 작업 폴더까지 */
 /** kind: 이력에서 어떻게 그릴지. all 전부, wip 커밋 안 한 것, turn 답 하나, commit 커밋 하나 */
 type Ver = { key: string; from: string | null; to: string | null; label: string; title: string; kind: "all" | "wip" | "turn" | "commit"; when: string };
-const NONE: Ver = { key: "all", from: "HEAD", to: null, label: "이 세션이 고친 것", title: "", kind: "all", when: "" };
+const NONE: Ver = { key: "all", from: "HEAD", to: null, label: tr`이 세션이 고친 것`, title: "", kind: "all", when: "" };
 export type FileDiff = { path: string; adds: number; dels: number; hunks: Hunk[]; note: string };
 
 /** git diff 글을 파일과 묶음, 줄로 나눈다. 줄마다 고치기 전과 뒤의 줄 번호를 붙인다 */
@@ -155,10 +156,10 @@ export function parse(diff: string): FileDiff[] {
       hunk = { head: (m?.[3] ?? "").trim(), lines: [] };
       file.hunks.push(hunk);
     } else if (!hunk) {
-      if (raw.startsWith("new file")) file.note = "새 파일";
-      else if (raw.startsWith("deleted file")) file.note = "지워짐";
-      else if (raw.startsWith("rename to")) file.note = "이름 바뀜";
-      else if (raw.startsWith("Binary")) file.note = "글이 아닌 파일";
+      if (raw.startsWith("new file")) file.note = tr`새 파일`;
+      else if (raw.startsWith("deleted file")) file.note = tr`지워짐`;
+      else if (raw.startsWith("rename to")) file.note = tr`이름 바뀜`;
+      else if (raw.startsWith("Binary")) file.note = tr`글이 아닌 파일`;
     } else if (raw.startsWith("+")) {
       hunk.lines.push({ kind: "add", text: raw.slice(1), newNo: newNo++ });
       file.adds += 1;
@@ -206,8 +207,8 @@ export default function Review({ places, known, sessions, onSay, onClose }: Prop
     () => [
       // 맨 위는 하나: 이 세션이 고친 것 전부. 답마다 찍어 둔 상태가 있으면 첫 답 앞에서 지금까지,
       // 없으면(Julgi가 지켜보기 전의 세션) 작업 브랜치는 기준에서 갈라진 뒤 전부, 기준 브랜치 위라면 커밋 안 한 것
-      { ...NONE, from: turns.length ? turns[0].from : git && git.branch !== git.default ? null : "HEAD", title: turns.length ? "이 세션의 첫 답 앞에서 지금까지 바뀐 것" : "답마다 찍어 둔 기록이 없어, 폴더에 남아 있는 변경을 보여 준다" },
-      ...[...turns].reverse().map((t, i) => ({ key: "t:" + t.to, from: t.from, to: t.to, label: i === 0 ? "방금 답" : `${i}번 전 답`, title: "이 답 하나에서 바뀐 것만", kind: "turn" as const, when: ago(t.at / 1000) })),
+      { ...NONE, from: turns.length ? turns[0].from : git && git.branch !== git.default ? null : "HEAD", title: turns.length ? tr`이 세션의 첫 답 앞에서 지금까지 바뀐 것` : tr`답마다 찍어 둔 기록이 없어, 폴더에 남아 있는 변경을 보여 준다` },
+      ...[...turns].reverse().map((t, i) => ({ key: "t:" + t.to, from: t.from, to: t.to, label: i === 0 ? tr`방금 답` : tr`${i}번 전 답`, title: tr`이 답 하나에서 바뀐 것만`, kind: "turn" as const, when: ago(t.at / 1000) })),
       // 커밋은 그 첫 부모와 견준다 (머지 커밋이면 머지로 들어온 것 전부가 보인다)
       ...commits.map(([sha, parents, subject, at]) => ({ key: "c:" + sha, from: parents.split(" ")[0] || null, to: sha, label: subject, title: `${subject} (${sha.slice(0, 8)})`, kind: "commit" as const, when: at ? ago(at) : "" })),
     ],
@@ -304,6 +305,7 @@ export default function Review({ places, known, sessions, onSay, onClose }: Prop
   };
   const say = () => {
     if (!noteAt || !note.trim()) return;
+    // 세션에 치는 말은 번역하지 않는다 i18n-ok
     onSay(`[코드 검토] ${noteAt.path}:${noteAt.no}\n> ${noteAt.text.trim().slice(0, 200)}\n\n${note.trim()}`);
     setNote("");
     setNoteAt(null);
@@ -356,15 +358,15 @@ export default function Review({ places, known, sessions, onSay, onClose }: Prop
       <div className="rv-top">
         {git && (
           <div className="rv-git">
-            <small className="rv-label">깃</small>
+            <small className="rv-label">{tr`깃`}</small>
             <span>
-              브랜치 <b className={git.branch === git.default ? "" : "off"}>{git.branch}</b>
-              {git.branch === git.default && <em> · 기본 브랜치에서 바로 고치고 있다</em>}
+              {tr`브랜치`} <b className={git.branch === git.default ? "" : "off"}>{git.branch}</b>
+              {git.branch === git.default && <em> · {tr`기본 브랜치에서 바로 고치고 있다`}</em>}
             </span>
-            <span>커밋 안 한 파일 {git.dirty}</span>
-            {git.ahead > 0 && <span>안 올린 커밋 {git.ahead}</span>}
-            {git.ahead < 0 && <span>원격에 아직 없는 브랜치</span>}
-            {git.behind > 0 && <span>원격보다 뒤 {git.behind}</span>}
+            <span>{tr`커밋 안 한 파일 ${git.dirty}`}</span>
+            {git.ahead > 0 && <span>{tr`안 올린 커밋 ${git.ahead}`}</span>}
+            {git.ahead < 0 && <span>{tr`원격에 아직 없는 브랜치`}</span>}
+            {git.behind > 0 && <span>{tr`원격보다 뒤 ${git.behind}`}</span>}
             {mr && (
               <button type="button" tabIndex={-1} onClick={() => { const pr = prOf(mr[2]); if (pr) openPr(pr); else void openUrl(mr[2]); }} title={mr[2]}>
                 MR · {mr[1].slice(0, 40)} · {mr[3]}
@@ -380,7 +382,7 @@ export default function Review({ places, known, sessions, onSay, onClose }: Prop
                 {p.label}
               </button>
             ))}
-          <span className="rv-hint">{sent > 0 ? `세션에 ${sent}번 말함 · ` : ""}⌘E 터미널로</span>
+          <span className="rv-hint">{sent > 0 ? tr`세션에 ${sent}번 말함 · ` : ""}{tr`⌘E 터미널로`}</span>
         </div>
         {chosen && (
           <div className="rv-msg">
@@ -397,35 +399,35 @@ export default function Review({ places, known, sessions, onSay, onClose }: Prop
         {brief && (ver.key === "all" || ver.key === (turns.length ? "t:" + turns[turns.length - 1].to : "")) && (
           <div className="rv-brief">
             <b>{brief.line}</b>
-            {brief.found?.map((f, i) => (
+            {brief.found?.map((f, i) => ( // level은 저장된 값이다 i18n-ok
               <button key={"f" + i} type="button" tabIndex={-1} className={"rv-found l-" + (f.level === "버그" ? "bug" : f.level === "위험" ? "risk" : "ask")} onClick={() => jump(f.where)}>
                 <i>
-                  <em>{f.level}</em> {f.where}
+                  <em>{tr(f.level)}</em> {f.where}
                 </i>
                 {f.what}
               </button>
             ))}
-            {brief.found && brief.found.length > 0 && (
+            {brief.found && brief.found.length > 0 && ( // 세션에 치는 말은 번역하지 않는다 i18n-ok
               <button type="button" tabIndex={-1} className="rv-hand" onClick={() => (onSay(`[코드 검토] 다른 모델이 변경을 읽고 짚은 곳이다. 하나씩 맞는지 확인하고, 맞으면 고치고 틀리면 왜 틀린지 말해줘.\n\n${brief.found!.map((f) => `- ${f.level} · ${f.where}: ${f.what}`).join("\n")}`), setSent((n) => n + 1))}>
-                짚은 {brief.found.length}곳을 세션에 넘겨 확인시키기
+                {tr`짚은 ${brief.found.length}곳을 세션에 넘겨 확인시키기`}
               </button>
             )}
-            {brief.found && brief.found.length === 0 && <span className="rv-clear">검토 · 다른 모델이 읽었고 짚은 곳이 없다</span>}
+            {brief.found && brief.found.length === 0 && <span className="rv-clear">{tr`검토 · 다른 모델이 읽었고 짚은 곳이 없다`}</span>}
             {brief.watch.map((w, i) => (
               <button key={i} type="button" tabIndex={-1} onClick={() => jump(w.where)}>
                 <i>{w.where}</i>
                 {w.why}
               </button>
             ))}
-            {brief.unverified && <span className="rv-unv">확인 안 된 것 · {brief.unverified}</span>}
+            {brief.unverified && <span className="rv-unv">{tr`확인 안 된 것`} · {brief.unverified}</span>}
           </div>
         )}
       </div>
       <div className={"rv-main" + (hist ? "" : " no-hist")}>
         <div className="rv-files">
-          {diff === undefined && <div className="side-none">읽는 중</div>}
-          {diff === null && <div className="side-none">git 레포가 아니거나 읽지 못했다</div>}
-          {diff !== undefined && diff !== null && files.length === 0 && <div className="side-none">{ver.key === "all" ? "이 세션이 고친 것이 없다" : "이 판에서는 바뀐 것이 없다"}</div>}
+          {diff === undefined && <div className="side-none">{tr`읽는 중`}</div>}
+          {diff === null && <div className="side-none">{tr`git 레포가 아니거나 읽지 못했다`}</div>}
+          {diff !== undefined && diff !== null && files.length === 0 && <div className="side-none">{ver.key === "all" ? tr`이 세션이 고친 것이 없다` : tr`이 판에서는 바뀐 것이 없다`}</div>}
           {files.map((f, i) => (
             <button key={f.path} type="button" tabIndex={-1} className={"rv-file" + (i === fileAt ? " on" : "") + (seen.includes(f.path) ? " seen" : "")} onClick={() => setFileAt(i)} title={f.path}>
               <span className="rv-name">
@@ -448,12 +450,12 @@ export default function Review({ places, known, sessions, onSay, onClose }: Prop
                   {file.note && <em> · {file.note}</em>}
                 </span>
                 <span className="rv-acts">
-                  <button type="button" tabIndex={-1} className={"hs-kind" + (whole ? " on" : "")} title="바뀐 곳만 보기와 파일 전체 보기를 오간다 (f)" onClick={() => setWhole(!whole)}>
-                    {whole ? "파일 전체" : "바뀐 곳만"}
+                  <button type="button" tabIndex={-1} className={"hs-kind" + (whole ? " on" : "")} title={tr`바뀐 곳만 보기와 파일 전체 보기를 오간다 (f)`} onClick={() => setWhole(!whole)}>
+                    {whole ? tr`파일 전체` : tr`바뀐 곳만`}
                   </button>
                 </span>
               </div>
-              {file.hunks.length === 0 && <div className="side-none">보여 줄 줄이 없다 ({file.note || "내용 변경 없음"})</div>}
+              {file.hunks.length === 0 && <div className="side-none">{tr`보여 줄 줄이 없다 (${file.note || tr`내용 변경 없음`})`}</div>}
               {file.hunks.map((h, hi) => (
                 <div key={hi} className="rv-hunk">
                   {h.head && <div className="rv-head">{h.head}</div>}
@@ -463,7 +465,7 @@ export default function Review({ places, known, sessions, onSay, onClose }: Prop
                     const open = noteAt?.path === file.path && noteAt.no === no && noteAt.text === l.text;
                     return (
                       <div key={li}>
-                        <div className={"rv-line " + l.kind + (open ? " open" : "")} onClick={() => (setNoteAt({ path: file.path, no, text: l.text }), setNote(""))} title="눌러서 이 줄에 대해 세션에게 말하기">
+                        <div className={"rv-line " + l.kind + (open ? " open" : "")} onClick={() => (setNoteAt({ path: file.path, no, text: l.text }), setNote(""))} title={tr`눌러서 이 줄에 대해 세션에게 말하기`}>
                           <span className="no">{l.oldNo ?? ""}</span>
                           <span className="no">{l.newNo ?? ""}</span>
                           <span className="sign">{l.kind === "add" ? "+" : l.kind === "del" ? "−" : " "}</span>
@@ -471,7 +473,7 @@ export default function Review({ places, known, sessions, onSay, onClose }: Prop
                         </div>
                         {open && (
                           <div className="rv-note">
-                            <textarea autoFocus rows={2} value={note} placeholder="이 줄에 대해 세션에게 할 말. Enter로 보낸다 (⇧Enter 줄바꿈, Esc 닫기)" onChange={(e) => setNote(e.target.value)} />
+                            <textarea autoFocus rows={2} value={note} placeholder={tr`이 줄에 대해 세션에게 할 말. Enter로 보낸다 (⇧Enter 줄바꿈, Esc 닫기)`} onChange={(e) => setNote(e.target.value)} />
                           </div>
                         )}
                       </div>
@@ -484,7 +486,7 @@ export default function Review({ places, known, sessions, onSay, onClose }: Prop
         </div>
         {hist && (
         <div className="rv-hist">
-          <div className="rv-hist-head">{git ? `${git.branch} 이력` : "이력"}</div>
+          <div className="rv-hist-head">{git ? tr`${git.branch} 이력` : tr`이력`}</div>
           {versions
             .filter((v) => v.kind !== "commit")
             .map((v) => (
@@ -493,7 +495,7 @@ export default function Review({ places, known, sessions, onSay, onClose }: Prop
                 <span className="rv-node-text">
                   <span>{v.label}</span>
                   {v.when && <small>{v.when}</small>}
-                  {v.kind === "all" && <small>{turns.length ? `답 ${turns.length}번에 걸쳐 · 커밋 안 한 파일 ${git?.dirty ?? 0}` : git && git.branch !== git.default ? `${git.default}에서 갈라진 뒤 전부` : `커밋 안 한 파일 ${git?.dirty ?? 0}`}</small>}
+                  {v.kind === "all" && <small>{turns.length ? tr`답 ${turns.length}번에 걸쳐 · 커밋 안 한 파일 ${git?.dirty ?? 0}` : git && git.branch !== git.default ? tr`${git.default}에서 갈라진 뒤 전부` : tr`커밋 안 한 파일 ${git?.dirty ?? 0}`}</small>}
                 </span>
               </button>
             ))}
@@ -527,25 +529,25 @@ export default function Review({ places, known, sessions, onSay, onClose }: Prop
                   )}
                   <circle cx={x(row.col)} cy={ROW / 2} r={row.merge ? 3 : 4} fill={row.merge ? "var(--bg)" : hue(row.col)} stroke={hue(row.col)} strokeWidth="1.6" />
                 </svg>
-                <span className="rv-c-text">{merged ? `머지 · ${merged}` : subject}</span>
+                <span className="rv-c-text">{merged ? tr`머지 · ${merged}` : subject}</span>
                 {marks.map((l) => (
-                  <em key={l.name} className={"k-" + l.kind} title={l.kind === "base" || l.name === git?.default ? "기준 브랜치" : undefined}>
+                  <em key={l.name} className={"k-" + l.kind} title={l.kind === "base" || l.name === git?.default ? tr`기준 브랜치` : undefined}>
                     {l.name}
                   </em>
                 ))}
                 {forked && (
-                  <em className="k-base" title={`기준 브랜치 ${git?.default}에서 이 커밋 뒤로 갈라져 나왔다`}>
-                    갈라진 곳
+                  <em className="k-base" title={tr`기준 브랜치 ${git?.default}에서 이 커밋 뒤로 갈라져 나왔다`}>
+                    {tr`갈라진 곳`}
                   </em>
                 )}
-                <small>{at ? ago(at).replace(" 전", "") : ""}</small>
+                <small>{at ? ago(at).replace(/ 전$| ago$/, "") : ""}</small>
               </button>
             );
           })}
         </div>
         )}
       </div>
-      <div className="pal-foot">↑↓ 파일 · ←→ 이력에서 위아래로 · f 파일 전체 · h 이력 · n p 다음/이전 바뀐 곳 · 줄을 누르면 세션에게 말한다 · Esc</div>
+      <div className="pal-foot">{tr`↑↓ 파일 · ←→ 이력에서 위아래로 · f 파일 전체 · h 이력 · n p 다음/이전 바뀐 곳 · 줄을 누르면 세션에게 말한다 · Esc`}</div>
     </div>
   );
 }

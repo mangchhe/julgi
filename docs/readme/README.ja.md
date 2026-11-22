@@ -21,7 +21,7 @@
 *Julgi*（줄기、「ジュルギ」）は韓国語で植物の茎のことです。このアプリでは、1 つの仕事とそれを引き継いできたセッションのつながりを **茎（stem）** と呼びます。
 
 > [!NOTE]
-> UI はいまのところ韓国語のみで、macOS でしか使っていません。署名済みインストーラはなく、自分でビルドします（スクリプト 1 つ）。
+> UI は英語と韓国語です（システムの言語に従い、`⌘,` で変えられます）。macOS でしか使っていません。署名済みインストーラはなく、自分でビルドします（スクリプト 1 つ）。
 
 ## 機能
 
@@ -122,11 +122,11 @@ scripts/install.sh --open    # ツール確認 → ビルド → /Applications/J
 
 更新するときも同じコマンドを実行します。`scripts/install.sh --check` はツールの確認だけを行います。開発するなら `npm install && npm run tauri dev`。
 
-連携には別途必要なものがあります。GitHub は [`gh`](https://cli.github.com)、GitLab は [`glab`](https://gitlab.com/gitlab-org/cli)、Jira は API トークン。`⌘,` → 接続（연결）でつなぎます。
+連携には別途必要なものがあります。GitHub は [`gh`](https://cli.github.com)、GitLab は [`glab`](https://gitlab.com/gitlab-org/cli)、Jira は API トークン。`⌘,` → Connections でつなぎます。
 
 ## はじめかた
 
-1. Julgi を開き、`⌘,` → 地図（지도）でリポジトリが集まっているフォルダを指定します。
+1. Julgi を開き、`⌘,` → Map でリポジトリが集まっているフォルダを指定します。
 2. `⌘L` を押し、やってほしいことを入力して Enter。
 3. セッションが自分を待つと「自分の番」に上がってきます。`⌘J` を押して答えます。
 

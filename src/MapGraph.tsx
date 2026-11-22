@@ -1,10 +1,13 @@
 import { useMemo, useState } from "react";
 import { Edge } from "./brain";
+import { tr } from "./i18n";
 
 /** focus: 밝혀 볼 레포들(영역 하나를 골랐을 때). 비어 있으면 전부 보인다 */
 type Props = { repos: { name: string; role: string }[]; edges: Edge[]; focus?: string[] };
 
 /** 왼쪽에서 오른쪽으로: 사람이 쓰는 쪽 → 받아 주는 쪽 → 서버 → 서버들이 기대는 것 → 그 밖 */
+// 역할과 선의 종류는 지도 파일에 적힌 값이다. 보여 줄 때만 tr로 옮긴다
+// i18n-off
 const COLUMNS = ["앱", "웹 화면", "게이트웨이", "백엔드 서버", "공용 모듈·계약", "배포 설정", "문서·지식", "도구"];
 /** 이어진 방식마다 색과 선 모양을 달리한다. 색만으로 가르지 않게 점선도 다르다 */
 const KINDS: Record<string, { color: string; dash: string }> = {
@@ -15,6 +18,8 @@ const KINDS: Record<string, { color: string; dash: string }> = {
   "배포 설정": { color: "var(--muted)", dash: "3 5" },
   기타: { color: "var(--muted)", dash: "1 4" },
 };
+const OTHER = "기타";
+// i18n-on
 const H = 30;
 const GAP_Y = 46;
 /** 화살촉의 길이. 선의 마지막 이만큼은 곧게 긋는다 */
@@ -48,7 +53,7 @@ export default function MapGraph({ repos, edges: all, focus = [] }: Props) {
   const [held, setHeld] = useState(""); // 눌러서 고정한 레포. 다시 누르거나 빈 곳을 누르면 풀린다
   const hot = over || held;
   // 무엇으로 이어지는지 확인되지 않은 선("기타")은 처음에는 감춘다. 범례를 눌러 켜고 끈다
-  const [off, setOff] = useState<string[]>(["기타"]);
+  const [off, setOff] = useState<string[]>([OTHER]);
   const edges = useMemo(() => all.filter((e) => !off.includes(e.kind)), [all, off]);
   const layout = useMemo(() => {
     const degree = (name: string) => edges.filter((e) => e.from === name || e.to === name).length;
@@ -143,18 +148,18 @@ export default function MapGraph({ repos, edges: all, focus = [] }: Props) {
   return (
     <div className="mg">
       <div className="mg-legend">
-        <span>화살표는 "기댄다"의 방향: A → B는 A가 B를 부르거나 B에 기댄다</span>
+        <span>{tr`화살표는 "기댄다"의 방향: A → B는 A가 B를 부르거나 B에 기댄다`}</span>
         {used.map((kind) => (
-          <button key={kind} type="button" tabIndex={-1} className={"mg-key" + (off.includes(kind) ? " off" : "")} title="눌러서 이 선을 켜고 끈다" onClick={() => setOff(off.includes(kind) ? off.filter((k) => k !== kind) : [...off, kind])}>
+          <button key={kind} type="button" tabIndex={-1} className={"mg-key" + (off.includes(kind) ? " off" : "")} title={tr`눌러서 이 선을 켜고 끈다`} onClick={() => setOff(off.includes(kind) ? off.filter((k) => k !== kind) : [...off, kind])}>
             <svg width="30" height="8" aria-hidden="true">
               <line x1="0" y1="4" x2="30" y2="4" stroke={KINDS[kind]?.color} strokeWidth="2" strokeDasharray={KINDS[kind]?.dash} />
             </svg>
-            {kind} {all.filter((e) => e.kind === kind).length}
+            {tr(kind)} {all.filter((e) => e.kind === kind).length}
           </button>
         ))}
       </div>
       <div className="mg-scroll">
-        <svg width={layout.width} height={layout.height} onClick={() => setHeld("")} role="img" aria-label={`레포 ${repos.length}개와 연결 ${edges.length}개`}>
+        <svg width={layout.width} height={layout.height} onClick={() => setHeld("")} role="img" aria-label={tr`레포 ${repos.length}개와 연결 ${edges.length}개`}>
           <defs>
             {Object.entries(KINDS).map(([kind, k], i) => (
               <marker key={kind} id={`mg-arrow-${i}`} viewBox="0 0 10 8" refX="9.6" refY="4" markerWidth="15" markerHeight="12" markerUnits="userSpaceOnUse" orient="auto">
@@ -164,11 +169,11 @@ export default function MapGraph({ repos, edges: all, focus = [] }: Props) {
           </defs>
           {layout.cols.map((col, ci) => (
             <text key={ci} x={8 + ci * layout.gapX} y={22} className="mg-col">
-              {col[0].role || "그 밖"}
+              {col[0].role ? tr(col[0].role) : tr`그 밖`}
             </text>
           ))}
           {edges.map((e) => {
-            const k = KINDS[e.kind] ?? KINDS["기타"];
+            const k = KINDS[e.kind] ?? KINDS[OTHER];
             const on = hot ? e.from === hot || e.to === hot : !focus.length || (focus.includes(e.from) && focus.includes(e.to));
             return (
               <path
@@ -179,7 +184,7 @@ export default function MapGraph({ repos, edges: all, focus = [] }: Props) {
                 strokeWidth={(hot || focus.length) && on ? 2.2 : 1.4}
                 strokeDasharray={k.dash}
                 opacity={on ? 0.9 : 0.08}
-                markerEnd={`url(#mg-arrow-${Object.keys(KINDS).indexOf(KINDS[e.kind] ? e.kind : "기타")})`}
+                markerEnd={`url(#mg-arrow-${Object.keys(KINDS).indexOf(KINDS[e.kind] ? e.kind : OTHER)})`}
               />
             );
           })}
@@ -205,12 +210,12 @@ export default function MapGraph({ repos, edges: all, focus = [] }: Props) {
             .filter((e) => e.from === hot || e.to === hot)
             .map((e) => (
               <span key={`${e.from}>${e.to}`}>
-                {e.from === hot ? `→ ${e.to}` : `← ${e.from}`} · {e.kind}
+                {e.from === hot ? `→ ${e.to}` : `← ${e.from}`} · {tr(e.kind)}
                 {e.how && ` · ${e.how}`}
               </span>
             ))
         ) : (
-          <span>상자에 마우스를 올리면 그 레포와 이어진 것만 남는다. 누르면 그대로 고정되고, 다시 누르거나 빈 곳을 누르면 풀린다. 위의 선 이름을 누르면 그 종류를 켜고 끈다{off.includes("기타") ? ". 무엇으로 이어지는지 확인되지 않은 선은 감춰져 있다" : ""}</span>
+          <span>{off.includes(OTHER) ? tr`상자에 마우스를 올리면 그 레포와 이어진 것만 남는다. 누르면 그대로 고정되고, 다시 누르거나 빈 곳을 누르면 풀린다. 위의 선 이름을 누르면 그 종류를 켜고 끈다. 무엇으로 이어지는지 확인되지 않은 선은 감춰져 있다` : tr`상자에 마우스를 올리면 그 레포와 이어진 것만 남는다. 누르면 그대로 고정되고, 다시 누르거나 빈 곳을 누르면 풀린다. 위의 선 이름을 누르면 그 종류를 켜고 끈다`}</span>
         )}
       </div>
     </div>

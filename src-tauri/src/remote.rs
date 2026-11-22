@@ -2,6 +2,7 @@
 //! 터미널을 통째로 옮기지는 않는다. 폰에서 하는 일은 셋이다: 무엇이 도는지 보기, 묻는 말에 답하기, 새 일 던지기.
 //! 받는 곳은 Tailscale 망(100.64.0.0/10)과 이 맥 자신뿐이고, 그 안에서도 주소에 든 토큰이 맞아야 한다.
 //! 화면에 보일 상태는 앱이 주기적으로 넘겨 주고(remote_publish), 폰이 시킨 일은 세션들이 쓰는 것과 같은 inbox에 적어 앱이 처리한다.
+use crate::lang::say;
 use std::{
     fs,
     io::Read,
@@ -151,7 +152,7 @@ fn serve(server: Server, token: String) {
 pub fn remote_start(port: u16) -> Result<String, String> {
     let token = token();
     if STARTED.get().is_none() {
-        let server = Server::http(("0.0.0.0", port)).map_err(|e| format!("{port}번 포트를 열지 못했다: {e}"))?;
+        let server = Server::http(("0.0.0.0", port)).map_err(|e| say(&format!("{port}번 포트를 열지 못했다: {e}"), &format!("Could not open port {port}: {e}")))?;
         let _ = STARTED.set(port);
         let held = token.clone();
         std::thread::spawn(move || serve(server, held));
@@ -160,7 +161,7 @@ pub fn remote_start(port: u16) -> Result<String, String> {
     let port = *STARTED.get().unwrap_or(&port);
     Ok(match tailnet_ip() {
         Some(ip) => format!("http://{}:{port}/?t={token}", tailnet_name().unwrap_or(ip)),
-        None => format!("Tailscale이 꺼져 있다. 켜면 여기에 주소가 나온다 (이 맥에서는 http://127.0.0.1:{port}/?t={token})"),
+        None => say(&format!("Tailscale이 꺼져 있다. 켜면 여기에 주소가 나온다 (이 맥에서는 http://127.0.0.1:{port}/?t={token})"), &format!("Tailscale is off. Turn it on and the address appears here (on this Mac: http://127.0.0.1:{port}/?t={token})")),
     })
 }
 

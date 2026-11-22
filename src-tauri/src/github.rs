@@ -2,6 +2,7 @@
 //! 로그인과 토큰은 gh가 키체인에 갖고 있다. Julgi는 토큰을 보지도 적지도 않는다.
 //! 셸을 거치지 않고 gh를 바로 띄운다. 레포 이름과 번호는 모양을 확인한 뒤에만 넘긴다.
 
+use crate::lang::say;
 use std::{path::Path, process::Command};
 
 use crate::gitlab;
@@ -22,7 +23,7 @@ fn run(args: &[&str]) -> Result<String, String> {
         .env("GH_PROMPT_DISABLED", "1")
         .env("NO_COLOR", "1")
         .output()
-        .map_err(|_| "gh가 없다. brew install gh".to_owned())?;
+        .map_err(|_| say("gh가 없다. brew install gh", "gh is not installed. brew install gh"))?;
     if out.status.success() {
         Ok(String::from_utf8_lossy(&out.stdout).into_owned())
     } else {
@@ -35,7 +36,7 @@ fn check_repo(repo: &str) -> Result<(), String> {
     let ok = |s: &str| !s.is_empty() && s.chars().all(|c| c.is_ascii_alphanumeric() || "._-".contains(c));
     match repo.split_once('/') {
         Some((owner, name)) if ok(owner) && ok(name) => Ok(()),
-        _ => Err(format!("레포 이름이 이상하다: {repo}")),
+        _ => Err(say(&format!("레포 이름이 이상하다: {repo}"), &format!("Invalid repo name: {repo}"))),
     }
 }
 
@@ -105,7 +106,7 @@ pub fn pr_status(repo: String, number: u64) -> Result<PrStatus, String> {
     let query = "query($owner:String!,$name:String!,$number:Int!){viewer{login} repository(owner:$owner,name:$name){pullRequest(number:$number){state reviewDecision commits(last:1){nodes{commit{statusCheckRollup{state}}}} comments(last:100){nodes{author{login}}} reviews(last:100){nodes{author{login}}} reviewThreads(last:100){nodes{comments(last:100){nodes{author{login}}}}} timelineItems(last:1,itemTypes:[CLOSED_EVENT,REOPENED_EVENT]){nodes{... on ClosedEvent{actor{login}} ... on ReopenedEvent{actor{login}}}}}}}";
     let out = run(&["api", "graphql", "-f", &format!("query={query}"), "-f", &format!("owner={owner}"), "-f", &format!("name={name}"), "-F", &format!("number={number}")])?;
     let v: serde_json::Value = serde_json::from_str(&out).map_err(|e| e.to_string())?;
-    status_of(&v).ok_or_else(|| "PR을 찾지 못했다".into())
+    status_of(&v).ok_or_else(|| say("PR을 찾지 못했다", "PR not found"))
 }
 
 fn status_of(v: &serde_json::Value) -> Option<PrStatus> {
@@ -170,7 +171,7 @@ pub fn glab_status() -> (bool, String) {
 // ── 쓰기: GitHub에 글이 올라가고 머지된다. 화면에서 내가 누른 것만 부른다 ──
 
 fn check_body(body: &str) -> Result<(), String> {
-    if body.trim().is_empty() { Err("쓸 말이 비었다".into()) } else { Ok(()) }
+    if body.trim().is_empty() { Err(say("쓸 말이 비었다", "Nothing to post: the text is empty")) } else { Ok(()) }
 }
 
 /// PR에 코멘트 하나 (대화에)
@@ -193,7 +194,7 @@ pub fn pr_line_comment(repo: String, number: u64, commit: String, path: String, 
     }
     check_repo(&repo)?;
     if commit.is_empty() || !commit.chars().all(|c| c.is_ascii_hexdigit()) || path.is_empty() || path.contains('\n') || !(side == "RIGHT" || side == "LEFT") {
-        return Err("줄 코멘트를 달 자리가 이상하다".into());
+        return Err(say("줄 코멘트를 달 자리가 이상하다", "Invalid position for a line comment"));
     }
     let api = format!("repos/{repo}/pulls/{number}/comments");
     let fields = [format!("body={body}"), format!("commit_id={commit}"), format!("path={path}"), format!("side={side}")];
@@ -209,7 +210,7 @@ pub fn pr_reply(repo: String, number: u64, id: String, body: String) -> Result<(
         return gitlab::reply(r, number, &id, &body);
     }
     check_repo(&repo)?;
-    let id: u64 = id.parse().map_err(|_| "코멘트 id가 이상하다".to_owned())?;
+    let id: u64 = id.parse().map_err(|_| say("코멘트 id가 이상하다", "Invalid comment id"))?;
     let field = format!("body={body}");
     run(&["api", "-X", "POST", &format!("repos/{repo}/pulls/{number}/comments/{id}/replies"), "-f", &field]).map(|_| ())
 }
@@ -225,7 +226,7 @@ pub fn pr_review(repo: String, number: u64, kind: String, body: String) -> Resul
         "approve" => "--approve",
         "request-changes" => "--request-changes",
         "comment" => "--comment",
-        _ => return Err(format!("모르는 리뷰: {kind}")),
+        _ => return Err(say(&format!("모르는 리뷰: {kind}"), &format!("Unknown review kind: {kind}"))),
     };
     // 수정 요청과 의견에는 글이 있어야 한다. 승인은 글 없이도 된다
     if kind != "approve" {
@@ -283,7 +284,7 @@ pub fn pr_merge(repo: String, number: u64, method: String, delete_branch: bool) 
         "squash" => "--squash",
         "merge" => "--merge",
         "rebase" => "--rebase",
-        _ => return Err(format!("모르는 머지 방식: {method}")),
+        _ => return Err(say(&format!("모르는 머지 방식: {method}"), &format!("Unknown merge method: {method}"))),
     };
     let n = number.to_string();
     let mut args = vec!["pr", "merge", &n, "-R", &repo, flag];

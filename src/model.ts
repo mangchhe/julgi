@@ -1,3 +1,5 @@
+import { tr } from "./i18n";
+
 export type SessionInfo = {
   id: string;
   cwd: string;
@@ -117,7 +119,7 @@ export const modelFor = (task: Task) => config.models[task] || (TIERS[config.thi
  * lead: 맡긴 세션. session: 맡은 세션. redo: 다시 시킨 횟수
  */
 /** work: 이 일감만을 위해 딴 워크트리 폴더. 없으면 레포의 작업 폴더에서 일한다 */
-export type Job = { id: string; lead: string; repo: string; cwd: string; work?: string; ask: string; status: "대기" | "하는 중" | "끝남" | "실패" | "멈춤"; session?: string; result?: string; created: number; started?: number; finished?: number; redo: number };
+export type Job = { id: string; lead: string; repo: string; cwd: string; work?: string; ask: string; status: "대기" | "하는 중" | "끝남" | "실패" | "멈춤"; session?: string; result?: string; created: number; started?: number; finished?: number; redo: number }; // i18n-ok
 /** 조율 하나가 동시에 돌리는 일감 수 */
 export const MAX_PARALLEL = 3;
 
@@ -174,10 +176,10 @@ export function enrich(ledger: Ledger): Session[] {
 
 export function ago(seconds: number): string {
   const diff = Date.now() / 1000 - seconds;
-  if (diff < 90) return "방금";
-  if (diff < 3600) return `${Math.round(diff / 60)}분 전`;
-  if (diff < 86400) return `${Math.round(diff / 3600)}시간 전`;
-  return `${Math.round(diff / 86400)}일 전`;
+  if (diff < 90) return tr("방금");
+  if (diff < 3600) return tr`${Math.round(diff / 60)}분 전`;
+  if (diff < 86400) return tr`${Math.round(diff / 3600)}시간 전`;
+  return tr`${Math.round(diff / 86400)}일 전`;
 }
 
 export const kilo = (tokens: number) => (tokens ? `${Math.round(tokens / 1000)}k` : "");
@@ -199,7 +201,7 @@ export const setAlive = (ids: string[]) => void (alive = new Set(ids));
 export const elsewhere = (s: Session) => alive.has(s.id) || (Date.now() / 1000 - s.mtime < ELSEWHERE_S && s.mtime > (sleptAt.get(s.id) ?? 0) + 5);
 /** 프로세스가 떠 있는 것을 직접 본 것인가 */
 export const aliveElsewhere = (s: Session) => alive.has(s.id);
-export const STATE_LABEL: Record<string, string> = { run: "일하는 중", wait: "답함 · 내 차례", hold: "일감 기다리는 중", idle: "일감 끝냄", ask: "확인이 필요함", dead: "끝남" };
+export const STATE_LABEL: Record<string, string> = { run: tr("일하는 중"), wait: tr("답함 · 내 차례"), hold: tr("일감 기다리는 중"), idle: tr("일감 끝냄"), ask: tr("확인이 필요함"), dead: tr("끝남") };
 
 // Julgi가 띄운 Claude 세션만 상태를 적게 한다. 전역 설정은 건드리지 않고 실행할 때만 훅을 얹는다.
 // 서브에이전트의 도구 호출도 부모 세션의 훅으로 온다(입력에 agent_id가 붙는다). 메인 답이 끝난 뒤 백그라운드 서브에이전트가
@@ -322,21 +324,25 @@ export const config = {
   /** 세션을 닫기 전에 한 번 묻는다 */
   confirmClose: true,
   /** 화면 색. 설정(⌘,)에서 고른다 */
+  /** 화면 글의 언어. auto는 시스템이 한국어면 한국어, 아니면 영어. 바꾸면 다시 켜야 적용된다 */
+  lang: "auto",
   theme: "ink",
   /** ⌘S를 누르면 지금 세션에 보내는 말. 비우면 아무 일도 없다 */
   saveCommand: "",
   /** 갈아탈 때 이전 세션에 보내는 부탁 */
+  // i18n-off
   handoffPrompt:
     "이 세션을 새 세션으로 넘기려고 한다. 새 세션이 이 글만 보고 이어서 일할 수 있게 인계 글을 써줘. 도구는 쓰지 말고 글로만 답해. 포함할 것: 목표, 지금까지 알아낸 것, 내린 결정과 이유, 바뀐 파일과 브랜치, 관련 링크, 다음 할 일(순서대로).",
+  // i18n-on
 };
 export const hot = (tokens: number) => tokens > config.hotTokens;
 
 /** 링크를 짧게: 무엇인지와 번호만 */
 export function linkLabel(url: string): string {
   const artifact = url.match(/claude\.ai\/artifact\/(\w{6})/);
-  if (artifact) return `아티팩트 ${artifact[1]}`;
+  if (artifact) return tr`아티팩트 ${artifact[1]}`;
   const pr = url.match(/\/([^/]+)\/(?:-\/)?(pull|merge_requests|issues)\/(\d+)/);
-  if (pr) return `${pr[1]} ${pr[2] === "pull" ? "PR" : pr[2] === "issues" ? "이슈" : "MR"} #${pr[3]}`;
+  if (pr) return `${pr[1]} ${pr[2] === "pull" ? "PR" : pr[2] === "issues" ? tr("이슈") : "MR"} #${pr[3]}`;
   const ticket = url.match(/browse\/([A-Z][A-Z0-9]+-\d+)/);
   if (ticket) return ticket[1];
   return url.replace(/^https:\/\//, "");

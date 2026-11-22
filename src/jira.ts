@@ -1,4 +1,5 @@
 /** Jira 연동의 화면 쪽 도우미: 연결 정보, 티켓 모양, ADF → 마크다운, 티켓 키 찾기, 새 소식 판정 */
+import { tr } from "./i18n.ts";
 
 export type JiraConn = { site: string; email: string; kind: string };
 /** 목록 한 줄 (Rust row) */
@@ -41,7 +42,7 @@ export const keyOfUrl = (url: string) => url.match(/\/browse\/([A-Z][A-Z0-9_]+-\
 export const openTicket = (key: string) => window.dispatchEvent(new CustomEvent<string>("julgi:ticket", { detail: key }));
 
 /** 상태 범주 → 묶음 이름 */
-export const CATEGORY: Record<string, string> = { new: "할 일", indeterminate: "진행 중", done: "끝남" };
+export const CATEGORY: Record<string, string> = { new: "할 일", indeterminate: "진행 중", done: "끝남" }; // i18n-ok
 
 /**
  * Jira 본문(ADF 또는 Server의 위키 글)을 마크다운으로. 문단·제목·목록·코드·인용·링크·굵게·기울임·코드 조각·멘션을 옮기고,
@@ -96,7 +97,7 @@ export function adfToMd(doc: unknown): string {
       case "mediaSingle":
       case "mediaGroup":
       case "media":
-        return "[첨부]";
+        return "[첨부]"; // i18n-ok
       default:
         return kids.length ? kids.map((k) => block(k, depth)).join("\n") : inline(n);
     }
@@ -120,9 +121,9 @@ export type TicketSeen = { status: string; others: number; assigned: boolean };
 
 /** 내 티켓의 새 소식: 새로 배정됨, 상태가 바뀜, 남이 코멘트를 닮. 처음 보는 감시(기록이 비었음)는 알리지 않는다 */
 export function ticketNews(before: TicketSeen | undefined, now: Ticket, firstRun: boolean): string {
-  if (!before) return firstRun ? "" : "새로 배정됨";
-  if (now.status !== before.status) return `상태 → ${now.status}`;
-  if (now.others > before.others) return `새 코멘트 ${now.others - before.others}`;
+  if (!before) return firstRun ? "" : tr`새로 배정됨`;
+  if (now.status !== before.status) return tr`상태 → ${now.status}`;
+  if (now.others > before.others) return tr`새 코멘트 ${now.others - before.others}`;
   return "";
 }
 

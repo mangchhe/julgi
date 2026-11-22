@@ -2,6 +2,7 @@
 //! 로그인과 토큰은 glab이 갖고 있다. 화면은 GitHub인지 GitLab인지 모르고 같은 모양만 받는다.
 //! 레포는 "호스트/그룹/.../프로젝트"로 받는다(github.rs가 "gitlab:" 꼬리표를 떼고 넘긴다).
 
+use crate::lang::say;
 use std::{path::Path, process::Command};
 
 use serde_json::{json, Value};
@@ -13,11 +14,11 @@ fn glab_bin() -> &'static str {
 /// "gitlab.com/group/sub/proj" → ("gitlab.com", "group/sub/proj"). 모양이 이상하면 거절한다
 pub fn split(repo: &str) -> Result<(&str, &str), String> {
     let ok = |s: &str| !s.is_empty() && s.chars().all(|c| c.is_ascii_alphanumeric() || "._-".contains(c));
-    let (host, path) = repo.split_once('/').ok_or_else(|| format!("GitLab 프로젝트 이름이 이상하다: {repo}"))?;
+    let (host, path) = repo.split_once('/').ok_or_else(|| say(&format!("GitLab 프로젝트 이름이 이상하다: {repo}"), &format!("Invalid GitLab project name: {repo}")))?;
     if ok(host) && host.contains('.') && path.split('/').count() >= 2 && path.split('/').all(ok) {
         Ok((host, path))
     } else {
-        Err(format!("GitLab 프로젝트 이름이 이상하다: {repo}"))
+        Err(say(&format!("GitLab 프로젝트 이름이 이상하다: {repo}"), &format!("Invalid GitLab project name: {repo}")))
     }
 }
 
@@ -33,7 +34,7 @@ fn api(host: &str, method: &str, endpoint: &str, fields: &[(&str, String)]) -> R
     for (k, v) in fields {
         cmd.arg("-f").arg(format!("{k}={v}"));
     }
-    let out = cmd.output().map_err(|_| "glab이 없다. brew install glab".to_owned())?;
+    let out = cmd.output().map_err(|_| say("glab이 없다. brew install glab", "glab is not installed. brew install glab"))?;
     if !out.status.success() {
         return Err(String::from_utf8_lossy(&out.stderr).trim().to_owned());
     }
@@ -293,7 +294,7 @@ pub fn line_comment(repo: &str, iid: u64, file: &str, line: u64, side: &str, bod
 pub fn reply(repo: &str, iid: u64, discussion: &str, body: &str) -> Result<(), String> {
     let (host, path) = split(repo)?;
     if !discussion.chars().all(|c| c.is_ascii_alphanumeric()) {
-        return Err("토론 id가 이상하다".into());
+        return Err(say("토론 id가 이상하다", "Invalid discussion id"));
     }
     api(host, "POST", &format!("{}/discussions/{discussion}/notes", mr_path(path, iid)), &[("body", body.to_owned())]).map(|_| ())
 }

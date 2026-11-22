@@ -1,0 +1,15 @@
+export default {
+  "줄기": "Stem",
+  "고정하면 이 세션을 재우지 않고, 이 칸을 다른 세션으로 바꾸지도 않는다 (⌘⇧P)": "Pinned sessions are not put to sleep, and this pane is not switched to another session (⌘⇧P)",
+  "고정됨": "Pinned",
+  "고정": "Pin",
+  "갈아타는 중": "Handing off",
+  "빈 칸": "Empty pane",
+  "할 말을 치면 Julgi가 맞는 세션을 찾아 보낸다": "Type what you want to say and Julgi sends it to the right session",
+  "내 차례인 세션이 생기면 이 칸에 알아서 올라온다. 비어 있으면 잠시 뒤 칸이 없어진다.": "When a session becomes your turn, it shows up in this pane by itself. If it stays empty, the pane goes away shortly.",
+  "화면에서 찾기": "Find on screen",
+  "없음": "None",
+  "위쪽(이전) 것 · Enter": "Previous (up) · Enter",
+  "아래쪽(다음) 것 · Shift+Enter": "Next (down) · Shift+Enter",
+  "⏎ 위로 · ⇧⏎ 아래로 · Esc": "⏎ up · ⇧⏎ down · Esc",
+} as Record<string, string>;

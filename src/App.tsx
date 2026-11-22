@@ -28,15 +28,16 @@ import * as terms from "./terms";
 import { rank } from "./route";
 import { Brief, Change, Job, MAX_PARALLEL, setMapDirs, setPrefs, markAuto, isAuto, autoList, STATE_LABEL, ago, Item, modelFor, SkillInfo, SkillUse, aboutOf, buildFolders, buildItems, aliveElsewhere, config, elsewhere, enrich, markSlept, setAlive, handoffCommand, Ledger, Merge, mergeCandidates, mergeKey, newCommand, Open, repoOf, resumeCommand, Session, TermState, Thread, waiting, withPrompt } from "./model";
 import { selftest } from "./selftest";
+import { tr } from "./i18n";
 import "./App.css";
 
 const MAX_PANES = 12;
 /** 작업 페이지의 티켓 묶음 (JQL) */
 const TICKET_GROUPS = [
-  { id: "doing", title: "진행 중", hint: "내게 배정된 진행 중 티켓", jql: 'assignee = currentUser() AND statusCategory = "In Progress" ORDER BY updated DESC' },
-  { id: "todo", title: "할 일", hint: "내게 배정된 아직 시작 안 한 티켓", jql: 'assignee = currentUser() AND statusCategory = "To Do" ORDER BY priority DESC, updated DESC' },
-  { id: "sprint", title: "이번 스프린트", hint: "열린 스프린트의 내 티켓 (Jira Software)", jql: "sprint in openSprints() AND assignee = currentUser() ORDER BY updated DESC" },
-  { id: "reported", title: "내가 보고한 것", hint: "내가 만든 안 끝난 티켓", jql: "reporter = currentUser() AND statusCategory != Done ORDER BY updated DESC" },
+  { id: "doing", title: tr("진행 중"), hint: tr("내게 배정된 진행 중 티켓"), jql: 'assignee = currentUser() AND statusCategory = "In Progress" ORDER BY updated DESC' },
+  { id: "todo", title: tr("할 일"), hint: tr("내게 배정된 아직 시작 안 한 티켓"), jql: 'assignee = currentUser() AND statusCategory = "To Do" ORDER BY priority DESC, updated DESC' },
+  { id: "sprint", title: tr("이번 스프린트"), hint: tr("열린 스프린트의 내 티켓 (Jira Software)"), jql: "sprint in openSprints() AND assignee = currentUser() ORDER BY updated DESC" },
+  { id: "reported", title: tr("내가 보고한 것"), hint: tr("내가 만든 안 끝난 티켓"), jql: "reporter = currentUser() AND statusCategory != Done ORDER BY updated DESC" },
 ];
 const MIN_PANE_PX = 120;
 /** 이보다 빨리 끝난 터미널은 닫지 않고 남겨서 왜 끝났는지 보이게 한다 */
@@ -58,10 +59,12 @@ const MAX_JUDGE = 8;
 const MAX_ACTS = 200;
 /** 답을 받고 이만큼 쉰 세션은 요약을 남겨 둔다 */
 const NOTE_AFTER_MS = 10 * 60_000;
+// i18n-off
 const NOTE_SYSTEM =
   "너는 작업 세션 요약기다. 첫 줄에 이 세션이 하는 일의 이름을 \"이름: \" 뒤에 적는다. 이름은 20자 안쪽의 명사구로, 무엇을 만들거나 고치는 일인지가 드러나야 한다(예: 이름: 재고 초과 주문 거절 처리). 사용자가 처음 한 말을 그대로 옮기지 않는다. 둘째 줄부터는 주어진 정보만으로 세 문장 이내로 요약한다: 무엇을 하는 세션인지, 어디까지 됐는지, 다음에 할 일. 레포·브랜치·티켓·PR 번호처럼 나중에 이 세션을 찾을 단서는 그대로 적는다. 다른 머리말이나 꾸밈은 쓰지 않는다.";
 const JUDGE_SYSTEM =
   '두 Claude Code 세션이 같은 작업인지 판정한다. 같은 작업이란 목표가 같고, 한쪽이 다른 쪽의 연속이거나 같은 변경을 다루는 것이다. 같은 레포, 같은 브랜치, 같은 티켓이나 PR을 언급했다는 것만으로는 같다고 하지 않는다. 내용이 모자라 확실하지 않으면 same을 false로 한다. JSON 한 줄만 답한다: {"same": true 또는 false, "why": "판단 근거 한 문장"}';
+// i18n-on
 type Verdict = { same: boolean; why: string };
 /** 인계 글을 이만큼 기다려도 안 오면 갈아타기를 그만둔다 */
 const HANDOFF_TIMEOUT_MS = 5 * 60_000;
@@ -270,8 +273,8 @@ export default function App() {
       warnedAway.current[s.id] = Date.now();
       return say(
         aliveElsewhere(s)
-          ? `"${s.title.slice(0, 30)}"은 다른 곳에 열려 있다. 여기서만 쓸 거면 한 번 더 누른다. 양쪽에서 번갈아 쓰면 대화가 엉킨다.`
-          : `"${s.title.slice(0, 30)}"은 방금까지 다른 곳에서 쓰던 세션이다. 거기서 닫았으면 한 번 더 누른다.`,
+          ? tr`"${s.title.slice(0, 30)}"은 다른 곳에 열려 있다. 여기서만 쓸 거면 한 번 더 누른다. 양쪽에서 번갈아 쓰면 대화가 엉킨다.`
+          : tr`"${s.title.slice(0, 30)}"은 방금까지 다른 곳에서 쓰던 세션이다. 거기서 닫았으면 한 번 더 누른다.`,
         7000,
       );
     }
@@ -281,11 +284,11 @@ export default function App() {
   };
   const newSession = (cwd: string) => {
     const id = crypto.randomUUID();
-    openTerm({ key: "c:" + id, label: `새 세션 · ${repoOf(cwd)}`, cwd, sessionId: id }, newCommand(id));
+    openTerm({ key: "c:" + id, label: tr`새 세션 · ${repoOf(cwd)}`, cwd, sessionId: id }, newCommand(id));
   };
   /** ⌘T: 셸은 보던 것 옆에 칸을 하나 더 내서 연다. 지금 칸이 비었거나 칸이 꽉 찼으면 지금 칸에 연다 */
   const newShell = (cwd: string, command?: string, label?: string) => {
-    const o: Open = { key: "s:" + crypto.randomUUID(), label: label ?? `셸 · ${repoOf(cwd)}`, cwd };
+    const o: Open = { key: "s:" + crypto.randomUUID(), label: label ?? tr`셸 · ${repoOf(cwd)}`, cwd };
     const { panes, focus } = live.current;
     if (!panes[focus] || panes.length >= MAX_PANES) return openTerm(o, command);
     terms.create({ key: o.key, cwd, command });
@@ -302,20 +305,20 @@ export default function App() {
     try {
       const repo = live.current.byId.get(thread.sessions[thread.sessions.length - 1])?.repo ?? "";
       const shelf = live.current.notes.filter((n) => !n.repo || n.repo === repo).slice(0, 80);
-      const prompt = `작업 이름: ${thread.name}\n레포: ${repo}\n\n이미 있는 노트:\n${shelf.map(indexLine).join("\n") || "(없음)"}\n\n작업 기록:\n${memory.slice(0, 9000)}\n`;
+      const prompt = `작업 이름: ${thread.name}\n레포: ${repo}\n\n이미 있는 노트:\n${shelf.map(indexLine).join("\n") || "(없음)"}\n\n작업 기록:\n${memory.slice(0, 9000)}\n`; // i18n-ok
       const raw = (await invoke<string | null>("route_ask", { system: LEARN_SYSTEM, prompt, model: modelFor("learn") })) ?? "";
       const found = (JSON.parse(raw.slice(raw.indexOf("{"), raw.lastIndexOf("}") + 1)) as { notes?: { title?: string; kind?: string; body?: string; update?: number | null }[] }).notes ?? [];
       const titles: string[] = [];
       for (const f of found.slice(0, 5)) {
         if (!f.title?.trim() || !f.body?.trim()) continue;
         const old = typeof f.update === "number" ? shelf[f.update] : undefined;
-        const note: Note = { id: old?.id ?? crypto.randomUUID().slice(0, 8), title: f.title.trim(), kind: f.kind ?? "사실", repo: old?.repo ?? repo, from: thread.name, created: old?.created ?? new Date().toISOString().slice(0, 10), body: f.body.trim() };
+        const note: Note = { id: old?.id ?? crypto.randomUUID().slice(0, 8), title: f.title.trim(), kind: f.kind ?? "사실", repo: old?.repo ?? repo, from: thread.name, created: old?.created ?? new Date().toISOString().slice(0, 10), body: f.body.trim() }; // i18n-ok
         const parsed = putNote(note);
         if (!parsed) continue;
-        titles.push((old ? "고침: " : "") + parsed.title);
+        titles.push((old ? tr("고침: ") : "") + parsed.title);
       }
       if (titles.length) {
-        record("배움", `"${thread.name.slice(0, 30)}"에서 브레인에 ${titles.length}개: ${titles.join(" / ").slice(0, 160)}`, thread.sessions[thread.sessions.length - 1]);
+        record("배움", tr`"${thread.name.slice(0, 30)}"에서 브레인에 ${titles.length}개: ${titles.join(" / ").slice(0, 160)}`, thread.sessions[thread.sessions.length - 1]); // i18n-ok
       }
       mark();
     } catch {
@@ -334,11 +337,13 @@ export default function App() {
     const rows = await invoke<[number, string, string, string, string][]>("corrections", { since }).catch(() => []);
     // 모델에게 묻는 값을 하려면 어느 정도는 쌓여야 한다
     if (rows.length < 5) return;
-    const shelf = live.current.notes.filter((n) => n.kind === "선호");
+    const shelf = live.current.notes.filter((n) => n.kind === "선호"); // i18n-ok
+    // i18n-off
     const prompt = `이미 있는 선호:\n${shelf.map((n, i) => `${i}. ${n.repo ? `[${n.repo}] ` : ""}${n.title}`).join("\n") || "(없음)"}\n\n바로잡은 말들 (${rows.length}개):\n${rows
       .slice(-80)
       .map(([, , cwd, doing, said], i) => `${i}. 레포: ${repoOf(cwd)} | 세션이 하던 것: ${doing.slice(0, 160)} | 내가 한 말: ${said.slice(0, 300)}`)
       .join("\n")}\n`;
+    // i18n-on
     try {
       const raw = (await invoke<string | null>("route_ask", { system: CORRECT_SYSTEM, prompt, model: modelFor("learn") })) ?? "";
       const found = (JSON.parse(raw.slice(raw.indexOf("{"), raw.lastIndexOf("}") + 1)) as { notes?: { title?: string; body?: string; repo?: string; count?: number; update?: number | null }[] }).notes ?? [];
@@ -346,13 +351,13 @@ export default function App() {
       for (const f of found.slice(0, 4)) {
         if (!f.title?.trim() || !f.body?.trim()) continue;
         const old = typeof f.update === "number" ? shelf[f.update] : undefined;
-        const parsed = putNote({ id: old?.id ?? crypto.randomUUID().slice(0, 8), title: f.title.trim(), kind: "선호", repo: old?.repo ?? (f.repo ?? "").trim(), from: `바로잡은 말 ${f.count ?? 1}번`, created: old?.created ?? new Date().toISOString().slice(0, 10), body: f.body.trim() });
-        if (parsed) titles.push((old ? "고침: " : "") + parsed.title);
+        const parsed = putNote({ id: old?.id ?? crypto.randomUUID().slice(0, 8), title: f.title.trim(), kind: "선호", repo: old?.repo ?? (f.repo ?? "").trim(), from: tr`바로잡은 말 ${f.count ?? 1}번`, created: old?.created ?? new Date().toISOString().slice(0, 10), body: f.body.trim() }); // i18n-ok
+        if (parsed) titles.push((old ? tr("고침: ") : "") + parsed.title);
       }
       await invoke("data_write", { name: "corrections-seen.json", text: JSON.stringify({ at: rows[rows.length - 1][0] + 1 }) });
       if (titles.length) {
-        log(`바로잡은 말 ${rows.length}개에서 선호 ${titles.length}개: ${titles.join(" / ").slice(0, 200)}`);
-        record("배움", `바로잡은 말 ${rows.length}개에서 선호 ${titles.length}개를 담음: ${titles.join(" / ").slice(0, 160)}`);
+        log(tr`바로잡은 말 ${rows.length}개에서 선호 ${titles.length}개: ${titles.join(" / ").slice(0, 200)}`);
+        record("배움", tr`바로잡은 말 ${rows.length}개에서 선호 ${titles.length}개를 담음: ${titles.join(" / ").slice(0, 160)}`); // i18n-ok
       }
     } catch {
       // 답이 깨졌으면 다음 점검 때 같은 말로 다시 본다
@@ -412,12 +417,12 @@ export default function App() {
         gone.add(drop.id);
         putNote({ ...keep, title: m.title?.trim() || keep.title, body: m.body.trim() });
         forget(drop.id);
-        log(`합침: "${drop.title.slice(0, 40)}" → "${keep.title.slice(0, 40)}"`);
+        log(tr`합침: "${drop.title.slice(0, 40)}" → "${keep.title.slice(0, 40)}"`);
       }
       for (const c of (answer.conflict ?? []).slice(0, 5)) {
         const a = shelf[c.a];
         const b = shelf[c.b];
-        if (a && b) seen.push(`브레인: 서로 어긋나는 노트 "${a.title.slice(0, 40)}" ↔ "${b.title.slice(0, 40)}" · ${String(c.why).slice(0, 80)}`);
+        if (a && b) seen.push(tr`브레인: 서로 어긋나는 노트 "${a.title.slice(0, 40)}" ↔ "${b.title.slice(0, 40)}" · ${String(c.why).slice(0, 80)}`);
       }
     } catch {
       // 정리는 다음 점검에서 다시 해 본다
@@ -434,7 +439,7 @@ export default function App() {
       const rows = live.current.sessions.filter((s) => !s.auto && s.mtime > cutoff).slice(0, 150);
       if (rows.length < 10) return;
       const have = live.current.skills.map((k) => `- ${k.name}: ${k.description.slice(0, 120)}`).join("\n");
-      const prompt = `이미 있는 스킬:\n${have || "(없음)"}\n\n시킨 일 목록:\n${rows.map((s, i) => `${i}. ${s.said.slice(0, 90)} | ${s.title.slice(0, 50)} | ${s.repo}`).join("\n")}\n`;
+      const prompt = `이미 있는 스킬:\n${have || "(없음)"}\n\n시킨 일 목록:\n${rows.map((s, i) => `${i}. ${s.said.slice(0, 90)} | ${s.title.slice(0, 50)} | ${s.repo}`).join("\n")}\n`; // i18n-ok
       const raw = (await invoke<string | null>("route_ask", { system: CAND_SYSTEM, prompt, model: modelFor("cands") })) ?? "";
       const found = (JSON.parse(raw.slice(raw.indexOf("{"), raw.lastIndexOf("}") + 1)) as { candidates?: { name: string; what: string; sessions: number[] }[] }).candidates ?? [];
       const today = new Date().toISOString().slice(0, 10);
@@ -445,7 +450,7 @@ export default function App() {
         .sort((a, b) => b.count - a.count);
       setSkillCands(next);
       void invoke("data_write", { name: "skill-candidates.json", text: JSON.stringify(next, null, 1) });
-      if (next.length) record("스킬", `되풀이하는 일 ${next.length}가지를 찾음: ${next.map((c) => `${c.name}(${c.count}번)`).join(", ").slice(0, 160)}`);
+      if (next.length) record("스킬", tr`되풀이하는 일 ${next.length}가지를 찾음: ${next.map((c) => tr`${c.name}(${c.count}번)`).join(", ").slice(0, 160)}`); // i18n-ok
     } catch {
       // 내일 다시 본다
     } finally {
@@ -511,29 +516,29 @@ export default function App() {
     learning.current = true;
     try {
       // 낡은 코드로 지도를 그리지 않게 먼저 원격에서 받아 온다. 작업 중인 레포는 건드리지 않는다
-      const synced = config.mapFetch ? await Promise.all(repos.map((r) => invoke<string>("repo_sync", { path: r.cwd }).catch(() => "실패"))) : [];
-      const pulled = repos.filter((_, i) => synced[i]?.startsWith("당김"));
-      const behind = repos.map((r, i) => (synced[i]?.startsWith("뒤처짐") ? `${r.repo}(${synced[i].slice(4)}커밋)` : "")).filter(Boolean);
-      const failed = repos.filter((_, i) => synced[i] === "실패").map((r) => r.repo);
+      const synced = config.mapFetch ? await Promise.all(repos.map((r) => invoke<string>("repo_sync", { path: r.cwd }).catch(() => "실패"))) : []; // i18n-ok
+      const pulled = repos.filter((_, i) => synced[i]?.startsWith("당김")); // i18n-ok
+      const behind = repos.map((r, i) => (synced[i]?.startsWith("뒤처짐") ? tr`${r.repo}(${synced[i].slice(4)}커밋)` : "")).filter(Boolean); // i18n-ok
+      const failed = repos.filter((_, i) => synced[i] === "실패").map((r) => r.repo); // i18n-ok
       const parts = await Promise.all(
         repos.map(async (r) => {
           const peek = await invoke<string>("repo_peek", { path: r.cwd });
           // 코드에 다른 레포의 이름이 나오는 곳이 레포끼리 이어져 있다는 증거다
           const refs = await invoke<string>("repo_refs", { path: r.cwd, names: repos.filter((x) => x.repo !== r.repo).map((x) => x.repo) }).catch(() => "");
           const did = live.current.sessions.filter((s) => s.repo === r.repo && !s.auto).slice(0, 8).map((s) => s.title.slice(0, 50)).join(" / ");
-          return `### ${r.repo}\n경로: ${r.cwd}\n${peek.slice(0, repos.length > 10 ? 1900 : 3600)}\n여기서 한 일: ${did || "(이 사람이 여기서 일한 적은 없다)"}\n코드에 다른 레포 이름이 나오는 곳:\n${refs || "(없음)"}`;
+          return `### ${r.repo}\n경로: ${r.cwd}\n${peek.slice(0, repos.length > 10 ? 1900 : 3600)}\n여기서 한 일: ${did || "(이 사람이 여기서 일한 적은 없다)"}\n코드에 다른 레포 이름이 나오는 곳:\n${refs || "(없음)"}`; // i18n-ok
         }),
       );
       const text = ((await invoke<string | null>("route_ask", { system: MAP_SYSTEM, prompt: parts.join("\n\n"), model: modelFor("map") })) ?? "").trim();
       if (!text.includes("## ")) return;
       const stamp = new Date().toISOString().slice(0, 10);
-      const whole = `# 레포 지도 (${stamp}에 Julgi가 그림)\n\n${text}\n`;
+      const whole = `# 레포 지도 (${stamp}에 Julgi가 그림)\n\n${text}\n`; // i18n-ok
       await invoke("data_write", { name: "MAP.md", text: whole });
       await invoke("data_write", { name: "map.json", text: JSON.stringify({ at: Date.now(), repos }) });
       mapState.current = { at: Date.now(), repos };
       setMapText(whole); // 파일과 같은 글이어야 화면이 첫 레포를 빠뜨리지 않는다
       setMapDirs(repos.map((r) => r.cwd));
-      record("지도", `레포 ${repos.length}개의 지도를 그림${pulled.length ? ` · 최신으로 당긴 것 ${pulled.length}개(${pulled.map((r) => r.repo).join(", ").slice(0, 80)})` : ""}${behind.length ? ` · 작업 중이라 그대로 둔 것: ${behind.join(", ").slice(0, 120)}` : ""}${failed.length ? ` · 받아 오지 못한 것: ${failed.join(", ").slice(0, 80)}` : ""}`);
+      record("지도", [tr`레포 ${repos.length}개의 지도를 그림`, pulled.length ? tr`최신으로 당긴 것 ${pulled.length}개(${pulled.map((r) => r.repo).join(", ").slice(0, 80)})` : "", behind.length ? tr`작업 중이라 그대로 둔 것: ${behind.join(", ").slice(0, 120)}` : "", failed.length ? tr`받아 오지 못한 것: ${failed.join(", ").slice(0, 80)}` : ""].filter(Boolean).join(" · ")); // i18n-ok
     } catch {
       // 다음 점검에서 다시 그린다
     } finally {
@@ -560,7 +565,7 @@ export default function App() {
       const line = (item: Item, i: number) => {
         const s = item.session;
         const about = (live.current.memories[s.id] || s.recap || "").replace(/\s+/g, " ").slice(0, 170);
-        return `${i}. ${item.name.slice(0, 50)} | 처음 한 말: ${s.said.slice(0, 60)} | ${s.repo} ${s.branch} | ${Math.round(s.tokens / 1000)}k | ${ago(s.mtime)}${item.thread ? ` | 줄기(세션 ${item.thread.sessions.length})` : ""}${about ? ` | ${about}` : ""}`;
+        return `${i}. ${item.name.slice(0, 50)} | 처음 한 말: ${s.said.slice(0, 60)} | ${s.repo} ${s.branch} | ${Math.round(s.tokens / 1000)}k | ${ago(s.mtime)}${item.thread ? ` | 줄기(세션 ${item.thread.sessions.length})` : ""}${about ? ` | ${about}` : ""}`; // i18n-ok
       };
       try {
         const raw = (await invoke<string | null>("route_ask", { system: SWEEP_SYSTEM, prompt: part.map(line).join("\n"), model: modelFor(task) })) ?? "";
@@ -572,7 +577,7 @@ export default function App() {
           for (const m of members.slice(1)) joinThreads(members[0].session.id, m.session.id, true);
           const thread = live.current.threads.find((t) => t.sessions.includes(members[0].session.id));
           if (thread && !thread.named && g.name?.trim()) saveThreads(live.current.threads.map((t) => (t.id === thread.id ? { ...t, name: g.name!.trim().slice(0, 40) } : t)));
-          log(`묶음: ${members.map((m) => `"${m.name.slice(0, 24)}"`).join(" + ")} → "${(g.name ?? thread?.name ?? "").slice(0, 30)}" · ${String(g.why ?? "").slice(0, 70)}`);
+          log(tr`묶음: ${members.map((m) => `"${m.name.slice(0, 24)}"`).join(" + ")} → "${(g.name ?? thread?.name ?? "").slice(0, 30)}" · ${String(g.why ?? "").slice(0, 70)}`);
         }
         for (const d of (answer.done ?? []).slice(0, 15)) {
           const item = part[d.n];
@@ -580,12 +585,12 @@ export default function App() {
           // 열려 있는 일은 내가 보고 있는 것이라 건드리지 않는다
           if (!item || ids.some((id) => openIds.has(id)) || live.current.threads.find((t) => t.sessions.includes(item.session.id))?.done) continue;
           finishThread(item.session.id, true);
-          log(`끝냄: "${item.name.slice(0, 40)}" · ${String(d.why ?? "").slice(0, 70)}`);
+          log(tr`끝냄: "${item.name.slice(0, 40)}" · ${String(d.why ?? "").slice(0, 70)}`);
         }
         const gone = (answer.trivial ?? []).slice(0, 20).map((t) => part[t.n]).filter((item) => item && !item.thread && !openIds.has(item.session.id));
         if (gone.length) {
           saveHidden([...new Set([...hiddenRef.current, ...gone.map((item) => item.session.id)])]);
-          for (const item of gone) log(`치움: "${item.name.slice(0, 40)}"`);
+          for (const item of gone) log(tr`치움: "${item.name.slice(0, 40)}"`);
         }
       } catch {
         // 이 묶음은 다음 점검에서 다시 본다
@@ -605,7 +610,7 @@ export default function App() {
       const names = [...new Set(`${note.title} ${note.body}`.match(/[A-Za-z][A-Za-z0-9]*(?:[A-Z_.][A-Za-z0-9]+)+/g) ?? [])].filter((w) => w.length >= 6 && !/^https?/.test(w) && !/^v?\d/.test(w)).slice(0, 6);
       if (names.length < 2) continue;
       const found = await invoke<boolean[]>("repo_has", { path: cwd, words: names }).catch(() => []);
-      if (found.length && !found.some(Boolean)) out.push(`브레인: "${note.title.slice(0, 44)}" 노트가 가리키는 이름(${names.slice(0, 3).join(", ")})이 ${note.repo} 코드에 하나도 없다. 낡았을 수 있다`);
+      if (found.length && !found.some(Boolean)) out.push(tr`브레인: "${note.title.slice(0, 44)}" 노트가 가리키는 이름(${names.slice(0, 3).join(", ")})이 ${note.repo} 코드에 하나도 없다. 낡았을 수 있다`);
     }
     return out.slice(0, 8);
   };
@@ -620,14 +625,14 @@ export default function App() {
     const pick = live.current.skillCands.find((c) => c.count >= 3 && /^[a-z0-9][a-z0-9-]{2,40}$/.test(c.name) && !have.has(c.name));
     if (!pick) return;
     const files = pick.sessions.slice(0, 5).map((id) => `~/.claude/projects/*/${id}.jsonl`);
-    await invoke("data_write", { name: "grown/.claude-plugin/plugin.json", text: JSON.stringify({ name: "julgi-grown", description: "Julgi가 되풀이되는 일에서 만든 스킬", version: "1.0.0" }, null, 2) });
-    const text = `[Julgi: 되풀이해서 시킨 일을 스킬로 만든다]\n\n이 사람은 "${pick.what}" 같은 일을 최근 ${pick.count}번 시켰다. 다음부터 어느 세션이든 같은 방법으로 하도록 Claude Code 스킬을 하나 만든다.\n\n1. 근거가 된 대화 기록을 읽는다(JSONL, 길면 필요한 부분만): ${files.join(", ")}\n2. 실제로 어떤 순서로 했는지, 어디서 막혔고 사용자가 무엇을 바로잡았는지 뽑는다. 기록에 없는 절차는 지어내지 않는다.\n3. 이 폴더에 skills/${pick.name}/SKILL.md 를 쓴다. 맨 위에 name: ${pick.name} 과 description(언제 쓰는지, 사용자가 할 법한 말과 함께 한 문단)을 frontmatter로 두고, 본문에 순서, 쓰는 명령, 흔한 함정, 끝났다고 볼 기준을 적는다. 특정한 한 번의 일이 아니라 다음에도 통하게 쓴다.\n4. 머지·푸시·배포·삭제·데이터 변경처럼 되돌리기 어려운 단계는 스킬이 직접 하게 쓰지 않고 "사용자에게 묻는다"고 적는다. 비밀 값(토큰, 비밀번호)은 적지 않는다.\n5. 다 쓰면 무엇을 근거로 무엇을 담았는지 세 줄로 답하고 끝낸다. 다른 파일은 건드리지 않는다.`;
+    await invoke("data_write", { name: "grown/.claude-plugin/plugin.json", text: JSON.stringify({ name: "julgi-grown", description: "Julgi가 되풀이되는 일에서 만든 스킬", version: "1.0.0" }, null, 2) }); // i18n-ok
+    const text = `[Julgi: 되풀이해서 시킨 일을 스킬로 만든다]\n\n이 사람은 "${pick.what}" 같은 일을 최근 ${pick.count}번 시켰다. 다음부터 어느 세션이든 같은 방법으로 하도록 Claude Code 스킬을 하나 만든다.\n\n1. 근거가 된 대화 기록을 읽는다(JSONL, 길면 필요한 부분만): ${files.join(", ")}\n2. 실제로 어떤 순서로 했는지, 어디서 막혔고 사용자가 무엇을 바로잡았는지 뽑는다. 기록에 없는 절차는 지어내지 않는다.\n3. 이 폴더에 skills/${pick.name}/SKILL.md 를 쓴다. 맨 위에 name: ${pick.name} 과 description(언제 쓰는지, 사용자가 할 법한 말과 함께 한 문단)을 frontmatter로 두고, 본문에 순서, 쓰는 명령, 흔한 함정, 끝났다고 볼 기준을 적는다. 특정한 한 번의 일이 아니라 다음에도 통하게 쓴다.\n4. 머지·푸시·배포·삭제·데이터 변경처럼 되돌리기 어려운 단계는 스킬이 직접 하게 쓰지 않고 "사용자에게 묻는다"고 적는다. 비밀 값(토큰, 비밀번호)은 적지 않는다.\n5. 다 쓰면 무엇을 근거로 무엇을 담았는지 세 줄로 답하고 끝낸다. 다른 파일은 건드리지 않는다.`; // i18n-ok
     const home = live.current.home;
-    const session = await dispatch({ kind: "new", cwd: `${home}/.julgi/grown` }, text, { rank: -1, by: "일감 스킬 만들기" }, false, true);
+    const session = await dispatch({ kind: "new", cwd: `${home}/.julgi/grown` }, text, { rank: -1, by: "일감 스킬 만들기" }, false, true); // i18n-ok
     if (typeof session !== "string") return;
     await invoke("data_write", { name: "skills-made.json", text: JSON.stringify([...made, { name: pick.name, at: Date.now(), what: pick.what, count: pick.count, session }], null, 1) });
-    log(`스킬 만들기 시작: ${pick.name} (${pick.count}번 되풀이한 일). 세션이 쓰고 있다`);
-    record("스킬", `되풀이한 일로 스킬을 만든다: ${pick.name} · ${pick.what.slice(0, 80)}`, session);
+    log(tr`스킬 만들기 시작: ${pick.name} (${pick.count}번 되풀이한 일). 세션이 쓰고 있다`);
+    record("스킬", tr`되풀이한 일로 스킬을 만든다: ${pick.name} · ${pick.what.slice(0, 80)}`, session); // i18n-ok
   };
   /**
    * 있는 스킬을 가꾼다. 판단은 숫자로 한다.
@@ -641,16 +646,16 @@ export default function App() {
     const now = Date.now();
     const bare = (name: string) => name.split(":").pop() ?? name;
     const usedIn = (name: string, days: number) => [...new Set(skillUses.filter((u) => bare(u.skill) === name && now - Date.parse(u.at) < days * 86_400_000).map((u) => u.session))];
-    for (const k of skills.filter((k) => k.source === "Julgi가 만듦" && now / 1000 - k.modified > 60 * 86400 && usedIn(k.name, 45).length === 0)) {
+    for (const k of skills.filter((k) => k.source === "Julgi가 만듦" && now / 1000 - k.modified > 60 * 86400 && usedIn(k.name, 45).length === 0)) { // i18n-ok
       const moved = await invoke<string>("skill_retire", { name: k.name }).catch(() => "");
       if (!moved) continue;
-      log(`스킬 내림: ${k.name} (만든 지 60일이 넘도록 안 쓰임). ~/.julgi/grown/retired에 있다`);
-      record("스킬", `안 쓰이는 스킬을 내림: ${k.name}`);
+      log(tr`스킬 내림: ${k.name} (만든 지 60일이 넘도록 안 쓰임). ~/.julgi/grown/retired에 있다`);
+      record("스킬", tr`안 쓰이는 스킬을 내림: ${k.name}`); // i18n-ok
     }
     const tended = await invoke<string | null>("data_read", { name: "skills-tended.json" }).then((t) => (t ? (JSON.parse(t) as { name: string; at: number }[]) : []), () => []);
     if (tended.some((t) => now - t.at < 7 * 86_400_000)) return;
     const pick = skills
-      .filter((k) => (k.source === "내 스킬" || k.source === "Julgi가 만듦") && !k.linked && /^[a-z0-9][a-z0-9-]{1,60}$/.test(k.name))
+      .filter((k) => (k.source === "내 스킬" || k.source === "Julgi가 만듦") && !k.linked && /^[a-z0-9][a-z0-9-]{1,60}$/.test(k.name)) // i18n-ok
       .filter((k) => !tended.some((t) => t.name === k.name && now - t.at < 30 * 86_400_000))
       .map((k) => ({ skill: k, used: usedIn(k.name, 30) }))
       .filter((row) => row.used.length >= 3)
@@ -658,39 +663,39 @@ export default function App() {
     if (!pick) return;
     const { name, path } = pick.skill;
     const files = pick.used.slice(0, 6).map((id) => `~/.claude/projects/*/${id}.jsonl`);
-    const text = `[Julgi: 자주 쓰는 스킬을 쓰인 기록에 비추어 다듬는다]\n\n"${name}" 스킬이 최근 30일에 세션 ${pick.used.length}곳에서 쓰였다. 실제로 쓰인 기록을 보고, 스킬 때문에 일이 어긋난 곳이 되풀이되면 그 부분만 고친다.\n\n1. 지금 스킬을 읽는다: ${path}\n2. 쓰인 기록을 읽는다(JSONL이고 길다. 스킬 이름으로 찾아 그 뒤만 본다): ${files.join(", ")}\n3. 세션마다 센다: (가) 스킬대로 했다가 틀려서 사용자가 바로잡은 곳 (나) 스킬에 없어서 매번 헤매거나 다시 찾아야 했던 단계 (다) 스킬에 적혀 있지만 이제 안 맞는 명령·경로·이름.\n4. 같은 문제가 세션 두 곳 넘게 나온 것만 고친다. 한 번뿐인 일은 고치지 않는다. 고칠 것이 없으면 아무 파일도 쓰지 말고 "고칠 것 없음"과 센 숫자만 답하고 끝낸다.\n5. 고칠 것이 있으면 고친 전체 글을 이 폴더의 revised/${name}/SKILL.md 에 쓴다. 원본은 직접 건드리지 않는다. frontmatter의 name은 그대로 두고, 문제가 된 곳만 바꾸고 나머지 글은 글자 그대로 둔다. 되돌리기 어려운 단계(머지·푸시·배포·삭제·데이터 변경)를 스킬이 묻지 않고 하게 바꾸지 않는다. 비밀 값은 적지 않는다.\n6. 그런 다음 ~/.julgi/bin/julgi skill apply ${name} "무엇을 왜 바꿨는지 한 문장 (근거 세션 수)" 를 실행한다. Julgi가 옛 글을 따로 남기고 바꿔 넣는다.\n7. 센 숫자와 바꾼 것을 세 줄로 답하고 끝낸다. 다른 파일은 건드리지 않는다.`;
-    const session = await dispatch({ kind: "new", cwd: `${home}/.julgi/grown` }, text, { rank: -1, by: "일감 스킬 다듬기" }, false, true);
+    const text = `[Julgi: 자주 쓰는 스킬을 쓰인 기록에 비추어 다듬는다]\n\n"${name}" 스킬이 최근 30일에 세션 ${pick.used.length}곳에서 쓰였다. 실제로 쓰인 기록을 보고, 스킬 때문에 일이 어긋난 곳이 되풀이되면 그 부분만 고친다.\n\n1. 지금 스킬을 읽는다: ${path}\n2. 쓰인 기록을 읽는다(JSONL이고 길다. 스킬 이름으로 찾아 그 뒤만 본다): ${files.join(", ")}\n3. 세션마다 센다: (가) 스킬대로 했다가 틀려서 사용자가 바로잡은 곳 (나) 스킬에 없어서 매번 헤매거나 다시 찾아야 했던 단계 (다) 스킬에 적혀 있지만 이제 안 맞는 명령·경로·이름.\n4. 같은 문제가 세션 두 곳 넘게 나온 것만 고친다. 한 번뿐인 일은 고치지 않는다. 고칠 것이 없으면 아무 파일도 쓰지 말고 "고칠 것 없음"과 센 숫자만 답하고 끝낸다.\n5. 고칠 것이 있으면 고친 전체 글을 이 폴더의 revised/${name}/SKILL.md 에 쓴다. 원본은 직접 건드리지 않는다. frontmatter의 name은 그대로 두고, 문제가 된 곳만 바꾸고 나머지 글은 글자 그대로 둔다. 되돌리기 어려운 단계(머지·푸시·배포·삭제·데이터 변경)를 스킬이 묻지 않고 하게 바꾸지 않는다. 비밀 값은 적지 않는다.\n6. 그런 다음 ~/.julgi/bin/julgi skill apply ${name} "무엇을 왜 바꿨는지 한 문장 (근거 세션 수)" 를 실행한다. Julgi가 옛 글을 따로 남기고 바꿔 넣는다.\n7. 센 숫자와 바꾼 것을 세 줄로 답하고 끝낸다. 다른 파일은 건드리지 않는다.`; // i18n-ok
+    const session = await dispatch({ kind: "new", cwd: `${home}/.julgi/grown` }, text, { rank: -1, by: "일감 스킬 다듬기" }, false, true); // i18n-ok
     if (typeof session !== "string") return;
     await invoke("data_write", { name: "skills-tended.json", text: JSON.stringify([...tended, { name, at: now, uses: pick.used.length, session }], null, 1) });
-    log(`스킬 다듬기 시작: ${name} (30일에 세션 ${pick.used.length}곳에서 쓰임). 세션이 쓰인 기록을 읽고 있다`);
-    record("스킬", `자주 쓰는 스킬을 쓰인 기록에 비추어 다듬는다: ${name} · 세션 ${pick.used.length}곳`, session);
+    log(tr`스킬 다듬기 시작: ${name} (30일에 세션 ${pick.used.length}곳에서 쓰임). 세션이 쓰인 기록을 읽고 있다`);
+    record("스킬", tr`자주 쓰는 스킬을 쓰인 기록에 비추어 다듬는다: ${name} · 세션 ${pick.used.length}곳`, session); // i18n-ok
   };
   /** kind: 매일은 최근 일주일에 쓴 세션만, 매주는 전부를 보고 브레인까지 정리한다 */
-  const review = async (kind: "매일" | "매주") => {
+  const review = async (kind: "매일" | "매주") => { // i18n-ok
     const did: string[] = [];
     const log = (text: string) => void did.push(text);
     learning.current = true;
     const cutoff = Date.now() / 1000 - 7 * 86400;
     const live0 = live.current.items.filter((item) => !item.thread?.done);
-    await sweep(kind === "매일" ? live0.filter((item) => item.session.mtime > cutoff) : live0, kind === "매일" ? "sweep" : "sweepAll", log);
+    await sweep(kind === "매일" ? live0.filter((item) => item.session.mtime > cutoff) : live0, kind === "매일" ? "sweep" : "sweepAll", log); // i18n-ok
     await findCandidates();
     if (config.brain) await learnCorrections(log);
     learning.current = true;
     if (config.growSkills) await growSkill(log);
-    if (config.growSkills && kind === "매주") await tendSkills(log);
-    await refreshMap(kind === "매주");
+    if (config.growSkills && kind === "매주") await tendSkills(log); // i18n-ok
+    await refreshMap(kind === "매주"); // i18n-ok
     learning.current = true;
-    if (kind === "매주") {
+    if (kind === "매주") { // i18n-ok
     // 1. 안 쓰이는 노트를 내린다
     // 선호는 세션마다 늘 붙으니 쓰임을 세지 않는다. 안 쓰였다고 내리지 않는다
-    for (const n of live.current.notes.filter((n) => n.kind !== "선호" && stale(n, statOf(statsRef.current, n.id)))) {
+    for (const n of live.current.notes.filter((n) => n.kind !== "선호" && stale(n, statOf(statsRef.current, n.id)))) { // i18n-ok
       forget(n.id);
-      log(`내림: "${n.title.slice(0, 50)}" (석 달 넘게 안 쓰임)`);
+      log(tr`내림: "${n.title.slice(0, 50)}" (석 달 넘게 안 쓰임)`);
     }
     }
     // 2. 겹치는 노트를 합치고 어긋나는 짝을 찾는다 (매주)
-    const seen = kind === "매주" && live.current.notes.length >= 6 ? await tidy(log) : [];
-    if (kind === "매주") seen.push(...(await staleNotes()));
+    const seen = kind === "매주" && live.current.notes.length >= 6 ? await tidy(log) : []; // i18n-ok
+    if (kind === "매주") seen.push(...(await staleNotes())); // i18n-ok
     learning.current = false;
     // 3. 값을 재서 판으로 남긴다
     const text = (await invoke<string | null>("data_read", { name: "routes.jsonl" })) ?? "";
@@ -703,13 +708,13 @@ export default function App() {
       }
     }
     const { notes, skills, sessions, names, acts, skillUses } = live.current;
-    const metrics = measure({ routes, moved: acts.filter((a) => a.kind === "옮김").length, notes, stats: statsRef.current, skills, skillUses, sessions, names });
+    const metrics = measure({ routes, moved: acts.filter((a) => a.kind === "옮김").length, notes, stats: statsRef.current, skills, skillUses, sessions, names }); // i18n-ok
     const all = live.current.reviews;
     const next: Review = { v: (all[all.length - 1]?.v ?? 0) + 1, kind, at: Date.now(), metrics, did, seen: [...findings(metrics, skills, skillUses), ...seen] };
     live.current.reviews = [...all, next];
     setReviews(live.current.reviews);
     void invoke("data_write", { name: "reviews.json", text: JSON.stringify(live.current.reviews, null, 1) });
-    record("점검", `${next.v}판(${kind}): 손댄 것 ${did.length}개, 눈에 띈 것 ${next.seen.length}개. ⌘G의 통계에서 본다`);
+    record("점검", tr`${next.v}판(${tr(kind)}): 손댄 것 ${did.length}개, 눈에 띈 것 ${next.seen.length}개. ⌘G의 통계에서 본다`); // i18n-ok
   };
   /** 세션의 요약을 작은 모델로 만들어 둔다. 대화 기록이 그대로면 다시 만들지 않는다 */
   const summarize = async (sessionId: string) => {
@@ -719,7 +724,7 @@ export default function App() {
     try {
       const pair = await invoke<[string, string] | null>("last_exchange", { sessionId });
       if (!pair?.[1]) return;
-      const prompt = `처음 한 말: ${s.said}\n레포: ${s.repo} · 브랜치: ${s.branch || "없음"}\n${s.recap ? `앞선 요약: ${s.recap}\n` : ""}\n마지막으로 사용자가 한 말:\n${pair[0].slice(0, 1500)}\n\n마지막 답:\n${pair[1].slice(0, 3000)}\n`;
+      const prompt = `처음 한 말: ${s.said}\n레포: ${s.repo} · 브랜치: ${s.branch || "없음"}\n${s.recap ? `앞선 요약: ${s.recap}\n` : ""}\n마지막으로 사용자가 한 말:\n${pair[0].slice(0, 1500)}\n\n마지막 답:\n${pair[1].slice(0, 3000)}\n`; // i18n-ok
       const text = ((await invoke<string | null>("route_ask", { system: NOTE_SYSTEM, prompt, model: modelFor("note") })) ?? "").trim();
       if (!text) return;
       // 첫 줄의 이름은 떼어 세션 제목으로 쓰고, 나머지를 요약으로 둔다
@@ -780,7 +785,7 @@ export default function App() {
       const found = await invoke<{ diff: string; files: string[]; commits: string[] } | null>("repo_changes", { path: cwd });
       if (!found?.diff && !found?.files.length) return;
       const reply = (await invoke<string | null>("last_reply", { sessionId }).catch(() => null)) ?? "";
-      const prompt = `세션의 마지막 답:\n${reply.slice(0, 2500)}\n\n커밋하지 않은 파일:\n${found.files.slice(0, 60).join("\n")}\n\n쌓은 커밋:\n${found.commits.slice(0, 20).join("\n") || "(없음)"}\n\n변경 내용:\n${found.diff.slice(0, 60_000)}\n`;
+      const prompt = `세션의 마지막 답:\n${reply.slice(0, 2500)}\n\n커밋하지 않은 파일:\n${found.files.slice(0, 60).join("\n")}\n\n쌓은 커밋:\n${found.commits.slice(0, 20).join("\n") || "(없음)"}\n\n변경 내용:\n${found.diff.slice(0, 60_000)}\n`; // i18n-ok
       const raw = (await invoke<string | null>("route_ask", { system: BRIEF_SYSTEM, prompt, model: modelFor("brief") })) ?? "";
       const brief = JSON.parse(raw.slice(raw.indexOf("{"), raw.lastIndexOf("}") + 1)) as Brief;
       if (!brief.line) return;
@@ -788,15 +793,15 @@ export default function App() {
       save({ ...changesRef.current[cwd], brief: kept, briefSig: sig });
       // 걸러 읽기: 더 큰 모델이 세션의 설명 없이 변경만 보고 틀린 곳을 짚는다. 몇 줄 안 되는 변경에는 하지 않는다
       if (!config.check || adds + dels < 15 || !found.diff) return;
-      const checked = (await invoke<string | null>("route_ask", { system: CHECK_SYSTEM, prompt: `변경 내용:\n${found.diff.slice(0, 60_000)}\n`, model: modelFor("check") })) ?? "";
+      const checked = (await invoke<string | null>("route_ask", { system: CHECK_SYSTEM, prompt: `변경 내용:\n${found.diff.slice(0, 60_000)}\n`, model: modelFor("check") })) ?? ""; // i18n-ok
       const spots = ((JSON.parse(checked.slice(checked.indexOf("{"), checked.lastIndexOf("}") + 1)) as { found?: { where?: string; level?: string; what?: string }[] }).found ?? [])
         .filter((f) => f.where && f.what)
         .slice(0, 6)
-        .map((f) => ({ where: String(f.where), level: ["버그", "위험", "의문"].includes(f.level ?? "") ? String(f.level) : "의문", what: String(f.what) }));
+        .map((f) => ({ where: String(f.where), level: ["버그", "위험", "의문"].includes(f.level ?? "") ? String(f.level) : "의문", what: String(f.what) })); // i18n-ok
       // 그사이 변경이 또 달라졌으면 옛 검토를 붙이지 않는다
       if (changesRef.current[cwd]?.briefSig !== sig) return;
       save({ ...changesRef.current[cwd], brief: { ...kept, found: spots } });
-      if (spots.length) record("검토", `"${nameOf(live.current.open.find((o) => o.sessionId === sessionId)?.key ?? "")}"의 변경에서 ${spots.length}곳을 짚음: ${spots.map((f) => `${f.level} ${f.where}`).join(", ").slice(0, 160)}`, sessionId);
+      if (spots.length) record("검토", tr`"${nameOf(live.current.open.find((o) => o.sessionId === sessionId)?.key ?? "")}"의 변경에서 ${spots.length}곳을 짚음: ${spots.map((f) => `${f.level} ${f.where}`).join(", ").slice(0, 160)}`, sessionId); // i18n-ok
     } catch {
       // 브리핑은 없어도 된다. 변경이 또 달라지면 다시 해 본다
     } finally {
@@ -817,10 +822,10 @@ export default function App() {
   const report = async (task: Job) => {
     const lead = live.current.items.find((item) => (item.thread?.sessions ?? [item.session.id]).includes(task.lead));
     const mine = tasksRef.current.filter((t) => t.lead === task.lead);
-    const left = `남은 일감: 하는 중 ${mine.filter((t) => t.status === "하는 중").length}, 대기 ${mine.filter((t) => t.status === "대기").length}`;
-    const text = `[Julgi 조율: 일감 ${task.id} (${task.repo}) ${task.status}. ${left}]\n${(task.result ?? "").slice(0, 1800)}\n\n(전체 결과: ~/.julgi/bin/julgi task result ${task.id})`;
-    record("일감", `${task.id} (${task.repo}) ${task.status} · 결과를 맡긴 세션에 돌려줌`, task.session ?? task.lead);
-    if (lead) await dispatch({ kind: "item", item: lead }, text, { rank: -1, by: `일감 ${task.id} 결과` }, false, true);
+    const left = `남은 일감: 하는 중 ${mine.filter((t) => t.status === "하는 중").length}, 대기 ${mine.filter((t) => t.status === "대기").length}`; // i18n-ok
+    const text = `[Julgi 조율: 일감 ${task.id} (${task.repo}) ${task.status}. ${left}]\n${(task.result ?? "").slice(0, 1800)}\n\n(전체 결과: ~/.julgi/bin/julgi task result ${task.id})`; // i18n-ok
+    record("일감", tr`${task.id} (${task.repo}) ${tr(task.status)} · 결과를 맡긴 세션에 돌려줌`, task.session ?? task.lead); // i18n-ok
+    if (lead) await dispatch({ kind: "item", item: lead }, text, { rank: -1, by: `일감 ${task.id} 결과` }, false, true); // i18n-ok
   };
   /**
    * 일감을 돌본다: 자리가 나면 대기 중인 일감에 세션을 붙이고, 맡은 세션이 답을 끝내면 결과를 거둬 돌려준다.
@@ -830,14 +835,14 @@ export default function App() {
     const all = tasksRef.current;
     const { open } = live.current;
     for (const task of all) {
-      if (task.status !== "하는 중" || !task.session || collecting.current.has(task.id)) continue;
+      if (task.status !== "하는 중" || !task.session || collecting.current.has(task.id)) continue; // i18n-ok
       const key = "c:" + task.session;
       const raw = rawStates.current[key];
       const gone = !open.some((o) => o.key === key) && now - (task.started ?? 0) > 20_000;
       // 띄운 지 한참인데 일을 시작했다는 신호조차 없으면 어딘가에 멈춰 선 것이다. 맡긴 쪽이 마냥 기다리지 않게 알린다
       const stuck = !raw && now - (task.started ?? 0) > 120_000;
       if (stuck) {
-        const next: Job = { ...task, status: "실패", result: "맡은 세션이 2분 넘게 일을 시작하지 못했다. 폴더를 믿느냐는 물음이나 로그인에 멈춰 있을 수 있다. 그 세션을 열어 확인하거나 다시 맡긴다", finished: now };
+        const next: Job = { ...task, status: "실패", result: "맡은 세션이 2분 넘게 일을 시작하지 못했다. 폴더를 믿느냐는 물음이나 로그인에 멈춰 있을 수 있다. 그 세션을 열어 확인하거나 다시 맡긴다", finished: now }; // i18n-ok
         saveTasks(tasksRef.current.map((t) => (t.id === task.id ? next : t)));
         void report(next);
         continue;
@@ -851,18 +856,18 @@ export default function App() {
         const reply = done ? await invoke<string | null>("last_reply", { sessionId: task.session }) : null;
         // 고친 것이 하나도 없는 워크트리는 지운다. 고친 것이 있으면 두고, 어디에 있는지 결과에 붙여 조율자가 읽게 한다
         const kept = task.work && reply ? !(await invoke<boolean>("worktree_drop", { path: task.work }).catch(() => false)) : false;
-        const where = kept ? `\n\n[Julgi: 이 일감이 고친 것은 워크트리 ${task.work} (브랜치 julgi/${task.id})에 있다. 원래 작업 폴더에는 아직 없다]` : "";
-        const next: Job = { ...task, work: task.work && !kept && reply ? undefined : task.work, status: reply ? "끝남" : "실패", result: reply ? reply + where : gone ? "맡은 세션이 닫혀서 결과를 받지 못했다" : "결과를 읽지 못했다", finished: Date.now() };
+        const where = kept ? `\n\n[Julgi: 이 일감이 고친 것은 워크트리 ${task.work} (브랜치 julgi/${task.id})에 있다. 원래 작업 폴더에는 아직 없다]` : ""; // i18n-ok
+        const next: Job = { ...task, work: task.work && !kept && reply ? undefined : task.work, status: reply ? "끝남" : "실패", result: reply ? reply + where : gone ? "맡은 세션이 닫혀서 결과를 받지 못했다" : "결과를 읽지 못했다", finished: Date.now() }; // i18n-ok
         saveTasks(tasksRef.current.map((t) => (t.id === task.id ? next : t)));
-        void invoke("data_write", { name: `tasks/${task.id}.md`, text: `# 일감 ${task.id} (${task.repo})\n\n시킨 일:\n${task.ask}\n\n결과:\n${next.result}\n` });
+        void invoke("data_write", { name: `tasks/${task.id}.md`, text: `# 일감 ${task.id} (${task.repo})\n\n시킨 일:\n${task.ask}\n\n결과:\n${next.result}\n` }); // i18n-ok
         collecting.current.delete(task.id);
         await report(next);
       })();
     }
     // 대기 중인 일감에 세션을 붙인다. 조율 하나에 셋까지, 한 폴더에는 한 번에 하나만
     for (const task of all) {
-      if (task.status !== "대기" || starting.current.has(task.id)) continue;
-      const running = tasksRef.current.filter((t) => t.status === "하는 중");
+      if (task.status !== "대기" || starting.current.has(task.id)) continue; // i18n-ok
+      const running = tasksRef.current.filter((t) => t.status === "하는 중"); // i18n-ok
       // 워크트리를 쓰면 같은 레포의 일감도 나란히 돌 수 있다. 안 쓰면 한 폴더에 한 번에 하나만
       if (running.filter((t) => t.lead === task.lead).length + [...starting.current].length >= MAX_PARALLEL || (!config.taskWorktree && running.some((t) => t.cwd === task.cwd))) continue;
       starting.current.add(task.id);
@@ -870,17 +875,17 @@ export default function App() {
         const leadName = nameOf("c:" + task.lead).slice(0, 40);
         // 이 일감만을 위한 워크트리를 딴다. git 레포가 아니거나 못 따면 레포의 작업 폴더에서 한다
         const work = config.taskWorktree ? await invoke<string>("worktree_add", { repo: task.cwd, name: task.id, branch: null }).catch(() => undefined) : undefined;
-        const where = work ? ` 이 폴더는 이 일감만을 위해 딴 워크트리이고 브랜치는 julgi/${task.id}다. 여기서 고치고 커밋해도 원래 작업 폴더와 기본 브랜치에는 영향이 없다.` : "";
-        const text = `[Julgi 조율: "${leadName}"이 맡긴 일감 ${task.id}다.${where} 이 대화를 모르는 조율자가 결과를 읽으니, 끝나면 이렇게 답한다: 무엇을 했는지, 바뀐 파일, 확인한 방법, 남은 문제나 정해야 할 것. 머지·푸시·배포·데이터 변경은 하지 않는다. 막히면 짐작으로 밀고 가지 말고 무엇이 막혔는지 적고 끝낸다]\n\n${task.ask}`;
-        const session = await dispatch({ kind: "new", cwd: work ?? task.cwd }, text, { rank: -1, by: `일감 ${task.id}` }, false, true);
+        const where = work ? ` 이 폴더는 이 일감만을 위해 딴 워크트리이고 브랜치는 julgi/${task.id}다. 여기서 고치고 커밋해도 원래 작업 폴더와 기본 브랜치에는 영향이 없다.` : ""; // i18n-ok
+        const text = `[Julgi 조율: "${leadName}"이 맡긴 일감 ${task.id}다.${where} 이 대화를 모르는 조율자가 결과를 읽으니, 끝나면 이렇게 답한다: 무엇을 했는지, 바뀐 파일, 확인한 방법, 남은 문제나 정해야 할 것. 머지·푸시·배포·데이터 변경은 하지 않는다. 막히면 짐작으로 밀고 가지 말고 무엇이 막혔는지 적고 끝낸다]\n\n${task.ask}`; // i18n-ok
+        const session = await dispatch({ kind: "new", cwd: work ?? task.cwd }, text, { rank: -1, by: `일감 ${task.id}` }, false, true); // i18n-ok
         starting.current.delete(task.id);
-        if (typeof session !== "string") return saveTasks(tasksRef.current.map((t) => (t.id === task.id ? { ...t, status: "실패", result: "세션을 띄우지 못했다", finished: Date.now() } : t)));
+        if (typeof session !== "string") return saveTasks(tasksRef.current.map((t) => (t.id === task.id ? { ...t, status: "실패", result: "세션을 띄우지 못했다", finished: Date.now() } : t))); // i18n-ok
         // 목록에서 무엇인지 알아보게 이름을 붙여 둔다
-        const named = { ...live.current.names, [session]: `일감 ${task.id} · ${task.ask.split("\n")[0].slice(0, 28)}` };
+        const named = { ...live.current.names, [session]: tr`일감 ${task.id} · ${task.ask.split("\n")[0].slice(0, 28)}` };
         live.current.names = named;
         setNames(named);
         void invoke("data_write", { name: "names.json", text: JSON.stringify(named) });
-        saveTasks(tasksRef.current.map((t) => (t.id === task.id ? { ...t, status: "하는 중", session, work, started: Date.now() } : t)));
+        saveTasks(tasksRef.current.map((t) => (t.id === task.id ? { ...t, status: "하는 중", session, work, started: Date.now() } : t))); // i18n-ok
       })();
     }
   };
@@ -899,17 +904,17 @@ export default function App() {
         const text = [live.current.memories[id]?.trim(), line].filter(Boolean).join("\n");
         setMemories((old) => ({ ...old, [id]: text }));
         void invoke("data_write", { name: `threads/${id}.md`, text });
-        record("기억", `"${from}"이 적음: ${body.slice(0, 70)}`, sessionId);
+        record("기억", tr`"${from}"이 적음: ${body.slice(0, 70)}`, sessionId); // i18n-ok
       } else if (cmd === "send" && body) {
-        const text = `[Julgi의 다른 세션 "${from}"이 넘긴 일이다]\n\n${body}`;
+        const text = `[Julgi의 다른 세션 "${from}"이 넘긴 일이다]\n\n${body}`; // i18n-ok
         const others = items.filter((item) => !(item.thread?.sessions ?? [item.session.id]).includes(sessionId));
         const hit = target === "new" ? undefined : rank(target, others, new Set(open.map((o) => o.sessionId ?? "")))[0];
-        if (hit) void dispatch({ kind: "item", item: hit.item }, text, { rank: -1, by: `"${from}"이 넘김` }, false, true);
+        if (hit) void dispatch({ kind: "item", item: hit.item }, text, { rank: -1, by: `"${from}"이 넘김` }, false, true); // i18n-ok
         else {
           // 글에 레포 이름이 그대로 나올 때만 그 레포에 연다. 낱말 하나가 겹쳤다고 아무 레포에나 열지 않는다
           const lower = body.toLowerCase();
           const cwd = live.current.folders.find((f) => f.repo.length >= 4 && lower.includes(f.repo.toLowerCase()))?.cwd ?? (live.current.base || live.current.home);
-          void dispatch({ kind: "new", cwd }, text, { rank: -1, by: target === "new" ? `"${from}"이 넘김` : `"${from}"이 넘김, "${target}" 줄기를 못 찾아 새로` }, false, true);
+          void dispatch({ kind: "new", cwd }, text, { rank: -1, by: target === "new" ? `"${from}"이 넘김` : `"${from}"이 넘김, "${target}" 줄기를 못 찾아 새로` }, false, true); // i18n-ok
         }
       } else if (cmd === "used" && body) {
         bump(body.split(/\s+/).filter((id) => live.current.notes.some((n) => n.id === id)), "read");
@@ -917,37 +922,37 @@ export default function App() {
         const [title, ...text] = body.split("\n");
         const repo = live.current.byId.get(sessionId)?.repo ?? "";
         const made = putNote({ id: crypto.randomUUID().slice(0, 8), title: title.trim(), kind: target, repo, from: mine?.name ?? from, created: new Date().toISOString().slice(0, 10), body: text.join("\n").trim() });
-        if (made) record("배움", `"${from}"이 브레인에 남김: (${made.kind}) ${made.title.slice(0, 80)}`, sessionId);
+        if (made) record("배움", tr`"${from}"이 브레인에 남김: (${made.kind}) ${made.title.slice(0, 80)}`, sessionId); // i18n-ok
       } else if (cmd === "fix" && body) {
         const old = live.current.notes.find((n) => n.id === target);
         if (old && putNote({ ...old, body })) {
           bump([old.id], "fixed");
-          record("배움", `"${from}"이 브레인 노트를 고침: ${old.title.slice(0, 80)}`, sessionId);
+          record("배움", tr`"${from}"이 브레인 노트를 고침: ${old.title.slice(0, 80)}`, sessionId); // i18n-ok
         }
       } else if (cmd === "answer" && body && sessionId === "phone") {
         // 폰에서 내 차례인 세션에 답했다
         if (open.some((o) => o.key === target)) {
           terms.submitWhenClear(target, body);
-          record("답함", `폰에서 "${nameOf(target)}"에 답함: ${body.slice(0, 80)}`, open.find((o) => o.key === target)?.sessionId);
+          record("답함", tr`폰에서 "${nameOf(target)}"에 답함: ${body.slice(0, 80)}`, open.find((o) => o.key === target)?.sessionId); // i18n-ok
         }
       } else if (cmd === "throw" && body && sessionId === "phone") {
         // 폰에서 새 일을 던졌다. 화면에 보여 준 폴더에서만 연다
         const { folders, base } = live.current;
-        if (target === base || folders.some((f) => f.cwd === target)) void dispatch({ kind: "new", cwd: target }, body, { rank: -1, by: "폰에서 던짐" }, false, true);
+        if (target === base || folders.some((f) => f.cwd === target)) void dispatch({ kind: "new", cwd: target }, body, { rank: -1, by: "폰에서 던짐" }, false, true); // i18n-ok
       } else if (cmd === "skill" && target) {
         // 다듬기 세션이 고친 글을 다 썼다. 옛 글을 남기고 바꿔 넣는 것은 여기서 한다
         void invoke<string>("skill_apply", { name: target }).then(
           (kept) => {
-            record("스킬", `스킬을 다듬음: ${target}${body ? " · " + body.slice(0, 140) : ""} (옛 글: ${kept.replace(live.current.home, "~")})`, sessionId);
+            record("스킬", body ? tr`스킬을 다듬음: ${target} · ${body.slice(0, 140)} (옛 글: ${kept.replace(live.current.home, "~")})` : tr`스킬을 다듬음: ${target} (옛 글: ${kept.replace(live.current.home, "~")})`, sessionId); // i18n-ok
             void invoke<SkillInfo[] | null>("skills_list").then((k) => setSkills(k ?? []), () => {});
           },
-          (why) => record("스킬", `스킬을 다듬지 못함: ${target} · ${String(why).slice(0, 120)}`, sessionId),
+          (why) => record("스킬", tr`스킬을 다듬지 못함: ${target} · ${String(why).slice(0, 120)}`, sessionId), // i18n-ok
         );
       } else if (cmd === "forget") {
         const old = live.current.notes.find((n) => n.id === target);
         if (old) {
           forget(old.id);
-          record("배움", `"${from}"이 브레인 노트를 지움: ${old.title.slice(0, 60)}${body ? " · " + body.slice(0, 80) : ""}`, sessionId);
+          record("배움", tr`"${from}"이 브레인 노트를 지움: ${old.title.slice(0, 60)}` + (body ? " · " + body.slice(0, 80) : ""), sessionId); // i18n-ok
         }
       } else if (cmd === "task" && body) {
         // 조율 세션이 일감을 맡겼다. 여기서는 적어만 두고, 띄우는 것은 돌보미가 자리가 날 때 한다
@@ -956,15 +961,15 @@ export default function App() {
         const cwd = want === "new" || !want ? live.current.base : (mapState.current.repos.find((r) => r.repo.toLowerCase() === want)?.cwd ?? live.current.folders.find((f) => f.repo.toLowerCase() === want)?.cwd ?? "");
         // 맡긴 세션이 줄기가 아니면 줄기로 만든다. 줄기 보기에서 일감이 그 아래에 모인다
         if (!mine) saveThreads([...live.current.threads, { id: crypto.randomUUID(), name: from.slice(0, 40), sessions: [sessionId], created: Date.now() }]);
-        const task: Job = { id, lead: sessionId, repo: repo || "new", cwd, ask: body, status: cwd ? "대기" : "실패", result: cwd ? undefined : `"${repo}"라는 레포를 지도에서 찾지 못했다. julgi map 으로 이름을 확인한다`, created: Date.now(), redo: 0 };
+        const task: Job = { id, lead: sessionId, repo: repo || "new", cwd, ask: body, status: cwd ? "대기" : "실패", result: cwd ? undefined : `"${repo}"라는 레포를 지도에서 찾지 못했다. julgi map 으로 이름을 확인한다`, created: Date.now(), redo: 0 }; // i18n-ok
         saveTasks([...tasksRef.current.filter((t) => t.id !== id), task]);
-        record("일감", `"${from}"이 ${task.repo}에 맡김 (${id}): ${body.split("\n")[0].slice(0, 70)}`, sessionId);
+        record("일감", `"${from}"이 ${task.repo}에 맡김 (${id}): ${body.split("\n")[0].slice(0, 70)}`, sessionId); // i18n-ok
         if (!cwd) void report(task);
       } else if (cmd === "taskredo" && body) {
         const task = tasksRef.current.find((t) => t.id === target);
         if (task?.session) {
-          saveTasks(tasksRef.current.map((t) => (t.id === task.id ? { ...t, status: "하는 중", started: Date.now(), finished: undefined, redo: t.redo + 1 } : t)));
-          const text = `[Julgi 조율: 일감 ${task.id}에 이어서 시키는 일이다. 끝나면 결과를 요약해 답한다]\n\n${body}`;
+          saveTasks(tasksRef.current.map((t) => (t.id === task.id ? { ...t, status: "하는 중", started: Date.now(), finished: undefined, redo: t.redo + 1 } : t))); // i18n-ok
+          const text = `[Julgi 조율: 일감 ${task.id}에 이어서 시키는 일이다. 끝나면 결과를 요약해 답한다]\n\n${body}`; // i18n-ok
           const wkey = "c:" + task.session;
           // 맡았던 세션이 떠 있으면 거기에 바로 넣고, 잠들어 있으면 그 글을 들려 깨운다
           if (terms.opened(wkey)) terms.submitWhenClear(wkey, text);
@@ -972,13 +977,13 @@ export default function App() {
             void invoke<string>("data_write", { name: `outbox/${crypto.randomUUID()}.md`, text }).then((path) => {
               terms.dispose(wkey);
               terms.create({ key: wkey, cwd: task.work ?? task.cwd, command: withPrompt(resumeCommand(task.session!), path) });
-              if (!live.current.open.some((o) => o.key === wkey)) setOpen((list) => [...list, { key: wkey, label: `일감 ${task.id}`, cwd: task.work ?? task.cwd, sessionId: task.session }]);
+              if (!live.current.open.some((o) => o.key === wkey)) setOpen((list) => [...list, { key: wkey, label: tr`일감 ${task.id}`, cwd: task.work ?? task.cwd, sessionId: task.session }]);
               terms.wake(wkey);
             });
-          record("일감", `${task.id}를 다시 시킴 (${task.redo + 1}번째): ${body.split("\n")[0].slice(0, 70)}`, task.session);
+          record("일감", tr`${task.id}를 다시 시킴 (${task.redo + 1}번째): ${body.split("\n")[0].slice(0, 70)}`, task.session); // i18n-ok
         }
       } else if (cmd === "taskcancel") {
-        saveTasks(tasksRef.current.map((t) => (t.id === target && (t.status === "대기" || t.status === "하는 중") ? { ...t, status: "멈춤", finished: Date.now() } : t)));
+        saveTasks(tasksRef.current.map((t) => (t.id === target && (t.status === "대기" || t.status === "하는 중") ? { ...t, status: "멈춤", finished: Date.now() } : t))); // i18n-ok
       } else if (cmd === "handoff") {
         wantHandoff.current.add(key);
       } else if (cmd === "done") {
@@ -1011,7 +1016,7 @@ export default function App() {
   /** ⌘D: 지금 칸 오른쪽에 칸을 하나 더 만든다. key를 주면 그 터미널을 새 칸에 올린다 */
   const split = (key: string | null = null) => {
     const { panes, widths, focus } = live.current;
-    if (panes.length >= MAX_PANES) return say(`칸은 ${MAX_PANES}개까지다.`);
+    if (panes.length >= MAX_PANES) return say(tr`칸은 ${MAX_PANES}개까지다.`);
     const at = focus + 1;
     setPanes([...panes.slice(0, at), key, ...panes.slice(at)]);
     setWidths([...widths.slice(0, at), widths[focus], ...widths.slice(at)]);
@@ -1095,10 +1100,10 @@ export default function App() {
       .map((o) => {
         const st = states[o.key];
         const ch = changesRef.current[o.cwd];
-        return { key: o.key, id: o.sessionId, name: nameOf(o.key), repo: repoOf(o.cwd), state: st?.state ?? "", label: STATE_LABEL[st?.state ?? ""] ?? "열려 있음", since: st?.since ?? 0, changed: ch && ch.by === o.sessionId && ch.files ? `파일 ${ch.files} +${ch.adds} −${ch.dels}` : "" };
+        return { key: o.key, id: o.sessionId, name: nameOf(o.key), repo: repoOf(o.cwd), state: st?.state ?? "", label: STATE_LABEL[st?.state ?? ""] ?? tr("열려 있음"), since: st?.since ?? 0, changed: ch && ch.by === o.sessionId && ch.files ? tr`파일 ${ch.files} +${ch.adds} −${ch.dels}` : "" };
       })
       .sort((a, b) => a.since - b.since);
-    const places = [...(base ? [{ repo: `기본 폴더 · ${repoOf(base)}`, cwd: base }] : []), ...folders.slice(0, 40).map((f) => ({ repo: f.repo, cwd: f.cwd }))];
+    const places = [...(base ? [{ repo: tr`기본 폴더 · ${repoOf(base)}`, cwd: base }] : []), ...folders.slice(0, 40).map((f) => ({ repo: f.repo, cwd: f.cwd }))];
     void invoke("remote_publish", { state: JSON.stringify({ at: Date.now(), sessions, folders: places, acts: acts.slice(-10).reverse().map((a) => ({ at: a.at, kind: a.kind, text: a.text.slice(0, 140) })) }) });
   };
   const setConfig = (key: keyof typeof config, value: string | number | boolean) => {
@@ -1112,7 +1117,7 @@ export default function App() {
       else refreshTickets.current(true);
     }
     // 창 꺼내기 키는 바꾸는 즉시 다시 건다. 다른 앱이 쓰는 키면 알려 준다
-    if (key === "hotkey") void invoke("set_hotkey", { shortcut: String(value) }).catch((e) => say(`그 키는 쓸 수 없다: ${String(e).slice(0, 80)}`, 6000));
+    if (key === "hotkey") void invoke("set_hotkey", { shortcut: String(value) }).catch((e) => say(tr`그 키는 쓸 수 없다: ${String(e).slice(0, 80)}`, 6000));
     if (key === "defaultDir") void invoke<string>("default_dir", { path: String(value) || null }).then((dir) => setBase(dir ?? ""));
     setConfigTick((n) => n + 1);
     // 파일에 있던 다른 값은 건드리지 않고 바꾼 값만 고쳐 쓴다. 연달아 바꿔도 순서대로 쓴다
@@ -1131,7 +1136,7 @@ export default function App() {
     const running = live.current.states[key]?.state === "run";
     if (running && Date.now() - lastCloseTry.current > 2500) {
       lastCloseTry.current = Date.now();
-      return say("일하는 중이다. 한 번 더 누르면 재운다.");
+      return say(tr("일하는 중이다. 한 번 더 누르면 재운다."));
     }
     // 실수로 닫히지 않게 한 번 묻는다. 셸과 죽은 터미널, 묻지 않기로 한 경우는 바로 닫는다
     if (config.confirmClose && key.startsWith("c:") && !live.current.dead.includes(key)) {
@@ -1164,7 +1169,7 @@ export default function App() {
     // after: 갈아탄 새 세션에 이어서 시킬 말. sent: 인계 부탁을 이미 보냈다(잠든 세션을 깨우며 넣은 경우)
     const o = opts.open ?? live.current.open.find((x) => x.key === key);
     if (!o?.sessionId || live.current.handing.includes(key)) return;
-    if (!opts.sent && live.current.states[key]?.state === "run") return say("일하는 중이다. 끝난 뒤에 갈아탄다.");
+    if (!opts.sent && live.current.states[key]?.state === "run") return say(tr("일하는 중이다. 끝난 뒤에 갈아탄다."));
     const oldId = o.sessionId;
     const known = live.current.threads.find((t) => t.sessions.includes(oldId));
     const title = known?.name ?? live.current.byId.get(oldId)?.title ?? o.label;
@@ -1179,11 +1184,11 @@ export default function App() {
     };
     const timer = setInterval(() => {
       const state = live.current.states[key];
-      if (!live.current.open.some((x) => x.key === key)) return stop("세션이 닫혀서 갈아타기를 그만뒀다.");
+      if (!live.current.open.some((x) => x.key === key)) return stop(tr("세션이 닫혀서 갈아타기를 그만뒀다."));
       // 보낸 뒤에 새로 적힌 "기다림"이어야 끝난 것이다. 중간의 "일하는 중"을 못 봤어도 된다
       // (창이 가려져 타이머가 늦게 돌 수 있다).
       if (!waiting(state) || state.since < startedAt) {
-        if (Date.now() - startedAt > HANDOFF_TIMEOUT_MS) stop("인계 글이 오지 않아 갈아타기를 그만뒀다.");
+        if (Date.now() - startedAt > HANDOFF_TIMEOUT_MS) stop(tr("인계 글이 오지 않아 갈아타기를 그만뒀다."));
         return;
       }
       clearInterval(timer);
@@ -1191,10 +1196,10 @@ export default function App() {
       setTimeout(() => {
         void (async () => {
           const reply = await invoke<string | null>("last_reply", { sessionId: oldId });
-          if (!reply) return stop("인계 글을 읽지 못해 갈아타기를 그만뒀다.");
+          if (!reply) return stop(tr("인계 글을 읽지 못해 갈아타기를 그만뒀다."));
           const id = crypto.randomUUID();
-          const todo = opts.after ? `\n---\n\n인계를 읽었으면 바로 이어서 할 일:\n\n${opts.after}\n` : "";
-          const path = await invoke<string>("handoff_write", { id, text: `# 인계: ${title}\n\n이전 세션(${oldId})에서 넘어왔다. 아래를 읽고 이어서 진행한다.\n\n${reply}\n${todo}` });
+          const todo = opts.after ? `\n---\n\n인계를 읽었으면 바로 이어서 할 일:\n\n${opts.after}\n` : ""; // i18n-ok
+          const path = await invoke<string>("handoff_write", { id, text: `# 인계: ${title}\n\n이전 세션(${oldId})에서 넘어왔다. 아래를 읽고 이어서 진행한다.\n\n${reply}\n${todo}` }); // i18n-ok
           // 줄기에 새 세션을 잇고, 인계 글을 줄기의 기억으로 둔다. 줄기가 없었으면 여기서 생긴다.
           const base: Thread = live.current.threads.find((t) => t.sessions.includes(oldId)) ?? { id: crypto.randomUUID(), name: title, sessions: [oldId], created: Date.now() };
           const thread = { ...base, sessions: [...base.sessions, id] };
@@ -1215,8 +1220,8 @@ export default function App() {
           else setPanes((list) => (list.includes(key) ? list.map((k) => (k === key ? next.key : k)) : list.map((k, i) => (i === live.current.focus ? next.key : k))));
           // 넘겨준 이전 세션은 재운다. 열어 두면 같은 이름이 둘이 되고, 기다리는 세션으로 잡혀 칸에 다시 올라온다
           close(key, true);
-          record("갈아탐", `${title.slice(0, 40)} · 인계 글만 들고 새 세션으로${opts.after ? ", 이어서 보냄" : ""}. 이전 세션은 재움`, id);
-          stop(opts.after ? `갈아탄 뒤 보냈다 → ${title}` : "갈아탔다. 이전 세션은 재웠고 줄기에 남아 있다.");
+          record("갈아탐", opts.after ? tr`${title.slice(0, 40)} · 인계 글만 들고 새 세션으로, 이어서 보냄. 이전 세션은 재움` : tr`${title.slice(0, 40)} · 인계 글만 들고 새 세션으로. 이전 세션은 재움`, id); // i18n-ok
+          stop(opts.after ? tr`갈아탄 뒤 보냈다 → ${title}` : tr("갈아탔다. 이전 세션은 재웠고 줄기에 남아 있다."));
         })();
       }, 800);
     }, 1000);
@@ -1228,8 +1233,8 @@ export default function App() {
       if (states[key] || panes.includes(key) || !open.some((o) => o.key === key)) return;
       const at = panes.indexOf(null);
       if (at >= 0) setPanes(panes.map((k, i) => (i === at ? key : k)));
-      record("확인 필요", `"${label.slice(0, 40)}" 세션이 시작하지 못하고 있다`, idOfKey(key));
-      say(`"${label.slice(0, 30)}" 세션이 시작하지 못하고 있다. 내 확인을 기다리는지 열어 본다.`);
+      record("확인 필요", tr`"${label.slice(0, 40)}" 세션이 시작하지 못하고 있다`, idOfKey(key)); // i18n-ok
+      say(tr`"${label.slice(0, 30)}" 세션이 시작하지 못하고 있다. 내 확인을 기다리는지 열어 본다.`);
     }, ms);
   /** 보내기: 고른 줄기의 가장 최근 세션에 글을 보낸다. 잠들어 있으면 화면 밖에서 깨워 보낸다 */
   const dispatch = async (target: Target, message: string, note: RouteNote, viaHandoff = false, quiet = false): Promise<string | void> => {
@@ -1248,22 +1253,24 @@ export default function App() {
       const about = target.join && aboutOf(target.join);
       // 이 레포가 어디와 이어져 있고 바꿀 때 어디를 같이 봐야 하는지를 지도에서 떼어 붙인다
       const here = `\n${live.current.mapText}`.split(/\n## /).find((part) => part.split("\n")[0].trim() === repoOf(target.cwd));
-      const ties = mapItems(here ?? "").filter(([label, text]) => (label === "이어진 곳" || label === "바꿀 때 같이 볼 곳") && text && !/^(확인된 것 없음|없음)\.?$/.test(text));
-      const mapped = ties.length ? `[Julgi 지도: 이 레포(${repoOf(target.cwd)})와 이어진 곳. 참고만 하고, 다른 레포의 경로는 ~/.julgi/bin/julgi map 으로 본다]\n${ties.map(([label, text]) => `${label}:\n${text}`).join("\n").slice(0, 2400)}\n\n---\n\n` : "";
+      const ties = mapItems(here ?? "").filter(([label, text]) => (label === "이어진 곳" || label === "바꿀 때 같이 볼 곳") && text && !/^(확인된 것 없음|없음)\.?$/.test(text)); // i18n-ok
+      const mapped = ties.length ? `[Julgi 지도: 이 레포(${repoOf(target.cwd)})와 이어진 곳. 참고만 하고, 다른 레포의 경로는 ~/.julgi/bin/julgi map 으로 본다]\n${ties.map(([label, text]) => `${label}:\n${text}`).join("\n").slice(0, 2400)}\n\n---\n\n` : ""; // i18n-ok
       // 일이 레포 여러 곳에 걸치면 이 세션을 조율자로 세운다. 내가 "조율해 줘"라고 말할 필요가 없게
       const spans = config.autoLead && !target.join ? (note.span ?? []) : [];
       // 큰 일만 조율자로 세운다. 작은 일은 한 세션이 레포를 오가며 하는 편이 빠르다. 그 세션도 하다가 커지면 스스로 나눠 맡길 수 있다
+      // i18n-off
       const lead =
         spans.length < 2
           ? ""
           : note.big
             ? `[Julgi: 이 일은 레포 여러 곳(${spans.join(", ")})에 걸친 큰 일로 보인다. julgi-lead 스킬을 써서 조율자로 일한다. 직접 고치지 말고 일감으로 나눠 레포마다 맡기고, 돌아온 결과를 확인해 정리한다. 지도를 보고 작은 일이라고 판단되면 그렇게 말하고 직접 한다]\n\n`
             : `[Julgi: 이 일은 레포 여러 곳(${spans.join(", ")})에 걸치지만 작은 일로 보여 이 세션이 직접 한다. 다른 레포는 지도(~/.julgi/bin/julgi map)에서 찾아 직접 읽고 고친다. 고치기 전에 레포마다 작업 브랜치를 따고, 어느 레포의 무엇을 바꿨는지 끝에 정리한다. 하다 보니 레포마다 따로 진행할 덩어리가 커지면 julgi-lead 스킬로 일감을 나눠 맡긴다]\n\n`;
-      if (lead) record("조율", note.big ? `레포 ${spans.length}곳에 걸친 큰 일이라 조율자로 세움: ${spans.join(", ")}` : `레포 ${spans.length}곳에 걸치지만 작은 일이라 한 세션이 직접 함: ${spans.join(", ")}`, id);
+      // i18n-on
+      if (lead) record("조율", note.big ? tr`레포 ${spans.length}곳에 걸친 큰 일이라 조율자로 세움: ${spans.join(", ")}` : tr`레포 ${spans.length}곳에 걸치지만 작은 일이라 한 세션이 직접 함: ${spans.join(", ")}`, id); // i18n-ok
       const recalled = lead + mapped + (note.brain?.length ? `${recallText(note.brain)}\n\n---\n\n` : "");
-      const text = recalled + (about ? `[이어지는 작업 "${target.join!.name}"의 지금까지 내용. 참고만 한다]\n${about.slice(0, 4000)}\n\n---\n\n${message}` : message);
+      const text = recalled + (about ? `[이어지는 작업 "${target.join!.name}"의 지금까지 내용. 참고만 한다]\n${about.slice(0, 4000)}\n\n---\n\n${message}` : message); // i18n-ok
       if (note.brain?.length) bump(note.brain.map((n) => n.id), "out");
-      if (note.brain?.length) record("꺼냄", `브레인에서 ${note.brain.length}개를 새 세션에 붙임: ${note.brain.map((n) => n.title).join(" / ").slice(0, 120)}`, id);
+      if (note.brain?.length) record("꺼냄", tr`브레인에서 ${note.brain.length}개를 새 세션에 붙임: ${note.brain.map((n) => n.title).join(" / ").slice(0, 120)}`, id); // i18n-ok
       // 내가 던진 것이 아니면(세션이나 폰이 넘긴 일, 일감, 스킬) 알아서 띄운 세션으로 적어 둔다. 권한을 따로 준다
       if (quiet) {
         markAuto(id);
@@ -1275,12 +1282,12 @@ export default function App() {
       // 한 번도 안 써 본 폴더면 Claude Code가 폴더를 믿느냐고 물을 것이라, 오래 기다리지 않고 꺼내 보인다
       watch(key, message, live.current.sessions.some((s) => s.cwd === target.cwd) || target.cwd === live.current.base || mapState.current.repos.some((r) => r.cwd === target.cwd) ? 15_000 : 3000);
       if (target.join) joinThreads(target.join.session.id, id, true);
-      if (!note.by?.startsWith("일감 ")) record("보냄", `${target.join ? `"${target.join.name.slice(0, 30)}" 줄기에 ` : "새 줄기 · "}${repoOf(target.cwd)} ← "${message.split("\n")[0].slice(0, 50)}" (${note.by ?? "직접"})`, id);
-      say(target.join ? `${target.join.name} 줄기에 ${repoOf(target.cwd)} 세션을 더해 보냈다` : `새 줄기에 보냈다 · ${repoOf(target.cwd)}`);
+      if (!note.by?.startsWith("일감 ")) record("보냄", `${target.join ? `"${target.join.name.slice(0, 30)}" 줄기에 ` : "새 줄기 · "}${repoOf(target.cwd)} ← "${message.split("\n")[0].slice(0, 50)}" (${note.by ?? "직접"})`, id); // i18n-ok
+      say(target.join ? tr`${target.join.name} 줄기에 ${repoOf(target.cwd)} 세션을 더해 보냈다` : tr`새 줄기에 보냈다 · ${repoOf(target.cwd)}`);
       return id; // 새로 띄운 세션. 일감을 맡길 때 누가 맡았는지 적는 데 쓴다
     }
     const { item } = target;
-    if (!note.by?.startsWith("일감 ")) record("보냄", `${item.name.slice(0, 40)} ← "${message.split("\n")[0].slice(0, 50)}" (${note.by ?? "직접"}${viaHandoff ? ", 갈아탄 뒤" : ""})`, item.session.id);
+    if (!note.by?.startsWith("일감 ")) record("보냄", `${item.name.slice(0, 40)} ← "${message.split("\n")[0].slice(0, 50)}" (${note.by ?? "직접"}${viaHandoff ? ", 갈아탄 뒤" : ""})`, item.session.id); // i18n-ok
     if (item.thread?.done) saveThreads(live.current.threads.map((t) => (t.id === item.thread!.id ? { ...t, done: false } : t)));
     const ids = item.thread?.sessions ?? [item.session.id];
     const openOne = live.current.open
@@ -1300,19 +1307,19 @@ export default function App() {
     }
     if (openOne && terms.opened(openOne.key)) {
       // 그 세션에 내가 치다 만 글이 있으면 뒤에 붙지 않게, 그 글을 보내거나 지울 때까지 기다린다
-      const held = terms.submitWhenClear(openOne.key, message, () => say(`기다리던 글을 보냈다 → ${item.name}`));
-      if (held) return say(`"${item.name.slice(0, 30)}"에 치던 글이 있어서 기다린다. 그 글을 보내거나 지우면 이어서 보낸다`, 6000);
+      const held = terms.submitWhenClear(openOne.key, message, () => say(tr`기다리던 글을 보냈다 → ${item.name}`));
+      if (held) return say(tr`"${item.name.slice(0, 30)}"에 치던 글이 있어서 기다린다. 그 글을 보내거나 지우면 이어서 보낸다`, 6000);
     } else {
       const sessionId = openOne?.sessionId ?? item.session.id;
       const key = "c:" + sessionId;
-      if (!openOne && elsewhere(item.session)) record("확인 필요", `"${item.name.slice(0, 40)}"은 다른 곳에서도 열려 있는 것 같다. Julgi에서 깨워 보냈으니 한쪽은 닫는다`, sessionId);
+      if (!openOne && elsewhere(item.session)) record("확인 필요", tr`"${item.name.slice(0, 40)}"은 다른 곳에서도 열려 있는 것 같다. Julgi에서 깨워 보냈으니 한쪽은 닫는다`, sessionId); // i18n-ok
       terms.dispose(key); // 목록에만 있고 아직 안 뜬 것은 글을 들려서 다시 만든다
       terms.create({ key, cwd: item.session.cwd, command: withPrompt(resumeCommand(sessionId), await outbox()) });
       if (!openOne) setOpen((list) => [...list, { key, label: item.name, cwd: item.session.cwd, sessionId }]);
       terms.wake(key);
       watch(key, item.name);
     }
-    say(`보냈다 → ${item.name}`);
+    say(tr`보냈다 → ${item.name}`);
   };
   const saveThreads = (all: Thread[]) => {
     live.current.threads = all; // 한 번에 여러 줄기를 손댈 때 앞에서 고친 것이 보이게
@@ -1333,12 +1340,12 @@ export default function App() {
     if (!mine) return;
     const rest = mine.sessions.filter((id) => id !== sessionId);
     saveThreads(rest.length ? all.map((t) => (t === mine ? { ...t, sessions: rest } : t)) : all.filter((t) => t !== mine));
-    say("줄기에서 뺐다. 세션은 그대로 남아 있다.");
+    say(tr("줄기에서 뺐다. 세션은 그대로 남아 있다."));
   };
   /** 줄기를 푼다. 세션은 낱개로 돌아가고 기억 파일은 지우지 않는다 */
   const dropThread = (threadId: string) => {
     saveThreads(live.current.threads.filter((t) => t.id !== threadId));
-    say("줄기를 풀었다. 세션은 그대로 남아 있다.");
+    say(tr("줄기를 풀었다. 세션은 그대로 남아 있다."));
   };
   /** 두 세션(또는 그 줄기)을 한 줄기로 묶는다. 순서는 마지막으로 쓴 때 순 */
   const joinThreads = (a: string, b: string, quiet = false) => {
@@ -1346,11 +1353,11 @@ export default function App() {
     const all = live.current.threads;
     const ta = all.find((t) => t.sessions.includes(a));
     const tb = all.find((t) => t.sessions.includes(b));
-    if (ta && ta === tb) return say("이미 같은 줄기다.");
+    if (ta && ta === tb) return say(tr("이미 같은 줄기다."));
     const when = (id: string) => live.current.byId.get(id)?.mtime ?? Number.MAX_SAFE_INTEGER;
     const sessions = [...new Set([...(ta?.sessions ?? [a]), ...(tb?.sessions ?? [b])])].sort((x, y) => when(x) - when(y));
     const keep = ta ?? tb;
-    const name = keep?.name ?? live.current.byId.get(sessions[0])?.title ?? "줄기";
+    const name = keep?.name ?? live.current.byId.get(sessions[0])?.title ?? tr("줄기");
     const merged: Thread = { id: keep?.id ?? crypto.randomUUID(), name, sessions, created: keep?.created ?? Date.now() };
     saveThreads([...all.filter((t) => t !== ta && t !== tb), merged]);
     // 두 줄기에 기억이 따로 있었으면 한 파일로 합친다
@@ -1360,7 +1367,7 @@ export default function App() {
       setMemories((old) => ({ ...old, [merged.id]: text }));
       void invoke("data_write", { name: `threads/${merged.id}.md`, text });
     }
-    if (!quiet) say(`한 줄기로 묶었다 → ${name} (세션 ${sessions.length}개)`);
+    if (!quiet) say(tr`한 줄기로 묶었다 → ${name} (세션 ${sessions.length}개)`);
   };
   /** 줄기를 끝낸다. 목록에서 내려가고 ⌘K로는 계속 찾는다. 다시 누르거나 보내면 살아난다 */
   const finishThread = (sessionId: string, quiet = false) => {
@@ -1368,25 +1375,25 @@ export default function App() {
     const mine = all.find((t) => t.sessions.includes(sessionId));
     const next: Thread = mine
       ? { ...mine, done: !mine.done }
-      : { id: crypto.randomUUID(), name: live.current.byId.get(sessionId)?.title ?? "줄기", sessions: [sessionId], created: Date.now(), done: true };
+      : { id: crypto.randomUUID(), name: live.current.byId.get(sessionId)?.title ?? tr("줄기"), sessions: [sessionId], created: Date.now(), done: true };
     saveThreads([...all.filter((t) => t !== mine), next]);
-    if (!next.done) return say("줄기를 다시 살렸다.");
+    if (!next.done) return say(tr("줄기를 다시 살렸다."));
     for (const o of live.current.open)
       if (o.sessionId && next.sessions.includes(o.sessionId) && live.current.states[o.key]?.state !== "run") close(o.key);
     if (quiet) return; // 점검이 한 것은 점검 기록에 남긴다
-    record("끝냄", `"${next.name.slice(0, 40)}" · 목록에서 내림`, sessionId);
-    say("줄기를 끝냈다. 목록에서 내렸고 ⌘K로는 계속 찾는다.");
+    record("끝냄", tr`"${next.name.slice(0, 40)}" · 목록에서 내림`, sessionId); // i18n-ok
+    say(tr("줄기를 끝냈다. 목록에서 내렸고 ⌘K로는 계속 찾는다."));
   };
   /** 지금 세션에서 마지막으로 주고받은 말을 다른 줄기로 옮긴다. 보낼 곳은 보내기 상자에서 고른다 */
   const move = async () => {
     const o = live.current.open.find((x) => x.key === live.current.panes[live.current.focus]);
-    if (!o?.sessionId) return say("지금 칸에 Claude 세션이 있어야 옮길 수 있다.");
+    if (!o?.sessionId) return say(tr("지금 칸에 Claude 세션이 있어야 옮길 수 있다."));
     const pair = await invoke<[string, string] | null>("last_exchange", { sessionId: o.sessionId });
-    if (!pair) return say("옮길 말이 아직 없다.");
+    if (!pair) return say(tr("옮길 말이 아직 없다."));
     const title = live.current.byId.get(o.sessionId)?.title ?? o.label;
     movedFrom.current = { said: pair[0].replace(/\s+/g, " "), name: nameOf(o.key) };
-    const reply = pair[1] ? `\n\n받은 답:\n${pair[1].slice(0, 4000)}` : "";
-    setMoving(`[다른 세션 "${title}"에서 나온 얘기를 여기로 옮긴다. 이어서 봐줘.]\n\n내가 한 말:\n${pair[0].slice(0, 2000)}${reply}`);
+    const reply = pair[1] ? `\n\n받은 답:\n${pair[1].slice(0, 4000)}` : ""; // i18n-ok
+    setMoving(`[다른 세션 "${title}"에서 나온 얘기를 여기로 옮긴다. 이어서 봐줘.]\n\n내가 한 말:\n${pair[0].slice(0, 2000)}${reply}`); // i18n-ok
     setOverlay("send");
   };
   const togglePin = (key: string) => setPinned((list) => (list.includes(key) ? list.filter((k) => k !== key) : [...list, key]));
@@ -1402,7 +1409,7 @@ export default function App() {
       // 일하다가 내 차례가 됐는데 내가 Julgi를 안 보고 있으면 알린다. 갈아타는 중의 인계 글은 내가 볼 것이 아니라 뺀다
       if (config.notify && was === "run" && (is === "wait" || is === "ask") && !document.hasFocus() && !handing.includes(o.key))
       {
-        void invoke("notify", { title: nameOf(o.key).slice(0, 60), body: is === "ask" ? "확인이 필요하다" : "답을 끝냈다. 내 차례다" });
+        void invoke("notify", { title: nameOf(o.key).slice(0, 60), body: is === "ask" ? tr("확인이 필요하다") : tr("답을 끝냈다. 내 차례다") });
         notified.current = { key: o.key, at: now };
       }
       // 답이 끝났으면 그 폴더에서 무엇이 바뀌었는지 센다. 변경이 달라졌으면 브리핑도 새로 만든다
@@ -1429,14 +1436,14 @@ export default function App() {
           if (old) delete answered.current[old];
           previous.current[at] = old;
           setPanes(panes.map((k, i) => (i === at ? hidden[0].key : k)));
-          record("칸", old ? `칸 ${at + 1}: 답을 보낸 "${nameOf(old)}" 대신 기다리던 "${nameOf(hidden[0].key)}"` : `칸 ${at + 1}: 기다리던 "${nameOf(hidden[0].key)}"을 올림`, idOfKey(old ?? hidden[0].key));
+          record("칸", old ? tr`칸 ${at + 1}: 답을 보낸 "${nameOf(old)}" 대신 기다리던 "${nameOf(hidden[0].key)}"` : tr`칸 ${at + 1}: 기다리던 "${nameOf(hidden[0].key)}"을 올림`, idOfKey(old ?? hidden[0].key)); // i18n-ok
         } else if (!live.current.zoom && panes.length < MAX_PANES && (panesEl.current?.clientWidth ?? 0) / (panes.length + 1) >= AUTO_PANE_PX) {
           // 바꿔 끼울 칸이 없고 화면에 자리가 있으면 칸을 하나 늘려 올린다. 내가 칸을 나눌 일이 없게
           const { widths } = live.current;
           setPanes([...panes, hidden[0].key]);
           setWidths([...widths, widths.reduce((a, b) => a + b, 0) / widths.length]);
           previous.current.push(null);
-          record("칸", `칸을 하나 늘려 기다리던 "${nameOf(hidden[0].key)}"을 올림`, idOfKey(hidden[0].key));
+          record("칸", tr`칸을 하나 늘려 기다리던 "${nameOf(hidden[0].key)}"을 올림`, idOfKey(hidden[0].key)); // i18n-ok
         }
       }
       // 한참 비어 있는 칸은 없앤다. 지금 보고 있는 칸은 두고, 마지막 한 칸도 둔다
@@ -1452,11 +1459,11 @@ export default function App() {
         if (focus > empty) setFocus(focus - 1);
       }
     }
-    if (tasksRef.current.some((t) => t.status === "대기" || t.status === "하는 중")) tendTasks(now);
+    if (tasksRef.current.some((t) => t.status === "대기" || t.status === "하는 중")) tendTasks(now); // i18n-ok
     // 일감을 끝내고 결과까지 돌려준 세션은 재운다. 열어 두면 칸과 목록을 차지한다. 다시 시키면 Julgi가 깨운다
     for (const t of tasksRef.current) {
       const wkey = "c:" + t.session;
-      if (t.status !== "끝남" || !t.session || now - (t.finished ?? now) < 8000 || !open.some((o) => o.key === wkey)) continue;
+      if (t.status !== "끝남" || !t.session || now - (t.finished ?? now) < 8000 || !open.some((o) => o.key === wkey)) continue; // i18n-ok
       // 내가 그 세션에 직접 말을 걸어 다시 일하고 있거나, 지금 글을 치고 있으면 두고 본다
       if (rawStates.current[wkey]?.[0] === "run" || terms.idle(wkey) < 60_000 || terms.drafting(wkey)) continue;
       close(wkey);
@@ -1494,7 +1501,7 @@ export default function App() {
         daily.current = { day, week: weekDue ? day : daily.current.week };
         learnAt.current = now;
         void invoke("data_write", { name: "brain-daily.json", text: JSON.stringify(daily.current) });
-        void review(weekDue ? "매주" : "매일");
+        void review(weekDue ? "매주" : "매일"); // i18n-ok
       }
     }
     // 요약과 이름이 없는 최근 세션을 한가할 때 하나씩 채운다. 목록의 이름과 보낼 곳 고르기가 이 요약에 기댄다
@@ -1530,7 +1537,7 @@ export default function App() {
       }
       trustedOnce.current.add(o.key);
       terms.send(o.key, "\r");
-      record("허용", `${o.cwd.replace(live.current.home, "~")} 폴더를 믿는다고 대신 답함`, o.sessionId);
+      record("허용", tr`${o.cwd.replace(live.current.home, "~")} 폴더를 믿는다고 대신 답함`, o.sessionId); // i18n-ok
     }
     for (const o of open) {
       if (!o.sessionId) continue;
@@ -1553,7 +1560,7 @@ export default function App() {
         .sort((a, b) => idle(b) - idle(a))[0];
       if (pick) {
         mem.sleptAt = now;
-        record("재움", `"${nameOf(pick.key)}" · 세션들의 메모리가 ${total.toFixed(1)}GB로 한도 ${config.memoryLimitGb}GB를 넘어서 (이 세션 ${((mem.rows[pick.key]?.[0] ?? 0) / 1024).toFixed(0)}MB)`, pick.sessionId);
+        record("재움", tr`"${nameOf(pick.key)}" · 세션들의 메모리가 ${total.toFixed(1)}GB로 한도 ${config.memoryLimitGb}GB를 넘어서 (이 세션 ${((mem.rows[pick.key]?.[0] ?? 0) / 1024).toFixed(0)}MB)`, pick.sessionId); // i18n-ok
         close(pick.key);
       }
     }
@@ -1570,14 +1577,14 @@ export default function App() {
         const rested = looked && (never || (st?.state === "wait" && seen.current[o.key] === st.since && now - st.since > limit));
         // 고정한 세션은 재우지 않는다. 며칠씩 이어 가는 주 세션을 그렇게 둔다
         if (rested && o.key.startsWith("c:") && !panes.includes(o.key) && !handing.includes(o.key) && !pinned.includes(o.key)) {
-          record("재움", `"${nameOf(o.key)}" · 답을 본 뒤 ${config.sleepHours}시간 넘게 쉬어서`, o.sessionId);
+          record("재움", tr`"${nameOf(o.key)}" · 답을 본 뒤 ${config.sleepHours}시간 넘게 쉬어서`, o.sessionId); // i18n-ok
           close(o.key);
         }
       }
   };
   const exited = (key: string) => {
     if (terms.age(key) > QUICK_EXIT_MS) return close(key);
-    terms.note(key, "바로 끝났다. 위 내용을 확인하고 ⌘W로 닫는다.");
+    terms.note(key, tr("바로 끝났다. 위 내용을 확인하고 ⌘W로 닫는다."));
     setDead((list) => [...list, key]);
   };
   const nextWaiting = () => {
@@ -1610,13 +1617,13 @@ export default function App() {
       if (p.repo) return openPr({ repo: p.repo, number: p.number });
       // 번호만 쳤으면 지금 칸의 레포에서 연다. GitHub 레포일 때만 된다
       const cwd = cwdOf(current);
-      void invoke<string | null>("repo_slug", { path: cwd }).then((repo) => (repo ? openPr({ repo, number: p.number }) : say(`${repoOf(cwd)}는 GitHub 레포가 아니다.`)));
+      void invoke<string | null>("repo_slug", { path: cwd }).then((repo) => (repo ? openPr({ repo, number: p.number }) : say(tr`${repoOf(cwd)}는 GitHub 레포가 아니다.`)));
     } else newSession(p.cwd);
   };
   const join = (sessionId: string) => {
     setOverlay(null);
     const o = live.current.open.find((x) => x.key === live.current.panes[live.current.focus]);
-    if (!o?.sessionId) return say("지금 칸에 Claude 세션이 있어야 묶을 수 있다.");
+    if (!o?.sessionId) return say(tr("지금 칸에 Claude 세션이 있어야 묶을 수 있다."));
     joinThreads(o.sessionId, sessionId);
   };
   const attach = (s: Session) => {
@@ -1624,7 +1631,7 @@ export default function App() {
     const key = live.current.panes[live.current.focus];
     if (!key || key === "c:" + s.id) return;
     const summary = (s.recap || s.title).replace(/\s+/g, " ").trim();
-    terms.paste(key, `[참고: 다른 세션 "${s.title}" (${s.repo}) 요약] ${summary} `);
+    terms.paste(key, `[참고: 다른 세션 "${s.title}" (${s.repo}) 요약] ${summary} `); // i18n-ok
   };
 
   /** PR에 일이 생겼다: 기록에 남기고, 창을 안 보고 있으면 알린다. 알림을 누르고 돌아오면 그 세션이 뜬다 */
@@ -1638,8 +1645,8 @@ export default function App() {
   /** 잠든 세션의 PR에 일이 생겼다: 내 차례에 올리고 알린다. 설정에 따라 바로 깨운다 */
   const sleepNotice = (sessionId: string, pr: PrTarget, news: string) => {
     const s = live.current.byId.get(sessionId);
-    const name = live.current.names[sessionId] || s?.title || "세션";
-    record("PR", `${name.slice(0, 40)} (잠듦) · PR #${pr.number} ${news}`, sessionId);
+    const name = live.current.names[sessionId] || s?.title || tr("세션");
+    record("PR", tr`${name.slice(0, 40)} (잠듦) · PR #${pr.number} ${news}`, sessionId);
     if (config.wakeOnPr && s) {
       wakeQuiet(s);
       setPrNews((old) => ({ ...old, ["c:" + sessionId]: news }));
@@ -1673,7 +1680,7 @@ export default function App() {
     return live.current.ticketLinks[id] ?? (s && firstKey(s.branch)) ?? s?.links.map(keyOfUrl).find(Boolean);
   };
   const ticketNotice = (t: Ticket, news: string) => {
-    record("티켓", `${t.key} ${news}: ${t.title.slice(0, 60)}`);
+    record("티켓", `${t.key} ${news}: ${t.title.slice(0, 60)}`); // i18n-ok
     if (!config.notify || document.hasFocus()) return;
     void invoke("notify", { title: `${t.key} · ${news}`, body: t.title.slice(0, 80) });
   };
@@ -1681,10 +1688,10 @@ export default function App() {
   const moveTicket = async (key: string, name: string) => {
     const list = await invoke<{ id: string; name: string; to: string }[]>("jira_transitions", { conn: jiraConn(), key }).catch(() => []);
     const hit = list.find((t) => t.to.toLowerCase() === name.toLowerCase() || t.name.toLowerCase() === name.toLowerCase());
-    if (!hit) return say(`${key}에는 지금 "${name}"로 가는 전환이 없다. 티켓 화면에서 고른다.`, 6000);
+    if (!hit) return say(tr`${key}에는 지금 "${name}"로 가는 전환이 없다. 티켓 화면에서 고른다.`, 6000);
     await invoke("jira_transition", { conn: jiraConn(), key, id: hit.id, comment: "" }).then(
-      () => (record("티켓", `${key}을 ${hit.to}로 옮김`), say(`${key} → ${hit.to}`), refreshTickets.current()),
-      (e) => say(`옮기지 못했다: ${String(e).slice(0, 80)}`, 6000),
+      () => (record("티켓", tr`${key}을 ${hit.to}로 옮김`), say(`${key} → ${hit.to}`), refreshTickets.current()), // i18n-ok
+      (e) => say(tr`옮기지 못했다: ${String(e).slice(0, 80)}`, 6000),
     );
   };
   /** 티켓과 이어진 세션의 PR이 올라오거나 머지되면 상태를 옮길지 한 번 묻는다 */
@@ -1692,7 +1699,7 @@ export default function App() {
     const key = ticketOfSession(sessionId);
     const name = kind === "pr" ? config.jiraPrTransition : config.jiraMergeTransition;
     if (!key || !name.trim()) return;
-    setOffer({ text: `${kind === "pr" ? "PR이 올라왔다" : "PR이 머지됐다"} (#${pr.number}). ${key}을 ${name}로 옮길까?`, yes: `${name}로 옮기기`, run: () => void moveTicket(key, name) });
+    setOffer({ text: kind === "pr" ? tr`PR이 올라왔다 (#${pr.number}). ${key}을 ${name}로 옮길까?` : tr`PR이 머지됐다 (#${pr.number}). ${key}을 ${name}로 옮길까?`, yes: tr`${name}로 옮기기`, run: () => void moveTicket(key, name) });
   };
   /** 이 티켓으로 시작: 워크트리 + 브랜치를 따고, 첫 지시를 들려 새 세션을 띄우고, 세션과 티켓을 잇는다 */
   const startFromTicket = async (t: TicketFull, o: { cwd: string; repo: string; branch: string; prompt: string; transition: boolean }) => {
@@ -1700,7 +1707,7 @@ export default function App() {
     setTicketShown(null);
     setOverlay(null);
     const name = o.branch.replace(/[^A-Za-z0-9-]/g, "-").slice(0, 60);
-    const path = await invoke<string>("worktree_add", { repo: o.cwd, name, branch: o.branch }).catch((e) => (say(`워크트리를 따지 못했다: ${String(e).slice(0, 100)}`, 8000), ""));
+    const path = await invoke<string>("worktree_add", { repo: o.cwd, name, branch: o.branch }).catch((e) => (say(tr`워크트리를 따지 못했다: ${String(e).slice(0, 100)}`, 8000), ""));
     if (!path) return;
     const id = crypto.randomUUID();
     const key = "c:" + id;
@@ -1715,22 +1722,22 @@ export default function App() {
     const project = t.key.split("-")[0];
     const pairs = config.jiraRepos.split(",").map((p) => p.trim()).filter((p) => p && !p.startsWith(project + "="));
     setConfig("jiraRepos", [...pairs, `${project}=${o.repo}`].join(", "));
-    record("시작", `${t.key} "${t.title.slice(0, 40)}"을 ${o.repo}의 ${o.branch}에서 새 세션으로 시작`, id);
+    record("시작", tr`${t.key} "${t.title.slice(0, 40)}"을 ${o.repo}의 ${o.branch}에서 새 세션으로 시작`, id); // i18n-ok
     if (o.transition && config.jiraStartTransition.trim()) void moveTicket(t.key, config.jiraStartTransition);
   };
   /** 세션과 이어지지 않은 내 PR에 일이 생겼다 */
   const mineNotice = (pr: ReviewAsk, news: string) => {
     const repo = repoName(pr.repository.nameWithOwner);
-    record("PR", `내 PR ${repo} #${pr.number} · ${news}: ${pr.title.slice(0, 60)}`);
+    record("PR", tr`내 PR ${repo} #${pr.number} · ${news}: ${pr.title.slice(0, 60)}`);
     if (!config.notify || document.hasFocus()) return;
     void invoke("notify", { title: `${repo} #${pr.number} · ${news}`, body: pr.title.slice(0, 80) });
   };
   /** 새 리뷰 요청이 왔다 */
   const askNotice = (a: ReviewAsk) => {
     const repo = repoName(a.repository.nameWithOwner);
-    record("리뷰 요청", `${a.author.login}: ${repo} #${a.number} ${a.title.slice(0, 60)}`);
+    record("리뷰 요청", `${a.author.login}: ${repo} #${a.number} ${a.title.slice(0, 60)}`); // i18n-ok
     if (!config.notify || document.hasFocus()) return;
-    void invoke("notify", { title: `리뷰 요청 · ${repo} #${a.number}`, body: `${a.author.login}: ${a.title.slice(0, 80)}` });
+    void invoke("notify", { title: tr`리뷰 요청 · ${repo} #${a.number}`, body: `${a.author.login}: ${a.title.slice(0, 80)}` });
   };
   /** 작업 페이지의 묶음: 세션 PR(열린 세션과 최근 잠든 세션), 내 PR, 리뷰 요청 */
   const workGroups = (): WorkGroup[] => {
@@ -1747,25 +1754,26 @@ export default function App() {
       if (!target || seen.has(`${target.repo}#${target.number}`)) continue;
       seen.add(`${target.repo}#${target.number}`);
       const s = byId.get(id);
-      sessionRows.push({ target, title: names[id] || s?.title || "세션", by: "세션", status: status(target), news: prNews["c:" + id] ?? sleepNews[id]?.news, sessionId: id, sleeping: !openIds.has(id) });
+      sessionRows.push({ target, title: names[id] || s?.title || tr("세션"), by: tr("세션"), status: status(target), news: prNews["c:" + id] ?? sleepNews[id]?.news, sessionId: id, sleeping: !openIds.has(id) });
     }
     const mineRows: WorkRow[] = minePrs.map((p) => {
       const target = { repo: p.repository.nameWithOwner, number: p.number };
       const id = `${target.repo}#${target.number}`;
       const sessionRow = sessionRows.find((r) => `${r.target.repo}#${r.target.number}` === id);
-      return { target, title: p.title, by: sessionRow ? `세션 "${sessionRow.title.slice(0, 20)}"` : "", at: p.updatedAt, status: status(target), news: mineNews[id]?.news ?? sessionRow?.news, sessionId: sessionRow?.sessionId, sleeping: sessionRow?.sleeping };
+      return { target, title: p.title, by: sessionRow ? tr`세션 "${sessionRow.title.slice(0, 20)}"` : "", at: p.updatedAt, status: status(target), news: mineNews[id]?.news ?? sessionRow?.news, sessionId: sessionRow?.sessionId, sleeping: sessionRow?.sleeping };
     });
     const askRows: WorkRow[] = asks.map((a) => ({ target: { repo: a.repository.nameWithOwner, number: a.number }, title: a.title, by: a.author.login, at: a.updatedAt, ask: a }));
     return [
-      { id: "mine", title: "내 PR", hint: "내가 연 열린 PR 전부", rows: mineRows },
-      { id: "review", title: "리뷰 요청", hint: "나를 리뷰어로 지정한 PR", rows: askRows },
-      { id: "session", title: "세션 PR", hint: "열린 세션과 최근 세션이 올린 PR (머지·닫힌 것 포함)", rows: sessionRows },
+      { id: "mine", title: tr("내 PR"), hint: tr("내가 연 열린 PR 전부"), rows: mineRows },
+      { id: "review", title: tr("리뷰 요청"), hint: tr("나를 리뷰어로 지정한 PR"), rows: askRows },
+      { id: "session", title: tr("세션 PR"), hint: tr("열린 세션과 최근 세션이 올린 PR (머지·닫힌 것 포함)"), rows: sessionRows },
     ];
   };
   /** 리뷰 요청을 새 세션에 맡긴다. 로컬에 그 레포가 있으면 거기서 띄워 코드도 같이 읽게 한다 */
   const handReview = (a: ReviewAsk, extra: string) => {
     const name = repoName(a.repository.nameWithOwner);
     const cwd = mapState.current.repos.find((r) => r.repo === name)?.cwd ?? (live.current.base || live.current.home);
+    // i18n-off
     const ask =
       `PR ${a.url} (${a.repository.nameWithOwner} #${a.number} "${a.title}", 작성 ${a.author.login})을 리뷰해 줘.\n\n` +
       (isLab(a.repository.nameWithOwner)
@@ -1774,7 +1782,8 @@ export default function App() {
       `- 버그, 위험, 빠진 처리, 확인할 것을 "파일:줄 — 무엇을 왜" 목록으로 정리한다. 중요한 것부터.\n` +
       `- GitHub에 코멘트를 달거나 승인하지 않는다. 올리는 것은 내가 Julgi의 PR 화면에서 한다.` +
       (extra ? `\n\n덧붙여: ${extra}` : "");
-    void dispatch({ kind: "new", cwd }, ask, { rank: 0, by: "리뷰 요청" });
+    // i18n-on
+    void dispatch({ kind: "new", cwd }, ask, { rank: 0, by: "리뷰 요청" }); // i18n-ok
   };
   const actions = useRef({ readUsage, publishRemote, say, dispatch, show, close, sleep, requestQuit, handoff, exited, newSession, newShell, nextWaiting, openTerm, resize, split, unsplit, finishThread, move, togglePin, tend, serve, confirmClose, toggleReview, prNotice, askNotice, mineNotice, sleepNotice, wake, ticketNotice, ticketOffer });
   actions.current = { readUsage, publishRemote, say, dispatch, show, close, sleep, requestQuit, handoff, exited, newSession, newShell, nextWaiting, openTerm, resize, split, unsplit, finishThread, move, togglePin, tend, serve, confirmClose, toggleReview, prNotice, askNotice, mineNotice, sleepNotice, wake, ticketNotice, ticketOffer };
@@ -1851,7 +1860,7 @@ export default function App() {
         // 티켓과 이어진 세션의 PR이 처음 보이거나 머지되면 티켓 상태를 옮길지 묻는다
         const sid = keys.length ? live.current.open.find((o) => o.key === keys[0])?.sessionId : sleeper;
         if (sid && !before && !firstRun && now.state === "OPEN") actions.current.ticketOffer(sid, target, "pr");
-        if (sid && news === "머지됨") actions.current.ticketOffer(sid, target, "merge");
+        if (sid && news === tr("머지됨")) actions.current.ticketOffer(sid, target, "merge");
         if (!news) continue;
         if (!keys.length && sleeper) {
           actions.current.sleepNotice(sleeper, target, news);
@@ -1959,7 +1968,7 @@ export default function App() {
     // 티켓 키·주소는 어디서 눌러도 여기로 와서 티켓 화면으로 열린다
     const onTicket = (e: Event) => {
       const key = (e as CustomEvent<string>).detail;
-      if (!config.jiraSite) return say("Jira에 연결돼 있지 않다. ⌘,의 연결에서 연결한다.");
+      if (!config.jiraSite) return say(tr("Jira에 연결돼 있지 않다. ⌘,의 연결에서 연결한다."));
       setTicketShown(key);
       setTicketNews(({ [key]: _, ...rest }) => rest);
     };
@@ -2011,7 +2020,7 @@ export default function App() {
           const stalled = hit[0] === "run" && Date.now() - out > QUIET_MS;
           const st = stalled ? { state: "wait", since: Math.max(out, hit[1]) } : { state: hit[0], since: hit[1] };
           // 일감을 맡기고 답을 끝낸 조율 세션은 내가 답할 차례가 아니다. 결과가 오면 Julgi가 넣어 준다
-          const holding = st.state === "wait" && tasksRef.current.some((t) => t.lead === o.sessionId && (t.status === "대기" || t.status === "하는 중"));
+          const holding = st.state === "wait" && tasksRef.current.some((t) => t.lead === o.sessionId && (t.status === "대기" || t.status === "하는 중")); // i18n-ok
           // 일감을 맡은 세션이 답을 끝낸 것도 내 차례가 아니다. 결과는 조율 세션으로 간다
           const worker = st.state === "wait" && tasksRef.current.some((t) => t.session === o.sessionId);
           next[o.key] = holding ? { state: "hold", since: st.since } : worker ? { state: "idle", since: st.since } : st;
@@ -2096,7 +2105,7 @@ export default function App() {
         // 내 차례인 세션들과 마지막에 물은 말을 편다. 거기서 바로 답한다
         if (overlay === "queue") setOverlay(null);
         else if (live.current.open.some((o) => waiting(live.current.states[o.key]) || live.current.prNews[o.key]) || live.current.asks.length || Object.keys(live.current.mineNews).length || Object.keys(live.current.sleepNews).length || Object.keys(ticketNewsRef.current).length) setOverlay("queue");
-        else a.say("내 차례인 세션이 없다");
+        else a.say(tr("내 차례인 세션이 없다"));
       }
       // 창만 닫아 메뉴 막대로 보낸다. 세션은 계속 돈다
       else if (cmd && e.shiftKey && e.code === "KeyW") void getCurrentWindow().hide();
@@ -2125,7 +2134,7 @@ export default function App() {
       else if (cmd && !e.shiftKey && e.code === "KeyI") setInfo((v) => !v);
       else if (cmd && !e.shiftKey && e.code === "KeyB") setSidebar((v) => !v);
       else if (cmd && !e.shiftKey && e.code === "KeyS") {
-        if (!config.saveCommand) say("~/.julgi/config.json의 saveCommand에 보낼 말을 적어 두면 ⌘S로 보낸다.");
+        if (!config.saveCommand) say(tr("~/.julgi/config.json의 saveCommand에 보낼 말을 적어 두면 ⌘S로 보낸다."));
         else if (key?.startsWith("c:")) terms.send(key, config.saveCommand + "\r");
       } else if (cmd && e.code === "Equal") a.resize(fontSize + 1);
       else if (cmd && e.code === "Minus") a.resize(fontSize - 1);
@@ -2283,10 +2292,10 @@ export default function App() {
     turn.asked++;
     const tell = (item: Merge["a"]) => {
       const s = item.session;
-      const about = (aboutOf(item) || "요약 없음").slice(0, 900);
-      return `제목: ${item.name}\n레포: ${s.repo} · 브랜치: ${s.branch || "없음"}\n내용: ${about}`;
+      const about = (aboutOf(item) || "요약 없음").slice(0, 900); // i18n-ok
+      return `제목: ${item.name}\n레포: ${s.repo} · 브랜치: ${s.branch || "없음"}\n내용: ${about}`; // i18n-ok
     };
-    void invoke<string | null>("route_ask", { model: modelFor("judge"), system: JUDGE_SYSTEM, prompt: `겹치는 단서: ${next.evidence}\n\n[세션 A]\n${tell(next.a)}\n\n[세션 B]\n${tell(next.b)}\n` })
+    void invoke<string | null>("route_ask", { model: modelFor("judge"), system: JUDGE_SYSTEM, prompt: `겹치는 단서: ${next.evidence}\n\n[세션 A]\n${tell(next.a)}\n\n[세션 B]\n${tell(next.b)}\n` }) // i18n-ok
       .then((raw) => JSON.parse((raw ?? "").slice((raw ?? "").indexOf("{"), (raw ?? "").lastIndexOf("}") + 1)) as { same: boolean; why?: string })
       .catch(() => null)
       .then((answer) => {
@@ -2299,8 +2308,8 @@ export default function App() {
         // 같은 일이면 묻지 않고 합친다. 판정이 난 그때 한 번만 하므로, 내가 다시 떼어 낸 짝을 또 합치지는 않는다
         if (answer.same === true) {
           joinThreads(next.a.session.id, next.b.session.id, true);
-          record("합침", `"${next.a.name.slice(0, 30)}" + "${next.b.name.slice(0, 30)}" · ${answer.why ?? ""}`, next.a.session.id);
-          say(`같은 일이라 한 줄기로 합쳤다: ${next.a.name.slice(0, 30)} · ${(answer.why ?? "").slice(0, 80)}`, 9000);
+          record("합침", `"${next.a.name.slice(0, 30)}" + "${next.b.name.slice(0, 30)}" · ${answer.why ?? ""}`, next.a.session.id); // i18n-ok
+          say(tr`같은 일이라 한 줄기로 합쳤다: ${next.a.name.slice(0, 30)} · ${(answer.why ?? "").slice(0, 80)}`, 9000);
         }
       });
   }, [candidates, judged]);
@@ -2312,7 +2321,7 @@ export default function App() {
     const clean = (text: string) => text.replace(/\s+/g, " ").trim();
     const rows = items.slice(0, 300).map((item) => {
       const ids = item.thread?.sessions ?? [item.session.id];
-      const state = item.thread?.done ? "끝남" : ids.some((id) => openIds.has(id)) ? "열림" : "잠듦";
+      const state = item.thread?.done ? "끝남" : ids.some((id) => openIds.has(id)) ? "열림" : "잠듦"; // i18n-ok
       return [item.thread?.id ?? "-", item.session.id, ids.join(","), item.session.repo, state, clean(item.name), aboutOf(item).slice(0, 240)].join("\t");
     });
     const timer = setTimeout(() => void invoke("data_write", { name: "index.tsv", text: rows.join("\n") + "\n" }), 2000);
@@ -2383,21 +2392,21 @@ export default function App() {
 
   return (
     <div className={"app" + (sidebar ? "" : " no-side")} style={sidebar ? { gridTemplateColumns: `${sideW}px minmax(0, 1fr)` } : undefined}>
-      {sidebar && <div className="side-grip" style={{ left: sideW - 3 }} title="끌어서 목록 너비 바꾸기 · 두 번 누르면 처음 너비로" onMouseDown={dragSide} onDoubleClick={() => saveSideW(270)} />}
+      {sidebar && <div className="side-grip" style={{ left: sideW - 3 }} title={tr`끌어서 목록 너비 바꾸기 · 두 번 누르면 처음 너비로`} onMouseDown={dragSide} onDoubleClick={() => saveSideW(270)} />}
       {/* 창 맨 윗줄: 신호등 단추 옆에 앱 이름과 왼쪽 목록 단추를, 오른쪽 끝에 오른쪽 칸(정보, 코드 검토의 이력)을 펴고 접는 단추 */}
       <div className="topbar" data-tauri-drag-region>
         <span className="topbar-name" data-tauri-drag-region>
           Julgi
         </span>
-        <button type="button" className={"panel-btn" + (sidebar ? " on" : "")} title="왼쪽 목록 펴고 접기 (⌘B)" aria-label="왼쪽 목록 펴고 접기" onClick={() => setSidebar((v) => !v)}>
+        <button type="button" className={"panel-btn" + (sidebar ? " on" : "")} title={tr`왼쪽 목록 펴고 접기 (⌘B)`} aria-label={tr`왼쪽 목록 펴고 접기`} onClick={() => setSidebar((v) => !v)}>
           <svg width="15" height="13" viewBox="0 0 15 13" fill="none" stroke="currentColor" strokeWidth="1.3" aria-hidden="true"><rect x="0.65" y="0.65" width="13.7" height="11.7" rx="2.2" /><line x1="5.2" y1="0.8" x2="5.2" y2="12.2" /></svg>
         </button>
         <span className="topbar-fill" data-tauri-drag-region />
         <button
           type="button"
           className="panel-btn"
-          title="오른쪽 칸 펴고 접기: 코드 검토에서는 이력(h), 터미널에서는 세션 정보(⌘I)"
-          aria-label="오른쪽 칸 펴고 접기"
+          title={tr`오른쪽 칸 펴고 접기: 코드 검토에서는 이력(h), 터미널에서는 세션 정보(⌘I)`}
+          aria-label={tr`오른쪽 칸 펴고 접기`}
           onClick={() => (current && reviewing.includes(current) ? window.dispatchEvent(new Event("julgi:hist")) : setInfo((v) => !v))}
         >
           <svg width="15" height="13" viewBox="0 0 15 13" fill="none" stroke="currentColor" strokeWidth="1.3" aria-hidden="true"><rect x="0.65" y="0.65" width="13.7" height="11.7" rx="2.2" /><line x1="9.8" y1="0.8" x2="9.8" y2="12.2" /></svg>
@@ -2456,7 +2465,7 @@ export default function App() {
                 session={o?.sessionId ? byId.get(o.sessionId) : undefined}
                 thread={threadOf(o?.sessionId)}
                 memory={[memories[threadOf(o?.sessionId)?.id ?? ""], memories[o?.sessionId ?? ""]].filter(Boolean).join("\n\n")}
-                members={(threadOf(o?.sessionId)?.sessions ?? []).map((id) => ({ id, title: byId.get(id)?.title ?? "아직 기록이 없는 세션", here: id === o?.sessionId }))}
+                members={(threadOf(o?.sessionId)?.sessions ?? []).map((id) => ({ id, title: byId.get(id)?.title ?? tr("아직 기록이 없는 세션"), here: id === o?.sessionId }))}
                 thread_ops={{
                   name: (name) => o?.sessionId && nameThread(o.sessionId, name),
                   leave: leaveThread,
@@ -2478,14 +2487,14 @@ export default function App() {
                     ? {
                         // 지금 세션의 폴더와, 이 세션(줄기)이 맡긴 일감들의 워크트리
                         places: [
-                          { label: `${repoOf(o.cwd)} · 이 세션`, cwd: o.cwd },
-                          ...tasks.filter((t) => t.work && (threadOf(o.sessionId)?.sessions ?? [o.sessionId]).includes(t.lead)).map((t) => ({ label: `${t.repo} · 일감 ${t.id}`, cwd: t.work! })),
+                          { label: tr`${repoOf(o.cwd)} · 이 세션`, cwd: o.cwd },
+                          ...tasks.filter((t) => t.work && (threadOf(o.sessionId)?.sessions ?? [o.sessionId]).includes(t.lead)).map((t) => ({ label: tr`${t.repo} · 일감 ${t.id}`, cwd: t.work! })),
                         ],
                         known: changes,
                         sessions: threadOf(o.sessionId)?.sessions ?? (o.sessionId ? [o.sessionId] : []),
                         onSay: (text: string) => {
                           terms.submitWhenClear(key, text);
-                          say("세션에 보냈다. 터미널은 ⌘E로 본다");
+                          say(tr("세션에 보냈다. 터미널은 ⌘E로 본다"));
                         },
                         onClose: () => toggleReview(key),
                       }
@@ -2511,7 +2520,7 @@ export default function App() {
           folders={[...folders, ...mapState.current.repos.filter((r) => !folders.some((f) => f.repo === r.repo)).map((r) => ({ repo: r.repo, cwd: r.cwd, text: "" }))]}
           base={base}
           notes={config.brain ? notes : []}
-          misses={misses.slice(-6).map((m) => `- "${m.said}" → "${m.wrong}"으로 보냈으나 "${m.right}"이 맞았다`).join("\n")}
+          misses={misses.slice(-6).map((m) => `- "${m.said}" → "${m.wrong}"으로 보냈으나 "${m.right}"이 맞았다`).join("\n")} // i18n-ok
           stats={stats}
           areas={mapDomains(mapText).map((d) => `- ${d.name}: ${[...new Set(d.pieces.map((p) => (p.path ? `${p.repo}/${p.path}` : p.repo)))].slice(0, 6).join(", ")}`).join("\n").slice(0, 2200)}
           initial={moving}
@@ -2519,9 +2528,9 @@ export default function App() {
           onSend={(...args) => {
             // 엉뚱한 데 간 말을 옮긴 횟수는 보내기가 틀린 정도를 보여 준다
             if (moving) {
-              record("옮김", `다른 줄기로 옮김: "${args[1].split("\n").pop()?.slice(0, 50) ?? ""}"`);
+              record("옮김", tr`다른 줄기로 옮김: "${args[1].split("\n").pop()?.slice(0, 50) ?? ""}"`); // i18n-ok
               // 무엇이 어디로 잘못 갔고 어디가 맞았는지 적어 둔다. 다음에 보낼 곳을 정할 때 모델에게 보여 준다
-              const right = args[0].kind === "item" ? args[0].item.name : `새 줄기(${repoOf(args[0].cwd)})`;
+              const right = args[0].kind === "item" ? args[0].item.name : `새 줄기(${repoOf(args[0].cwd)})`; // i18n-ok
               const miss = { at: Date.now(), said: movedFrom.current.said.slice(0, 160), wrong: movedFrom.current.name.slice(0, 50), right: right.slice(0, 50) };
               if (miss.said) {
                 setMisses((list) => [...list, miss].slice(-20));
@@ -2532,7 +2541,7 @@ export default function App() {
           }}
           onLater={(text) => {
             setOverlay(null);
-            say(`"${text.split("\n")[0].slice(0, 30)}" 보낼 곳을 정하는 중. 정해지면 알아서 보낸다`, 6000);
+            say(tr`"${text.split("\n")[0].slice(0, 30)}" 보낼 곳을 정하는 중. 정해지면 알아서 보낸다`, 6000);
           }}
           onClose={() => setOverlay(null)}
         />
@@ -2547,7 +2556,7 @@ export default function App() {
             .concat(
               Object.entries(sleepNews).map(([id, { news, pr }]) => {
                 const s = byId.get(id);
-                return { key: "c:" + id, name: names[id] || s?.title || "세션", repo: s?.repo ?? "", state: "sleep", since: 0, sessionId: id, news, pr };
+                return { key: "c:" + id, name: names[id] || s?.title || tr("세션"), repo: s?.repo ?? "", state: "sleep", since: 0, sessionId: id, news, pr };
               }),
             )}
           asks={asks}
@@ -2569,7 +2578,7 @@ export default function App() {
           }}
           onHand={(a, extra) => {
             handReview(a, extra);
-            record("리뷰 맡김", `${a.repository.nameWithOwner} #${a.number}을 새 세션에 맡김${extra ? `: ${extra.slice(0, 60)}` : ""}`);
+            record("리뷰 맡김", extra ? tr`${a.repository.nameWithOwner} #${a.number}을 새 세션에 맡김: ${extra.slice(0, 60)}` : tr`${a.repository.nameWithOwner} #${a.number}을 새 세션에 맡김`); // i18n-ok
           }}
           onAnswer={(key, text) => {
             // 잠든 세션에 답하면 그 글을 들고 깨운다
@@ -2577,11 +2586,11 @@ export default function App() {
               const s = byId.get(key.slice(2));
               const item = items.find((i) => i.session.id === key.slice(2)) ?? (s && { session: s, name: s.title, memory: "" });
               setSleepNews(({ [key.slice(2)]: _, ...rest }) => rest);
-              if (item) void dispatch({ kind: "item", item }, text, { rank: 0, by: "내 차례" });
+              if (item) void dispatch({ kind: "item", item }, text, { rank: 0, by: "내 차례" }); // i18n-ok
               return;
             }
             terms.submitWhenClear(key, text);
-            record("답함", `"${nameOf(key)}"에 내 차례 목록에서 답함: ${text.slice(0, 80)}`, open.find((o) => o.key === key)?.sessionId);
+            record("답함", tr`"${nameOf(key)}"에 내 차례 목록에서 답함: ${text.slice(0, 80)}`, open.find((o) => o.key === key)?.sessionId); // i18n-ok
           }}
           onOpen={(key) => (open.some((o) => o.key === key) ? show(key) : wake(key.slice(2)))}
           onPr={(pr) => openPr(pr)}
@@ -2600,7 +2609,7 @@ export default function App() {
           map={mapText}
           drawing={drawing}
           onRedraw={() => {
-            if (drawing || learning.current) return say("다른 정리가 도는 중이다. 잠시 뒤 다시 누른다.");
+            if (drawing || learning.current) return say(tr("다른 정리가 도는 중이다. 잠시 뒤 다시 누른다."));
             setDrawing(true);
             void refreshMap(true).finally(() => setDrawing(false));
           }}
@@ -2627,7 +2636,7 @@ export default function App() {
             const s = byId.get(sessionId);
             if (o) show(o.key);
             else if (s) openSession(s);
-            else say("그 세션은 아직 대화 기록이 없다.");
+            else say(tr("그 세션은 아직 대화 기록이 없다."));
           }}
         />
       )}
@@ -2638,12 +2647,12 @@ export default function App() {
           onConnectLab={() => {
             // glab이 호스트와 로그인 방식(웹 또는 토큰)을 묻는다. 끝나면 셸 칸을 닫으면 된다
             setOverlay(null);
-            newShell(cwdOf(current), "glab auth login; echo; echo '끝났다. ⌘W로 이 칸을 닫는다.'; read -r _", "GitLab 연결");
+            newShell(cwdOf(current), `glab auth login; echo; echo '${tr("끝났다. ⌘W로 이 칸을 닫는다.")}'; read -r _`, tr("GitLab 연결"));
           }}
           onConnect={() => {
             // gh가 브라우저를 열고 일회용 코드를 보여 준다. 끝나면 셸 칸을 닫으면 된다
             setOverlay(null);
-            newShell(cwdOf(current), "gh auth login --web --hostname github.com; echo; echo '끝났다. ⌘W로 이 칸을 닫는다.'; read -r _", "GitHub 연결");
+            newShell(cwdOf(current), `gh auth login --web --hostname github.com; echo; echo '${tr("끝났다. ⌘W로 이 칸을 닫는다.")}'; read -r _`, tr("GitHub 연결"));
           }}
           onClose={() => setOverlay(null)}
           onChange={setConfig}
@@ -2653,11 +2662,11 @@ export default function App() {
         <Usage
           sessionInfo={(id, cwd) => {
             const s = byId.get(id);
-            return { repo: s?.repo || cwd.split("/").pop() || "?", name: names[id] || s?.title || "기록에서 빠진 세션" };
+            return { repo: s?.repo || cwd.split("/").pop() || "?", name: names[id] || s?.title || tr("기록에서 빠진 세션") };
           }}
           onOpenSession={(id) => {
             const s = byId.get(id);
-            if (!s) return say("이 세션은 목록에 없다. 너무 오래됐거나 다른 도구가 만든 세션이다.");
+            if (!s) return say(tr("이 세션은 목록에 없다. 너무 오래됐거나 다른 도구가 만든 세션이다."));
             setOverlay(null);
             if (open.some((o) => o.sessionId === id)) show("c:" + id);
             else openSession(s);
@@ -2669,7 +2678,7 @@ export default function App() {
         <Work
           groups={workGroups()}
           ticketGroups={config.jiraSite ? TICKET_GROUPS : []}
-          onConnectJira={() => (setSettingsAt("연결"), setOverlay("settings"))}
+          onConnectJira={() => (setSettingsAt("연결"), setOverlay("settings"))} // i18n-ok
           loadTickets={(jql) => invoke<Ticket[]>("jira_search", { conn: jiraConn(), jql, limit: 50 })}
           ticketNews={ticketNewsMap}
           onStartTicket={(key) => void invoke<TicketFull>("jira_view", { conn: jiraConn(), key }).then(setStartTicket, (e) => say(String(e).slice(0, 100)))}
@@ -2684,7 +2693,7 @@ export default function App() {
               onStart={setStartTicket}
               sessions={Object.entries(ticketLinks)
                 .filter(([, k]) => k === key)
-                .map(([id]) => ({ id, name: names[id] || byId.get(id)?.title || "세션" }))}
+                .map(([id]) => ({ id, name: names[id] || byId.get(id)?.title || tr("세션") }))}
               onOpenSession={(id) => {
                 setOverlay(null);
                 if (open.some((o) => o.sessionId === id)) show("c:" + id);
@@ -2695,7 +2704,7 @@ export default function App() {
           onClose={() => setOverlay(null)}
           onRefresh={() => {
             refreshPrs.current();
-            say("PR과 리뷰 요청을 다시 읽는 중");
+            say(tr("PR과 리뷰 요청을 다시 읽는 중"));
           }}
           onOpenSession={(id) => {
             setOverlay(null);
@@ -2705,7 +2714,7 @@ export default function App() {
           onHand={(a) => {
             setOverlay(null);
             handReview(a, "");
-            record("리뷰 맡김", `${a.repository.nameWithOwner} #${a.number}을 작업 페이지에서 새 세션에 맡김`);
+            record("리뷰 맡김", tr`${a.repository.nameWithOwner} #${a.number}을 작업 페이지에서 새 세션에 맡김`); // i18n-ok
           }}
         />
       )}
@@ -2719,7 +2728,7 @@ export default function App() {
           onStart={setStartTicket}
           sessions={Object.entries(ticketLinks)
             .filter(([, k]) => k === ticketShown)
-            .map(([id]) => ({ id, name: names[id] || byId.get(id)?.title || "세션" }))}
+            .map(([id]) => ({ id, name: names[id] || byId.get(id)?.title || tr("세션") }))}
           onOpenSession={(id) => {
             setTicketShown(null);
             if (open.some((o) => o.sessionId === id)) show("c:" + id);
@@ -2744,7 +2753,7 @@ export default function App() {
             {offer.yes}
           </button>
           <button type="button" onClick={() => setOffer(null)}>
-            아니
+            {tr`아니`}
           </button>
         </div>
       )}
@@ -2759,33 +2768,33 @@ export default function App() {
             const s = byId.get(sessionId);
             if (o) show(o.key);
             else if (s) openSession(s);
-            else say("그 세션은 아직 대화 기록이 없다.");
+            else say(tr("그 세션은 아직 대화 기록이 없다."));
           }}
         />
       )}
       {overlay === "quit" && (
         <div className="pal-back" onMouseDown={() => setOverlay(null)}>
           <div className="confirm" onMouseDown={(e) => e.stopPropagation()}>
-            <b>일하는 세션이 {open.filter((o) => states[o.key]?.state === "run").length}개 있다</b>
-            <p>지금 끄면 하던 일이 멈춘다. 대화는 남아서 다시 켜면 이어 열 수 있다.</p>
-            <div className="pal-foot">Enter 끄기 · Esc 취소</div>
+            <b>{tr`일하는 세션이 ${open.filter((o) => states[o.key]?.state === "run").length}개 있다`}</b>
+            <p>{tr`지금 끄면 하던 일이 멈춘다. 대화는 남아서 다시 켜면 이어 열 수 있다.`}</p>
+            <div className="pal-foot">{tr`Enter 끄기 · Esc 취소`}</div>
           </div>
         </div>
       )}
       {overlay === "close" && (
         <div className="pal-back" onMouseDown={() => setOverlay(null)}>
           <div className="confirm" onMouseDown={(e) => e.stopPropagation()}>
-            <b>"{nameOf(closing).slice(0, 40)}" 세션을 닫을까?</b>
-            <p>세션을 재운다. 대화는 남아 있어서 ⌘K로 다시 열면 이어진다.</p>
+            <b>{tr`"${nameOf(closing).slice(0, 40)}" 세션을 닫을까?`}</b>
+            <p>{tr`세션을 재운다. 대화는 남아 있어서 ⌘K로 다시 열면 이어진다.`}</p>
             <div className="confirm-acts">
               <button type="button" onClick={() => confirmClose(false)}>
-                닫기 <kbd>⏎</kbd>
+                {tr`닫기`} <kbd>⏎</kbd>
               </button>
               <button type="button" onClick={() => confirmClose(true)}>
-                닫고 다시 묻지 않기 <kbd>⌥⏎</kbd>
+                {tr`닫고 다시 묻지 않기`} <kbd>⌥⏎</kbd>
               </button>
               <button type="button" onClick={() => setOverlay(null)}>
-                취소 <kbd>Esc</kbd>
+                {tr`취소`} <kbd>Esc</kbd>
               </button>
             </div>
           </div>

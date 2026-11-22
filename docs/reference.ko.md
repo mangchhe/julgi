@@ -35,6 +35,7 @@
 
 | 값 | 기본 | 뜻 |
 |---|---|---|
+| `lang` | `auto` | 화면 글의 언어. `auto`는 시스템이 한국어면 한국어, 아니면 영어. `en`, `ko`. 다시 켜야 적용된다 |
 | `theme` | `ink` | 화면 색. `navy`, `forest`, `plum`, `sand`, `paper` |
 | `thinking` | `balanced` | 판단 모델의 수준. `light`(전부 Haiku), `balanced`, `deep` |
 | `hotTokens` | 150000 | 이보다 큰 세션에 보낼 때는 갈아탄 뒤 보낸다 |
@@ -114,4 +115,5 @@
 - 폰 화면은 보낼 곳을 알아서 고르지 않고, 알림이 없고, 허락을 묻는 세션은 풀지 못한다.
 - GitLab과 Jira는 문서에 나온 API 모양에 맞춰 만들었고, 실제 계정으로는 아직 확인하지 못했다.
 - 자동 테스트가 거의 없다. `scripts/` 아래 검사 스크립트 셋, Rust 단위 시험, 그리고 `JULGI_SELFTEST=1 npm run tauri dev`로 도는 앱 안 점검뿐이다.
-- 영어 UI, 서명된 설치 파일, macOS 밖의 지원이 없다.
+- 세션에 얹는 스킬과 `julgi` 명령의 출력은 아직 한국어뿐이다.
+- 서명된 설치 파일, macOS 밖의 지원이 없다.

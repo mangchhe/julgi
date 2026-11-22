@@ -6,6 +6,7 @@ import { md } from "./md";
 import { ago, config } from "./model";
 import { openPr, prNo, prOf, PrTarget, repoName } from "./pr";
 import { firstKey, openTicket } from "./jira";
+import { tr } from "./i18n";
 
 type Who = { login: string };
 type Check = { __typename?: string; name?: string; context?: string; status?: string; conclusion?: string; state?: string };
@@ -36,13 +37,13 @@ type LineComment = { id: number | string; path: string; line: number | null; sid
 /** 쓰는 중인 것: 코드 줄에 새 코멘트, 또는 스레드에 답글 */
 type Draft = { kind: "line"; path: string; line: number; side: "LEFT" | "RIGHT" } | { kind: "reply"; id: number | string };
 
-const STATE: Record<string, string> = { OPEN: "열림", CLOSED: "닫힘", MERGED: "머지됨" };
-const DECISION: Record<string, string> = { APPROVED: "승인됨", CHANGES_REQUESTED: "수정 요청", REVIEW_REQUIRED: "리뷰 필요" };
-const REVIEW: Record<string, string> = { APPROVED: "승인", CHANGES_REQUESTED: "수정 요청", COMMENTED: "리뷰", DISMISSED: "철회됨" };
+const STATE: Record<string, string> = { OPEN: tr`열림`, CLOSED: tr`닫힘`, MERGED: tr`머지됨` };
+const DECISION: Record<string, string> = { APPROVED: tr`승인됨`, CHANGES_REQUESTED: tr`수정 요청`, REVIEW_REQUIRED: tr`리뷰 필요` };
+const REVIEW: Record<string, string> = { APPROVED: tr`승인`, CHANGES_REQUESTED: tr`수정 요청`, COMMENTED: tr`리뷰`, DISMISSED: tr`철회됨` };
 const METHODS: [string, string][] = [
-  ["squash", "스쿼시"],
-  ["merge", "머지 커밋"],
-  ["rebase", "리베이스"],
+  ["squash", tr`스쿼시`],
+  ["merge", tr`머지 커밋`],
+  ["rebase", tr`리베이스`],
 ];
 const when = (iso: string) => (iso ? ago(Date.parse(iso) / 1000) : "");
 
@@ -147,7 +148,7 @@ export default function PrView({ target, onClose, inline = false, autoFocus = tr
       setLoads((n) => n + 1);
       return true;
     } catch (e) {
-      setError(`${label} 실패: ${String(e)}`);
+      setError(tr`${label} 실패: ${String(e)}`);
       return false;
     } finally {
       setBusy("");
@@ -157,30 +158,30 @@ export default function PrView({ target, onClose, inline = false, autoFocus = tr
     if (!draft || !text.trim() || busy) return;
     const ok =
       draft.kind === "line"
-        ? await send("줄 코멘트", "pr_line_comment", { commit: view?.headRefOid ?? "", path: draft.path, line: draft.line, side: draft.side, body: text })
-        : await send("답글", "pr_reply", { id: String(draft.id), body: text });
+        ? await send(tr`줄 코멘트`, "pr_line_comment", { commit: view?.headRefOid ?? "", path: draft.path, line: draft.line, side: draft.side, body: text })
+        : await send(tr`답글`, "pr_reply", { id: String(draft.id), body: text });
     if (ok) (setDraft(null), setText(""), box.current?.focus());
   };
   const review = async (kind: "comment" | "approve" | "request-changes") => {
     if (busy) return;
-    const ok = kind === "comment" ? await send("코멘트", "pr_comment", { body: say }) : await send(kind === "approve" ? "승인" : "수정 요청", "pr_review", { kind, body: say });
+    const ok = kind === "comment" ? await send(tr`코멘트`, "pr_comment", { body: say }) : await send(kind === "approve" ? tr`승인` : tr`수정 요청`, "pr_review", { kind, body: say });
     if (ok) setSay("");
   };
   const merge = async () => {
-    if (await send("머지", "pr_merge", { method, deleteBranch: dropBranch })) setMerging(false);
+    if (await send(tr`머지`, "pr_merge", { method, deleteBranch: dropBranch })) setMerging(false);
   };
   const close = async () => {
-    if (await send("닫기", "pr_close", { comment: closeNote, deleteBranch: dropBranch })) (setClosing(false), setCloseNote(""));
+    if (await send(tr`닫기`, "pr_close", { comment: closeNote, deleteBranch: dropBranch })) (setClosing(false), setCloseNote(""));
   };
-  const reopen = () => void send("다시 열기", "pr_reopen", { comment: "" });
+  const reopen = () => void send(tr`다시 열기`, "pr_reopen", { comment: "" });
 
   const checks = view ? tally(view.statusCheckRollup ?? []) : null;
   // 대화: 본문이 먼저, 그다음 코멘트와 리뷰를 시간 순으로. 글 없는 "리뷰"(줄 코멘트만 단 것)는 뺀다
   const talkItems = view
     ? [
-        { who: view.author.login, at: view.createdAt, kind: "본문", text: view.body },
+        { who: view.author.login, at: view.createdAt, kind: tr`본문`, text: view.body },
         ...[
-          ...view.comments.map((c) => ({ who: c.author.login, at: c.createdAt, kind: "코멘트", text: c.body })),
+          ...view.comments.map((c) => ({ who: c.author.login, at: c.createdAt, kind: tr`코멘트`, text: c.body })),
           ...view.reviews.filter((r) => r.body || r.state !== "COMMENTED").map((r) => ({ who: r.author.login, at: r.submittedAt, kind: REVIEW[r.state] ?? r.state, text: r.body })),
         ].sort((a, b) => Date.parse(a.at) - Date.parse(b.at)),
       ]
@@ -219,10 +220,10 @@ export default function PrView({ target, onClose, inline = false, autoFocus = tr
       />
       <div className="pr-acts">
         <button type="button" tabIndex={-1} className="primary" disabled={!text.trim() || !!busy} onClick={() => void sendDraft()}>
-          {busy ? `${busy} 보내는 중` : "올리기 ⌘Enter"}
+          {busy ? tr`${busy} 보내는 중` : tr`올리기 ⌘Enter`}
         </button>
         <button type="button" tabIndex={-1} onClick={() => (setDraft(null), box.current?.focus())}>
-          그만
+          {tr`그만`}
         </button>
       </div>
     </div>
@@ -237,10 +238,10 @@ export default function PrView({ target, onClose, inline = false, autoFocus = tr
         </div>
       ))}
       {draft?.kind === "reply" && draft.id === c.id ? (
-        editor("답글. ⌘Enter로 올린다 · Esc 그만")
+        editor(tr`답글. ⌘Enter로 올린다 · Esc 그만`)
       ) : (
         <button type="button" tabIndex={-1} className="pr-reply" onClick={() => (setDraft({ kind: "reply", id: c.id }), setText(""))}>
-          답글
+          {tr`답글`}
         </button>
       )}
     </div>
@@ -254,76 +255,76 @@ export default function PrView({ target, onClose, inline = false, autoFocus = tr
             <span className="pr-no">
               {repoName(target.repo)} {prNo(target)}
             </span>
-            <b>{view?.title ?? (error ? "" : "읽는 중")}</b>
+            <b>{view?.title ?? (error ? "" : tr`읽는 중`)}</b>
           </div>
-          {error && <div className="pr-error">{/auth|login|401/i.test(error) ? "GitHub에 연결돼 있지 않다. ⌘,의 연결에서 연결한다." : error}</div>}
+          {error && <div className="pr-error">{/auth|login|401/i.test(error) ? tr`GitHub에 연결돼 있지 않다. ⌘,의 연결에서 연결한다.` : error}</div>}
           {view && (
             <div className="rv-git">
-              <span className={"pr-state s-" + (view.isDraft ? "draft" : view.state.toLowerCase())}>{view.isDraft ? "초안" : STATE[view.state]}</span>
+              <span className={"pr-state s-" + (view.isDraft ? "draft" : view.state.toLowerCase())}>{view.isDraft ? tr`초안` : STATE[view.state]}</span>
               <span>{view.author.login}</span>
               <span>
                 <b>{view.baseRefName}</b> ← <b className="off">{view.headRefName}</b>
               </span>
               <span className="delta">
-                파일 {view.changedFiles} <b>+{view.additions}</b> <i>−{view.deletions}</i>
+                {tr`파일 ${view.changedFiles}`} <b>+{view.additions}</b> <i>−{view.deletions}</i>
               </span>
               {checks && checks.fail + checks.run + checks.ok > 0 && (
                 <span className={checks.fail ? "pr-bad" : checks.run ? "pr-run" : "pr-ok"}>
-                  CI {checks.fail ? `실패 ${checks.fail}` : checks.run ? `도는 중 ${checks.run}` : "통과"}
+                  {checks.fail ? tr`CI 실패 ${checks.fail}` : checks.run ? tr`CI 도는 중 ${checks.run}` : tr`CI 통과`}
                   {checks.fail + checks.run > 0 && ` / ${checks.fail + checks.run + checks.ok}`}
                 </span>
               )}
               {view.reviewDecision && <span className={view.reviewDecision === "APPROVED" ? "pr-ok" : view.reviewDecision === "CHANGES_REQUESTED" ? "pr-bad" : ""}>{DECISION[view.reviewDecision] ?? view.reviewDecision}</span>}
-              {notes.length > 0 && <span>줄 코멘트 {notes.length}</span>}
+              {notes.length > 0 && <span>{tr`줄 코멘트 ${notes.length}`}</span>}
               {(() => {
                 // PR 제목이나 브랜치에 티켓 키가 있으면 그 티켓으로 가는 칩
                 const key = firstKey(`${view.title} ${view.headRefName}`);
                 return key ? (
-                  <button type="button" tabIndex={-1} onClick={() => openTicket(key)} title="티켓 화면 열기">
+                  <button type="button" tabIndex={-1} onClick={() => openTicket(key)} title={tr`티켓 화면 열기`}>
                     {key}
                   </button>
                 ) : null;
               })()}
-              {busy && <span className="pr-run">{busy} 보내는 중</span>}
+              {busy && <span className="pr-run">{tr`${busy} 보내는 중`}</span>}
               {view.state === "OPEN" && (
                 <button type="button" tabIndex={-1} className="pr-merge-btn" onClick={() => (setMerging(!merging), setClosing(false))}>
-                  머지…
+                  {tr`머지…`}
                 </button>
               )}
               {view.state === "OPEN" && (
                 <button type="button" tabIndex={-1} className="pr-close-btn" onClick={() => (setClosing(!closing), setMerging(false))}>
-                  닫기…
+                  {tr`닫기…`}
                 </button>
               )}
               {view.state === "CLOSED" && (
                 <button type="button" tabIndex={-1} disabled={!!busy} onClick={reopen}>
-                  다시 열기
+                  {tr`다시 열기`}
                 </button>
               )}
               <button type="button" tabIndex={-1} onClick={() => void openUrl(view.url)}>
-                웹에서 열기
+                {tr`웹에서 열기`}
               </button>
             </div>
           )}
           {closing && view && (
             <div className="pr-merge">
-              <span className="sub">머지하지 않고 닫는다</span>
-              <input className="pr-close-note" value={closeNote} placeholder="닫으며 남길 코멘트 (선택)" onChange={(e) => setCloseNote(e.target.value)} />
+              <span className="sub">{tr`머지하지 않고 닫는다`}</span>
+              <input className="pr-close-note" value={closeNote} placeholder={tr`닫으며 남길 코멘트 (선택)`} onChange={(e) => setCloseNote(e.target.value)} />
               <label>
-                <input type="checkbox" checked={dropBranch} onChange={(e) => setDropBranch(e.target.checked)} /> {view.headRefName} 지우기
+                <input type="checkbox" checked={dropBranch} onChange={(e) => setDropBranch(e.target.checked)} /> {tr`${view.headRefName} 지우기`}
               </label>
               <button type="button" tabIndex={-1} className="danger" disabled={!!busy} onClick={() => void close()}>
-                PR 닫기
+                {tr`PR 닫기`}
               </button>
               <button type="button" tabIndex={-1} onClick={() => setClosing(false)}>
-                그만
+                {tr`그만`}
               </button>
             </div>
           )}
           {merging && view && (
             <div className="pr-merge">
-              {view.mergeable === "CONFLICTING" && <b className="pr-bad">충돌이 있어 머지할 수 없다. 브랜치를 먼저 맞춘다.</b>}
-              {checks && checks.fail > 0 && <b className="pr-bad">CI가 {checks.fail}개 실패한 상태다.</b>}
+              {view.mergeable === "CONFLICTING" && <b className="pr-bad">{tr`충돌이 있어 머지할 수 없다. 브랜치를 먼저 맞춘다.`}</b>}
+              {checks && checks.fail > 0 && <b className="pr-bad">{tr`CI가 ${checks.fail}개 실패한 상태다.`}</b>}
               <span className="set-seg">
                 {METHODS.map(([value, label]) => (
                   <button key={value} type="button" tabIndex={-1} className={method === value ? "yes" : ""} onClick={() => setMethod(value)}>
@@ -332,20 +333,20 @@ export default function PrView({ target, onClose, inline = false, autoFocus = tr
                 ))}
               </span>
               <label>
-                <input type="checkbox" checked={dropBranch} onChange={(e) => setDropBranch(e.target.checked)} /> 머지 뒤 {view.headRefName} 지우기
+                <input type="checkbox" checked={dropBranch} onChange={(e) => setDropBranch(e.target.checked)} /> {tr`머지 뒤 ${view.headRefName} 지우기`}
               </label>
               <button type="button" tabIndex={-1} className="primary" disabled={!!busy || view.mergeable === "CONFLICTING"} onClick={() => void merge()}>
-                {view.baseRefName}에 머지하기
+                {tr`${view.baseRefName}에 머지하기`}
               </button>
               <button type="button" tabIndex={-1} onClick={() => setMerging(false)}>
-                그만
+                {tr`그만`}
               </button>
             </div>
           )}
         </div>
         <div className={"rv-main pr-main" + (talk ? "" : " no-talk")}>
           <div className="rv-files">
-            {diff === null && !error && <div className="side-none">읽는 중</div>}
+            {diff === null && !error && <div className="side-none">{tr`읽는 중`}</div>}
             {files.map((f, i) => (
               <button key={f.path} type="button" tabIndex={-1} className={"rv-file" + (i === fileAt ? " on" : "")} onClick={() => setFileAt(i)} title={f.path}>
                 <span className="rv-name">
@@ -372,7 +373,7 @@ export default function PrView({ target, onClose, inline = false, autoFocus = tr
                 {/* 그 뒤로 코드가 바뀌어 지금 diff에 자리가 없는 코멘트는 파일 맨 위에 모은다 */}
                 {roots.filter((c) => c.path === file.path && c.line == null).length > 0 && (
                   <div className="pr-outdated">
-                    <small>지난 변경에 단 코멘트</small>
+                    <small>{tr`지난 변경에 단 코멘트`}</small>
                     {roots.filter((c) => c.path === file.path && c.line == null).map(thread)}
                   </div>
                 )}
@@ -390,7 +391,7 @@ export default function PrView({ target, onClose, inline = false, autoFocus = tr
                         <div key={li}>
                           <div
                             className={"rv-line " + l.kind + (open ? " open" : "")}
-                            title="눌러서 이 줄에 코멘트 달기"
+                            title={tr`눌러서 이 줄에 코멘트 달기`}
                             onClick={() => view?.state === "OPEN" && (setDraft({ kind: "line", path: file.path, line: no, side }), setText(""))}
                           >
                             <span className="no">{l.oldNo ?? ""}</span>
@@ -399,7 +400,7 @@ export default function PrView({ target, onClose, inline = false, autoFocus = tr
                             {html !== undefined ? <code dangerouslySetInnerHTML={{ __html: html || " " }} /> : <code>{l.text || " "}</code>}
                           </div>
                           {here.map(thread)}
-                          {open && <div className="pr-thread">{editor(`${file.path}:${no}에 코멘트. ⌘Enter로 올린다 · Esc 그만`)}</div>}
+                          {open && <div className="pr-thread">{editor(tr`${file.path}:${no}에 코멘트. ⌘Enter로 올린다 · Esc 그만`)}</div>}
                         </div>
                       );
                     })}
@@ -410,13 +411,13 @@ export default function PrView({ target, onClose, inline = false, autoFocus = tr
           </div>
           {talk && (
             <div className="rv-hist pr-talk">
-              <div className="rv-hist-head">대화</div>
+              <div className="rv-hist-head">{tr`대화`}</div>
               {talkItems.map((t, i) => (
                 <div key={i} className="pr-item">
                   <div>
                     <b>{t.who}</b> <em>{t.kind}</em> <small>{when(t.at)}</small>
                   </div>
-                  {t.text ? <Md text={t.text} /> : <div className="pr-text muted">(글 없음)</div>}
+                  {t.text ? <Md text={t.text} /> : <div className="pr-text muted">{tr`(글 없음)`}</div>}
                 </div>
               ))}
               {view && (
@@ -424,7 +425,7 @@ export default function PrView({ target, onClose, inline = false, autoFocus = tr
                   <textarea
                     rows={3}
                     value={say}
-                    placeholder="코멘트나 리뷰에 붙일 말 · ⌘Enter 코멘트"
+                    placeholder={tr`코멘트나 리뷰에 붙일 말 · ⌘Enter 코멘트`}
                     onChange={(e) => setSay(e.target.value)}
                     onKeyDown={(e) => {
                       if (e.key === "Enter" && (e.metaKey || e.ctrlKey) && !e.nativeEvent.isComposing && say.trim()) (e.preventDefault(), void review("comment"));
@@ -432,15 +433,15 @@ export default function PrView({ target, onClose, inline = false, autoFocus = tr
                   />
                   <div className="pr-acts">
                     <button type="button" tabIndex={-1} disabled={!say.trim() || !!busy} onClick={() => void review("comment")}>
-                      코멘트
+                      {tr`코멘트`}
                     </button>
                     {view.state === "OPEN" && (
                       <>
-                        <button type="button" tabIndex={-1} className="ok" disabled={!!busy} onClick={() => void review("approve")} title="글이 있으면 승인과 함께 붙는다">
-                          승인
+                        <button type="button" tabIndex={-1} className="ok" disabled={!!busy} onClick={() => void review("approve")} title={tr`글이 있으면 승인과 함께 붙는다`}>
+                          {tr`승인`}
                         </button>
-                        <button type="button" tabIndex={-1} className="bad" disabled={!say.trim() || !!busy} onClick={() => void review("request-changes")} title="무엇을 고쳐야 하는지 글로 쓴다">
-                          수정 요청
+                        <button type="button" tabIndex={-1} className="bad" disabled={!say.trim() || !!busy} onClick={() => void review("request-changes")} title={tr`무엇을 고쳐야 하는지 글로 쓴다`}>
+                          {tr`수정 요청`}
                         </button>
                       </>
                     )}
@@ -450,7 +451,7 @@ export default function PrView({ target, onClose, inline = false, autoFocus = tr
             </div>
           )}
         </div>
-        <div className="pal-foot">↑↓ 파일 · 줄을 누르면 코멘트 · h 대화 · m 머지 · o 웹에서 열기 · r 새로 읽기 · Esc</div>
+        <div className="pal-foot">{tr`↑↓ 파일 · 줄을 누르면 코멘트 · h 대화 · m 머지 · o 웹에서 열기 · r 새로 읽기 · Esc`}</div>
       </div>
     </div>
   );

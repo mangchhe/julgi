@@ -6,6 +6,7 @@ import MapGraph from "./MapGraph";
 import Repos from "./Repos";
 import { Candidate, mapDomains, mapEdges, mapItems, Note, stale, statOf, Stats, usedCount } from "./brain";
 import { Job, ago, elsewhere, SkillInfo, SkillUse, kilo, Open, Session, STATE_LABEL, TermState, Thread, waiting } from "./model";
+import { tr } from "./i18n";
 
 type Props = {
   /** 브레인 노트. Tab으로 넘겨 본다 */
@@ -44,7 +45,7 @@ type Props = {
 type Cell = { id: string; name: string; repo: string; tokens: number; mtime: number; state: string; label: string };
 type Row = { thread: Thread; cells: Cell[]; about: string; mtime: number; group: string; repos: number };
 
-const GROUPS = ["내 차례", "일하는 중", "쉬는 중", "끝냄"];
+const GROUPS = ["내 차례", "일하는 중", "쉬는 중", "끝냄"]; // i18n-ok
 /** 요약에 섞인 마크다운 기호를 걷어 한 문단으로 만든다 */
 const plain = (text: string) => text.replace(/[#*`>|]/g, " ").replace(/\s+/g, " ").trim();
 
@@ -61,8 +62,8 @@ export default function Threads({ repos, nameOf, onShow, map, drawing, onRedraw,
         const key = "c:" + id;
         const isOpen = open.some((o) => o.key === key);
         const state = isOpen ? (states[key]?.state ?? "open") : s && elsewhere(s) ? "away" : "sleep";
-        const label = state === "open" ? "열림" : state === "sleep" ? "잠듦" : state === "away" ? "다른 곳에서 열림" : STATE_LABEL[state] ?? state;
-        return { id, name: s?.title ?? "기록 없는 세션", repo: s?.repo ?? "기록 없음", tokens: s?.tokens ?? 0, mtime: s?.mtime ?? 0, state, label };
+        const label = state === "open" ? tr("열림") : state === "sleep" ? tr("잠듦") : state === "away" ? tr("다른 곳에서 열림") : STATE_LABEL[state] ?? state;
+        return { id, name: s?.title ?? tr("기록 없는 세션"), repo: s?.repo ?? tr("기록 없음"), tokens: s?.tokens ?? 0, mtime: s?.mtime ?? 0, state, label };
       });
       // 먼저 쓴 세션이 왼쪽, 가장 최근에 쓴 세션이 오른쪽
       cells.sort((a, b) => a.mtime - b.mtime);
@@ -70,7 +71,7 @@ export default function Threads({ repos, nameOf, onShow, map, drawing, onRedraw,
       const lastSession = last && byId.get(last.id);
       // 가장 최근 세션의 요약이 "지금 어디까지"에 가장 가깝다. 없으면 줄기 기억(인계 글)의 앞머리
       const about = plain((last && memories[last.id]) || lastSession?.recap || memories[thread.id] || "");
-      const group = thread.done ? "끝냄" : cells.some((c) => waiting({ state: c.state, since: 0 })) ? "내 차례" : cells.some((c) => c.state === "run") ? "일하는 중" : "쉬는 중";
+      const group = thread.done ? "끝냄" : cells.some((c) => waiting({ state: c.state, since: 0 })) ? "내 차례" : cells.some((c) => c.state === "run") ? "일하는 중" : "쉬는 중"; // i18n-ok
       return { thread, cells, about, mtime: Math.max(0, ...cells.map((c) => c.mtime)), group, repos: new Set(cells.map((c) => c.repo)).size };
     });
     return out.sort((a, b) => GROUPS.indexOf(a.group) - GROUPS.indexOf(b.group) || b.mtime - a.mtime);
@@ -96,11 +97,11 @@ export default function Threads({ repos, nameOf, onShow, map, drawing, onRedraw,
     const known = skills.map((k) => {
       const u = by.get(k.name);
       by.delete(k.name);
-      const status = u ? "쓰는 중" : now - k.modified > 90 * 86400 ? "낡음" : "안 쓰임";
+      const status = u ? "쓰는 중" : now - k.modified > 90 * 86400 ? "낡음" : "안 쓰임"; // i18n-ok
       return { name: k.name, source: k.source, description: k.description, modified: k.modified, uses: u?.uses ?? 0, sessions: u?.sessions.size ?? 0, last: u?.last ?? 0, status, repos: [...(u?.repos ?? [])] };
     });
     // 목록에 없는데 쓰인 것(Claude Code에 딸린 것, 다른 플러그인의 것)
-    const others = [...by].map(([name, u]) => ({ name, source: "다른 곳", description: "", modified: 0, uses: u.uses, sessions: u.sessions.size, last: u.last, status: "쓰는 중", repos: [...u.repos] }));
+    const others = [...by].map(([name, u]) => ({ name, source: tr("다른 곳"), description: "", modified: 0, uses: u.uses, sessions: u.sessions.size, last: u.last, status: "쓰는 중", repos: [...u.repos] })); // i18n-ok
     // 범위는 쓰인 곳으로 정한다: 레포 두 곳 넘게 쓰였으면 공용, 한 곳에서만 쓰였으면 그 레포 전용
     const scope = (r: { uses: number; repos: string[] }) => (!r.uses ? 2 : r.repos.length >= 2 ? 0 : 1);
     return [...known, ...others].map((r) => ({ ...r, scope: scope(r) })).sort((a, b) => a.scope - b.scope || b.uses - a.uses || b.last - a.last || a.name.localeCompare(b.name));
@@ -113,10 +114,10 @@ export default function Threads({ repos, nameOf, onShow, map, drawing, onRedraw,
     let links: string[] = [];
     for (const part of `\n${map}`.split(/\n## /).slice(1)) {
       const name = part.split("\n")[0].trim();
-      if (name === "연결" || name === "도메인") continue; // 선과 영역은 따로 읽는다
+      if (name === "연결" || name === "도메인") continue; // 선과 영역은 따로 읽는다 · i18n-ok
       const rows = mapItems(part);
-      if (name.includes("관계")) links = rows.map(([label, text]) => (label ? `${label}: ${text}` : text));
-      else repos.push({ name, role: rows.find(([label]) => label === "역할")?.[1] ?? "", rows: rows.filter(([label]) => label !== "역할") });
+      if (name.includes("관계")) links = rows.map(([label, text]) => (label ? `${label}: ${text}` : text)); // i18n-ok
+      else repos.push({ name, role: rows.find(([label]) => label === "역할")?.[1] ?? "", rows: rows.filter(([label]) => label !== "역할") }); // i18n-ok
     }
     // 같은 역할끼리 모아 보여 준다
     repos.sort((a, b) => a.role.localeCompare(b.role));
@@ -166,43 +167,44 @@ export default function Threads({ repos, nameOf, onShow, map, drawing, onRedraw,
   };
 
   const count = (group: string) => rows.filter((r) => r.group === group).length;
+  const mine = count("내 차례"), busy = count("일하는 중"); // i18n-ok
   return (
     <div className="pal-back wide" onMouseDown={onClose}>
       <div className="threads" ref={box} tabIndex={-1} onKeyDown={onKey} onMouseDown={(e) => e.stopPropagation()}>
         <div className="th-head">
           <button type="button" tabIndex={-1} className={"th-tab" + (tab === "stems" ? " on" : "")} onClick={() => setTab("stems")}>
-            <kbd>⌘1</kbd> 줄기 {rows.length}
+            <kbd>⌘1</kbd> {tr`줄기 ${rows.length}`}
           </button>
           <button type="button" tabIndex={-1} className={"th-tab" + (tab === "brain" ? " on" : "")} onClick={() => setTab("brain")}>
-            <kbd>⌘2</kbd> 브레인 {notes.length}
+            <kbd>⌘2</kbd> {tr`브레인 ${notes.length}`}
           </button>
           <button type="button" tabIndex={-1} className={"th-tab" + (tab === "skills" ? " on" : "")} onClick={() => setTab("skills")}>
-            <kbd>⌘3</kbd> 스킬 {skillRows.length}
+            <kbd>⌘3</kbd> {tr`스킬 ${skillRows.length}`}
           </button>
           <button type="button" tabIndex={-1} className={"th-tab" + (tab === "nums" ? " on" : "")} onClick={() => setTab("nums")}>
-            <kbd>⌘4</kbd> 통계
+            <kbd>⌘4</kbd> {tr("통계")}
           </button>
           <button type="button" tabIndex={-1} className={"th-tab" + (tab === "map" ? " on" : "")} onClick={() => setTab("map")}>
-            <kbd>⌘5</kbd> 지도 {mapRepos.length}
+            <kbd>⌘5</kbd> {tr`지도 ${mapRepos.length}`}
           </button>
           <button type="button" tabIndex={-1} className={"th-tab" + (tab === "git" ? " on" : "")} onClick={() => setTab("git")}>
-            <kbd>⌘6</kbd> 깃
+            <kbd>⌘6</kbd> {tr("깃")}
           </button>
-          {count("내 차례") > 0 && <span className="waitcount">내 차례 {count("내 차례")}</span>}
-          {count("일하는 중") > 0 && <span className="th-run">일하는 중 {count("일하는 중")}</span>}
-          <span className="th-dim th-hint">{tab === "stems" ? "상자 하나가 세션 하나. 왼쪽이 먼저 한 것, 오른쪽이 지금 하는 것" : tab === "brain" ? `한 번이라도 쓰인 노트 ${usedNotes} / ${notes.length} · 석 달 넘게 안 쓰인 것 ${staleNotes}` : tab === "git" ? "레포마다 어느 브랜치에 있고 무엇이 안 올라갔는지. 줄을 누르면 브랜치와 MR이 펴진다" : tab === "map" ? "세션이 다른 레포를 봐야 할 때 이 지도를 보고 찾아간다" : tab === "nums" ? "매일과 매주 점검하고 판마다 기록을 남긴다" : `최근 30일 · 쓰인 스킬 ${skillRows.filter((r) => r.uses > 0).length} / ${skillRows.length} · 부른 횟수 ${skillRows.reduce((a, r) => a + r.uses, 0)}`}</span>
+          {mine > 0 && <span className="waitcount">{tr`내 차례 ${mine}`}</span>}
+          {busy > 0 && <span className="th-run">{tr`일하는 중 ${busy}`}</span>}
+          <span className="th-dim th-hint">{tab === "stems" ? tr("상자 하나가 세션 하나. 왼쪽이 먼저 한 것, 오른쪽이 지금 하는 것") : tab === "brain" ? tr`한 번이라도 쓰인 노트 ${usedNotes} / ${notes.length} · 석 달 넘게 안 쓰인 것 ${staleNotes}` : tab === "git" ? tr("레포마다 어느 브랜치에 있고 무엇이 안 올라갔는지. 줄을 누르면 브랜치와 MR이 펴진다") : tab === "map" ? tr("세션이 다른 레포를 봐야 할 때 이 지도를 보고 찾아간다") : tab === "nums" ? tr("매일과 매주 점검하고 판마다 기록을 남긴다") : tr`최근 30일 · 쓰인 스킬 ${skillRows.filter((r) => r.uses > 0).length} / ${skillRows.length} · 부른 횟수 ${skillRows.reduce((a, r) => a + r.uses, 0)}`}</span>
         </div>
         {tab === "brain" && (
           <div className="br">
             <div className="br-list">
-              {notes.length === 0 && <div className="side-none">아직 없다. 큰 세션을 갈아타거나 세션이 메모를 남기면 Julgi가 거기서 추려 담는다.</div>}
+              {notes.length === 0 && <div className="side-none">{tr("아직 없다. 큰 세션을 갈아타거나 세션이 메모를 남기면 Julgi가 거기서 추려 담는다.")}</div>}
               {notes.map((n, i) => (
                 <div key={n.id} className={"br-row" + (n === note ? " on" : "")} onClick={() => (setNoteAt(i), setArmed(""))}>
-                  <span className={"br-kind k-" + n.kind}>{n.kind}</span>
+                  <span className={"br-kind k-" + n.kind}>{tr(n.kind)}</span>
                   <span className="br-title">{n.title}</span>
                   <span className="br-repo">
                     {n.repo}
-                    {usedCount(statOf(stats, n.id)) > 0 && <b> · {usedCount(statOf(stats, n.id))}번</b>}
+                    {usedCount(statOf(stats, n.id)) > 0 && <b> · {tr`${usedCount(statOf(stats, n.id))}번`}</b>}
                   </span>
                 </div>
               ))}
@@ -210,27 +212,27 @@ export default function Threads({ repos, nameOf, onShow, map, drawing, onRedraw,
             {note && (
               <div className="br-body">
                 <div className="br-head">
-                  <span className={"br-kind k-" + note.kind}>{note.kind}</span>
+                  <span className={"br-kind k-" + note.kind}>{tr(note.kind)}</span>
                   <b>{note.title}</b>
                 </div>
                 <p>{note.body}</p>
                 <div className="br-from">
-                  {[note.repo, note.from && `"${note.from}"에서`, note.created].filter(Boolean).join(" · ")}
+                  {[note.repo, note.from && tr`"${note.from}"에서`, note.created].filter(Boolean).join(" · ")}
                 </div>
                 <div className="br-nums">
                   <span>
-                    <b>{statOf(stats, note.id).out}</b> 새 세션에 붙임
+                    <b>{statOf(stats, note.id).out}</b> {tr("새 세션에 붙임")}
                   </span>
                   <span>
-                    <b>{statOf(stats, note.id).read}</b> 세션이 찾아봄
+                    <b>{statOf(stats, note.id).read}</b> {tr("세션이 찾아봄")}
                   </span>
                   <span>
-                    <b>{statOf(stats, note.id).fixed}</b> 고침
+                    <b>{statOf(stats, note.id).fixed}</b> {tr("고침")}
                   </span>
-                  <span>{statOf(stats, note.id).last ? `마지막 ${ago(statOf(stats, note.id).last / 1000)}` : stale(note, statOf(stats, note.id)) ? "석 달 넘게 안 쓰임" : "아직 안 쓰임"}</span>
+                  <span>{statOf(stats, note.id).last ? tr`마지막 ${ago(statOf(stats, note.id).last / 1000)}` : stale(note, statOf(stats, note.id)) ? tr("석 달 넘게 안 쓰임") : tr("아직 안 쓰임")}</span>
                 </div>
                 <button type="button" tabIndex={-1} className="br-del" onClick={() => (armed === note.id ? (onForget(note.id), setArmed("")) : setArmed(note.id))}>
-                  {armed === note.id ? "한 번 더 누르면 지운다" : "틀렸거나 쓸모없으면 지우기"}
+                  {armed === note.id ? tr("한 번 더 누르면 지운다") : tr("틀렸거나 쓸모없으면 지우기")}
                 </button>
               </div>
             )}
@@ -240,16 +242,16 @@ export default function Threads({ repos, nameOf, onShow, map, drawing, onRedraw,
         {tab === "map" && (
           <div className="mp">
             <div className="mp-bar">
-              <span>{mapRepos.length ? `레포 ${mapRepos.length}개 · 이어진 선 ${mapLines.length}개 · ${mapStamp}` : "아직 지도가 없다. 켜고 1분쯤 뒤 Julgi가 그린다"}</span>
+              <span>{mapRepos.length ? tr`레포 ${mapRepos.length}개 · 이어진 선 ${mapLines.length}개 · ${mapStamp}` : tr("아직 지도가 없다. 켜고 1분쯤 뒤 Julgi가 그린다")}</span>
               <button type="button" tabIndex={-1} onClick={onRedraw} disabled={drawing}>
-                {drawing ? "그리는 중… 1~2분 걸린다" : "지금 다시 그리기"}
+                {drawing ? tr("그리는 중… 1~2분 걸린다") : tr("지금 다시 그리기")}
               </button>
             </div>
             {mapRepos.length > 1 && <MapGraph repos={mapRepos} edges={mapLines} focus={shownArea ? shownArea.pieces.map((piece) => piece.repo) : []} />}
             {mapAreas.length > 0 && (
               <div className="ar">
                 <div className="ar-chips">
-                  <b>영역</b>
+                  <b>{tr("영역")}</b>
                   {mapAreas.map((d) => (
                     <button
                       key={d.name}
@@ -263,7 +265,7 @@ export default function Threads({ repos, nameOf, onShow, map, drawing, onRedraw,
                       {d.name}
                     </button>
                   ))}
-                  <span>올리면 위 그림에서 그 영역만 밝아진다. 누르면 고정된다</span>
+                  <span>{tr("올리면 위 그림에서 그 영역만 밝아진다. 누르면 고정된다")}</span>
                 </div>
                 {shownArea && (
                   <div className="ar-detail">
@@ -280,7 +282,7 @@ export default function Threads({ repos, nameOf, onShow, map, drawing, onRedraw,
             )}
             {mapLinks.length > 0 && (
               <div className="mp-links">
-                <b>레포끼리의 관계</b>
+                <b>{tr("레포끼리의 관계")}</b>
                 {mapLinks.map((line) => (
                   <p key={line}>{line}</p>
                 ))}
@@ -306,17 +308,17 @@ export default function Threads({ repos, nameOf, onShow, map, drawing, onRedraw,
         {tab === "skills" && (
           <div className="sk">
             <div className="sk-row sk-head">
-              <span>스킬</span>
-              <span>부른 횟수</span>
-              <span>세션</span>
-              <span>마지막으로 씀</span>
-              <span>마지막으로 고침</span>
-              <span>상태</span>
-              <span>쓰인 레포</span>
+              <span>{tr("스킬")}</span>
+              <span>{tr("부른 횟수")}</span>
+              <span>{tr("세션")}</span>
+              <span>{tr("마지막으로 씀")}</span>
+              <span>{tr("마지막으로 고침")}</span>
+              <span>{tr("상태")}</span>
+              <span>{tr("쓰인 레포")}</span>
             </div>
             {skillRows.map((r, i) => (
               <div key={r.name + r.source}>
-                {(i === 0 || skillRows[i - 1].scope !== r.scope) && <div className="th-group">{["공용 · 레포 두 곳 넘게 쓰임", "레포 전용 · 한 곳에서만 쓰임", "최근 30일 동안 안 쓰임"][r.scope]}</div>}
+                {(i === 0 || skillRows[i - 1].scope !== r.scope) && <div className="th-group">{[tr("공용 · 레포 두 곳 넘게 쓰임"), tr("레포 전용 · 한 곳에서만 쓰임"), tr("최근 30일 동안 안 쓰임")][r.scope]}</div>}
               <div className={"sk-row s-" + r.status} title={r.description}>
                 <span className="sk-name">
                   {r.name}
@@ -326,35 +328,35 @@ export default function Threads({ repos, nameOf, onShow, map, drawing, onRedraw,
                 <span className="sk-num">{r.sessions || "–"}</span>
                 <span>{r.last ? ago(r.last) : "–"}</span>
                 <span>{r.modified ? ago(r.modified) : "–"}</span>
-                <span className="sk-status">{r.status}</span>
+                <span className="sk-status">{tr(r.status)}</span>
                 <span className="sk-repos">{r.repos.join(", ")}</span>
               </div>
               </div>
             ))}
-            <div className="th-group">되풀이해서 시킨 일 · 스킬 후보 {candidates.length}</div>
-            {candidates.length === 0 && <div className="side-none">아직 없다. 하루에 한 번, 최근 30일 동안 같은 종류의 일을 세 번 넘게 시켰는지 본다.</div>}
+            <div className="th-group">{tr`되풀이해서 시킨 일 · 스킬 후보 ${candidates.length}`}</div>
+            {candidates.length === 0 && <div className="side-none">{tr("아직 없다. 하루에 한 번, 최근 30일 동안 같은 종류의 일을 세 번 넘게 시켰는지 본다.")}</div>}
             {candidates.map((c) => (
               <div key={c.name} className="sk-cand">
                 <b>{c.name}</b>
-                <span className="sk-num">{c.count}번</span>
+                <span className="sk-num">{tr`${c.count}번`}</span>
                 <span>{c.what}</span>
-                <small>{c.found}에 찾음</small>
+                <small>{tr`${c.found}에 찾음`}</small>
               </div>
             ))}
           </div>
         )}
         <div className="th-list" hidden={tab !== "stems"}>
-          {rows.length === 0 && <div className="side-none">아직 줄기가 없다. ⌘I에서 이름을 붙이거나, 큰 세션을 갈아타면 생긴다.</div>}
+          {rows.length === 0 && <div className="side-none">{tr("아직 줄기가 없다. ⌘I에서 이름을 붙이거나, 큰 세션을 갈아타면 생긴다.")}</div>}
           {rows.map((r, i) => (
             <div key={r.thread.id}>
-              {(i === 0 || rows[i - 1].group !== r.group) && <div className={"th-group g" + GROUPS.indexOf(r.group)}>{r.group}</div>}
+              {(i === 0 || rows[i - 1].group !== r.group) && <div className={"th-group g" + GROUPS.indexOf(r.group)}>{tr(r.group)}</div>}
               <div className={"th-row" + (i === at ? " on" : "") + (r.thread.done ? " done" : "")} onClick={() => (setSel(i), setCell(-1))} onDoubleClick={() => onPick(r.cells[r.cells.length - 1].id)}>
                 <div className="th-what">
                   <div className="th-name">{r.thread.name}</div>
                   <div className="th-meta">
-                    {[...new Set(r.cells.map((c) => c.repo))].join(" + ")} · 세션 {r.cells.length}개
+                    {[...new Set(r.cells.map((c) => c.repo))].join(" + ")} · {tr`세션 ${r.cells.length}개`}
                   </div>
-                  <div className="th-about">{r.about.slice(0, 190) || "요약이 아직 없다"}</div>
+                  <div className="th-about">{r.about.slice(0, 190) || tr("요약이 아직 없다")}</div>
                   {tasks.some((t) => r.thread.sessions.includes(t.lead)) && (
                     <div className="th-tasks">
                       {tasks
@@ -372,10 +374,10 @@ export default function Threads({ repos, nameOf, onShow, map, drawing, onRedraw,
                               if (t.session) onPick(t.session);
                             }}
                           >
-                            <b>{t.status}</b>
+                            <b>{tr(t.status)}</b>
                             <span>
                               {t.repo} · {t.ask.split("\n")[0].slice(0, 46)}
-                              {t.redo > 0 && ` · 다시 ${t.redo}번`}
+                              {t.redo > 0 && " · " + tr`다시 ${t.redo}번`}
                             </span>
                           </button>
                         ))}
@@ -402,7 +404,7 @@ export default function Threads({ repos, nameOf, onShow, map, drawing, onRedraw,
                         }}
                       >
                         <span className="th-cname">
-                          {r.cells.length > 1 && <i>{j === r.cells.length - 1 ? "지금" : j + 1}</i>}
+                          {r.cells.length > 1 && <i>{j === r.cells.length - 1 ? tr("지금") : j + 1}</i>}
                           {c.name}
                         </span>
                         <span className="th-state">{[c.label, kilo(c.tokens), c.mtime ? ago(c.mtime) : "", r.repos > 1 ? c.repo : ""].filter(Boolean).join(" · ")}</span>
@@ -416,7 +418,7 @@ export default function Threads({ repos, nameOf, onShow, map, drawing, onRedraw,
             </div>
           ))}
         </div>
-        <div className="pal-foot">{tab === "stems" ? "↑↓ 줄기 고르기 · ←→ 줄기 안의 세션 고르기 · Enter 그 세션으로 · ⌘1–⌘4 또는 Tab으로 탭 바꾸기 · Esc" : tab === "brain" ? "↑↓ 노트 고르기 · ⌫ 지우기 · Tab 스킬 · Esc" : tab === "git" ? "보기만 한다. 브랜치를 바꾸거나 올리는 것은 세션에게 시킨다 · ⌘1–⌘6 · Esc" : tab === "map" ? "레포를 넣고 빼는 것은 ⌘, 설정의 \"레포가 모여 있는 폴더\" · ⌘1–⌘5 · Esc" : tab === "nums" ? "⌘1–⌘5 또는 Tab으로 탭 바꾸기 · Esc" : "상태는 숫자로 정한다: 30일 안에 쓰였으면 쓰는 중, 안 쓰였으면 안 쓰임, 안 쓰이고 석 달 넘게 안 고쳤으면 낡음 · Tab 통계 · Esc"}</div>
+        <div className="pal-foot">{tab === "stems" ? tr("↑↓ 줄기 고르기 · ←→ 줄기 안의 세션 고르기 · Enter 그 세션으로 · ⌘1–⌘4 또는 Tab으로 탭 바꾸기 · Esc") : tab === "brain" ? tr("↑↓ 노트 고르기 · ⌫ 지우기 · Tab 스킬 · Esc") : tab === "git" ? tr("보기만 한다. 브랜치를 바꾸거나 올리는 것은 세션에게 시킨다 · ⌘1–⌘6 · Esc") : tab === "map" ? tr("레포를 넣고 빼는 것은 ⌘, 설정의 \"레포가 모여 있는 폴더\" · ⌘1–⌘5 · Esc") : tab === "nums" ? tr("⌘1–⌘5 또는 Tab으로 탭 바꾸기 · Esc") : tr("상태는 숫자로 정한다: 30일 안에 쓰였으면 쓰는 중, 안 쓰였으면 안 쓰임, 안 쓰이고 석 달 넘게 안 고쳤으면 낡음 · Tab 통계 · Esc")}</div>
       </div>
     </div>
   );

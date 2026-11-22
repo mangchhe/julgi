@@ -2,9 +2,11 @@ import { useEffect, useMemo, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import { Open } from "./model";
+import { tr } from "./i18n";
 
 type Branch = { name: string; ahead: number; behind: number; last: string; when: string };
 /** 원격의 오래 사는 브랜치. wait: 기준 브랜치에는 있는데 여기에는 아직 없는 커밋 수, own: 여기에만 있는 커밋 수 */
+// kind는 git을 읽는 쪽이 주는 값이다 i18n-ok
 type Line = { name: string; kind: "개발" | "배포" | "릴리스"; wait: number; own: number; when: string };
 type Tag = { name: string; when: string; wait: number; stable: boolean };
 type State = { branch: string; default: string; dirty: number; ahead: number; behind: number; branches: Branch[]; worktrees: [string, string][]; forge: string; lines: Line[]; tags: Tag[] };
@@ -18,8 +20,8 @@ type Props = {
   onShow: (key: string) => void;
 };
 
-const CI: Record<string, string> = { success: "통과", failed: "실패", running: "도는 중", pending: "대기", canceled: "취소됨", skipped: "건너뜀", manual: "손으로 돌림" };
-const MR_STATE: Record<string, string> = { opened: "열림", open: "열림", merged: "머지됨", closed: "닫힘" };
+const CI: Record<string, string> = { success: tr`통과`, failed: tr`실패`, running: tr`도는 중`, pending: tr`대기`, canceled: tr`취소됨`, skipped: tr`건너뜀`, manual: tr`손으로 돌림` };
+const MR_STATE: Record<string, string> = { opened: tr`열림`, open: tr`열림`, merged: tr`머지됨`, closed: tr`닫힘` };
 
 /**
  * 깃 (⌘G의 여섯째 탭). 레포마다 브랜치가 어떻게 굴러가는지: 기준 브랜치가 무엇이고, 개발·배포 브랜치가 거기서 얼마나 벌어져 있고, 마지막 태그가 무엇인지.
@@ -58,13 +60,13 @@ export default function Repos({ repos, open, nameOf, onShow }: Props) {
   return (
     <div className="gt">
       <div className="gt-row gt-head">
-        <span>레포</span>
-        <span>기준</span>
-        <span>개발 · 배포 (기준보다 뒤처진 커밋)</span>
-        <span>태그</span>
-        <span>내 쪽</span>
+        <span>{tr`레포`}</span>
+        <span>{tr`기준`}</span>
+        <span>{tr`개발 · 배포 (기준보다 뒤처진 커밋)`}</span>
+        <span>{tr`태그`}</span>
+        <span>{tr`내 쪽`}</span>
       </div>
-      {repos.length === 0 && <div className="side-none">지도에 레포가 없다. ⌘, 설정의 "레포가 모여 있는 폴더"를 정하면 여기에 나온다.</div>}
+      {repos.length === 0 && <div className="side-none">{tr`지도에 레포가 없다. ⌘, 설정의 "레포가 모여 있는 폴더"를 정하면 여기에 나온다.`}</div>}
       {rows.map((r) => {
         const st = states[r.cwd];
         const here = open.filter((o) => o.cwd === r.cwd || st?.worktrees.some(([dir]) => dir === o.cwd));
@@ -75,31 +77,31 @@ export default function Repos({ repos, open, nameOf, onShow }: Props) {
           <div key={r.cwd} className={"gt-repo" + (on ? " on" : "")}>
             <div className="gt-row" onClick={() => setAt(on ? "" : r.cwd)}>
               <b>{r.repo}</b>
-              {st === undefined && <span className="gt-dim">읽는 중</span>}
-              {st === null && <span className="gt-dim">git 레포가 아니다</span>}
+              {st === undefined && <span className="gt-dim">{tr`읽는 중`}</span>}
+              {st === null && <span className="gt-dim">{tr`git 레포가 아니다`}</span>}
               {st && (
                 <>
                   <span className="gt-branch">{st.default || "–"}</span>
                   <span className="gt-lines">
-                    {st.lines.length === 0 && <span className="gt-dim">기준 브랜치 하나로 굴러간다</span>}
-                    {st.lines.slice(0, 4).map((l) => (
-                      <span key={l.name} className={"gt-line k-" + (l.kind === "개발" ? "dev" : "out") + (l.wait ? " late" : "")} title={`${l.kind} 브랜치 · 마지막 커밋 ${l.when}${l.own ? ` · 여기에만 있는 커밋 ${l.own}` : ""}`}>
+                    {st.lines.length === 0 && <span className="gt-dim">{tr`기준 브랜치 하나로 굴러간다`}</span>}
+                    {st.lines.slice(0, 4).map((l) => ( // i18n-ok
+                      <span key={l.name} className={"gt-line k-" + (l.kind === "개발" ? "dev" : "out") + (l.wait ? " late" : "")} title={`${tr`${tr(l.kind)} 브랜치`} · ${tr`마지막 커밋 ${l.when}`}${l.own ? ` · ${tr`여기에만 있는 커밋 ${l.own}`}` : ""}`}>
                         {l.name}
                         <i>{l.wait ? `−${l.wait}` : "="}</i>
                       </span>
                     ))}
                     {st.lines.length > 4 && <span className="gt-dim">+{st.lines.length - 4}</span>}
                   </span>
-                  <span className="gt-dim" title={tag ? `${tag.when} · 그 뒤로 기준 브랜치에 커밋 ${tag.wait}` : ""}>
+                  <span className="gt-dim" title={tag ? `${tag.when} · ${tr`그 뒤로 기준 브랜치에 커밋 ${tag.wait}`}` : ""}>
                     {tag ? tag.name : "–"}
                     {tag && tag.wait > 0 && <small> +{tag.wait}</small>}
                   </span>
                   <span className="gt-dim">
                     {st.branch !== st.default && <span className="gt-branch off">{st.branch} </span>}
-                    {st.dirty > 0 && <em>고침 {st.dirty} </em>}
-                    {st.ahead > 0 && <em>안 올림 {st.ahead} </em>}
+                    {st.dirty > 0 && <em>{tr`고침 ${st.dirty}`} </em>}
+                    {st.ahead > 0 && <em>{tr`안 올림 ${st.ahead}`} </em>}
                     {mine.length > 0 && <span>MR {mine.length} </span>}
-                    {here.length > 0 && <span>세션 {here.length}</span>}
+                    {here.length > 0 && <span>{tr`세션 ${here.length}`}</span>}
                   </span>
                 </>
               )}
@@ -108,36 +110,36 @@ export default function Repos({ repos, open, nameOf, onShow }: Props) {
               <div className="gt-more">
                 <div className="gt-flow">
                   <div className="gt-f">
-                    <b>기준</b>
+                    <b>{tr`기준`}</b>
                     <span className="gt-branch">{st.default}</span>
-                    <span className="gt-dim">새 브랜치를 따고 MR·PR을 보내는 곳</span>
+                    <span className="gt-dim">{tr`새 브랜치를 따고 MR·PR을 보내는 곳`}</span>
                   </div>
                   {st.lines.map((l) => (
                     <div key={l.name} className="gt-f">
-                      <b>{l.kind}</b>
+                      <b>{tr(l.kind)}</b>
                       <span className="gt-branch">{l.name}</span>
                       <span className="gt-dim">
-                        {l.wait ? <em>기준의 커밋 {l.wait}개가 아직 안 들어갔다</em> : "기준의 것이 다 들어가 있다"}
-                        {l.own > 0 && ` · 여기에만 있는 커밋 ${l.own}`} · 마지막 커밋 {l.when}
+                        {l.wait ? <em>{tr`기준의 커밋 ${l.wait}개가 아직 안 들어갔다`}</em> : tr`기준의 것이 다 들어가 있다`}
+                        {l.own > 0 && ` · ${tr`여기에만 있는 커밋 ${l.own}`}`} · {tr`마지막 커밋 ${l.when}`}
                       </span>
                     </div>
                   ))}
                   {st.tags.map((t) => (
                     <div key={t.name} className="gt-f">
-                      <b>{t.stable ? "정식 태그" : "최근 태그"}</b>
+                      <b>{t.stable ? tr`정식 태그` : tr`최근 태그`}</b>
                       <span className="gt-branch">{t.name}</span>
                       <span className="gt-dim">
-                        {t.when} · 그 뒤로 기준 브랜치에 커밋 {t.wait}
+                        {t.when} · {tr`그 뒤로 기준 브랜치에 커밋 ${t.wait}`}
                       </span>
                     </div>
                   ))}
                 </div>
                 <div className="gt-sub">
-                  내 쪽 · 지금 {st.branch}
-                  {st.dirty > 0 && ` · 고친 파일 ${st.dirty}`}
-                  {st.ahead > 0 && ` · 안 올린 커밋 ${st.ahead}`}
-                  {st.behind > 0 && ` · 뒤처짐 ${st.behind}`}
-                  {st.ahead < 0 && " · 원격에 없는 브랜치"}
+                  {tr`내 쪽 · 지금 ${st.branch}`}
+                  {st.dirty > 0 && ` · ${tr`고친 파일 ${st.dirty}`}`}
+                  {st.ahead > 0 && ` · ${tr`안 올린 커밋 ${st.ahead}`}`}
+                  {st.behind > 0 && ` · ${tr`뒤처짐 ${st.behind}`}`}
+                  {st.ahead < 0 && ` · ${tr`원격에 없는 브랜치`}`}
                 </div>
                 {st.branches.map((b) => {
                   const mr = mine.find((m) => m[0] === b.name);
@@ -145,10 +147,10 @@ export default function Repos({ repos, open, nameOf, onShow }: Props) {
                   return (
                     <div key={b.name} className="gt-b">
                       <span className={"gt-branch" + (b.name === st.default ? "" : " off") + (b.name === st.branch ? " cur" : "")}>{b.name}</span>
-                      <span className="gt-dim">{b.name === st.default ? "기본 브랜치" : `기본보다 앞 ${b.ahead} · 뒤 ${b.behind}`}</span>
+                      <span className="gt-dim">{b.name === st.default ? tr`기본 브랜치` : tr`기본보다 앞 ${b.ahead} · 뒤 ${b.behind}`}</span>
                       <span className="gt-last">
                         {b.last} <small>{b.when}</small>
-                        {tree && tree[0] !== r.cwd && <small> · 워크트리 {tree[0].replace(/^\/Users\/[^/]+/, "~")}</small>}
+                        {tree && tree[0] !== r.cwd && <small> · {tr`워크트리 ${tree[0].replace(/^\/Users\/[^/]+/, "~")}`}</small>}
                       </span>
                       {mr ? (
                         <button type="button" tabIndex={-1} className={"gt-mr ci-" + mr[4]} title={mr[2]} onClick={() => void openUrl(mr[2])}>
@@ -163,7 +165,7 @@ export default function Repos({ repos, open, nameOf, onShow }: Props) {
                 })}
                 {here.length > 0 && (
                   <div className="gt-sessions">
-                    <small>여기서 열려 있는 세션</small>
+                    <small>{tr`여기서 열려 있는 세션`}</small>
                     {here.map((o) => (
                       <button key={o.key} type="button" tabIndex={-1} onClick={() => onShow(o.key)}>
                         {nameOf(o.key).slice(0, 50)}

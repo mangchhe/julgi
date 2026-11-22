@@ -73,7 +73,7 @@ details.acts[open] summary::after { transform: rotate(90deg); }
 .bubble .more { display: block; width: 100%; background: none; border: 0; border-bottom: 1px solid var(--line); color: var(--accent); font-size: 14px; padding: 0 0 10px; margin-bottom: 10px; text-align: left; }
 .bubble .asked { margin-top: 12px; background: var(--wait-soft); border-radius: 12px; padding: 10px 12px; }
 .bubble .asked > :last-child { margin-bottom: 0; }
-.bubble .asked::before { content: "묻는 말"; display: block; font-size: 12px; font-weight: 700; color: var(--wait); margin-bottom: 2px; }
+.bubble .asked::before { content: attr(data-label); display: block; font-size: 12px; font-weight: 700; color: var(--wait); margin-bottom: 2px; }
 .spacer { flex: 1; min-height: 12px; }
 .composer { position: sticky; bottom: 0; z-index: 2; background: color-mix(in srgb, var(--bg) 92%, transparent); -webkit-backdrop-filter: blur(14px); backdrop-filter: blur(14px); margin: 0 -16px; padding: 8px 16px calc(10px + env(safe-area-inset-bottom, 0px)); }
 .quick { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 8px; scrollbar-width: none; }
@@ -103,9 +103,9 @@ details.acts[open] summary::after { transform: rotate(90deg); }
 <body>
 <div class="app">
   <header>
-    <button type="button" id="back" class="back" hidden aria-label="목록으로"><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m12 4-6 6 6 6"/></svg>목록</button>
+    <button type="button" id="back" class="back" hidden><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m12 4-6 6 6 6"/></svg><span id="back-text"></span></button>
     <div class="titles" id="titles"><h1 id="title">Julgi</h1><p id="sub"></p></div>
-    <span class="live" id="live" role="img" aria-label="연결됨"></span>
+    <span class="live" id="live" role="img"></span>
   </header>
   <div id="stale" class="stale" hidden></div>
   <main id="list"></main>
@@ -115,30 +115,66 @@ details.acts[open] summary::after { transform: rotate(90deg); }
     <form class="composer" id="answer">
       <div class="quick" id="quick"></div>
       <div class="write">
-        <textarea id="answer-text" rows="1" placeholder="답 쓰기" aria-label="이 세션에 보낼 답"></textarea>
-        <button type="submit" class="send" id="answer-send" aria-label="보내기" disabled><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M10 16V4M4.5 9.5 10 4l5.5 5.5"/></svg></button>
+        <textarea id="answer-text" rows="1"></textarea>
+        <button type="submit" class="send" id="answer-send" disabled><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M10 16V4M4.5 9.5 10 4l5.5 5.5"/></svg></button>
       </div>
     </form>
   </main>
   <main id="throw" hidden>
     <form id="throw-form" style="display:contents">
-      <div class="field"><label for="throw-where">어디서</label><select id="throw-where"></select></div>
-      <div class="field"><label for="throw-text">시킬 일</label><textarea id="throw-text" placeholder="예: 로그인 실패 로그 원인 찾아줘"></textarea></div>
-      <button type="submit" class="big" id="throw-send" disabled>새 세션으로 던지기</button>
-      <div class="hint">고른 폴더에서 새 세션이 열리고, 답이 오면 목록의 내 차례로 올라온다.</div>
+      <div class="field"><label for="throw-where" id="where-label"></label><select id="throw-where"></select></div>
+      <div class="field"><label for="throw-text" id="text-label"></label><textarea id="throw-text"></textarea></div>
+      <button type="submit" class="big" id="throw-send" disabled></button>
+      <div class="hint" id="throw-hint"></div>
     </form>
   </main>
 </div>
-<button type="button" class="fab" id="new"><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M10 4v12M4 10h12"/></svg>새 일</button>
+<button type="button" class="fab" id="new"><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M10 4v12M4 10h12"/></svg><span id="new-text"></span></button>
 <div class="toast" id="toast" role="status" hidden></div>
 <script>
 const $ = (id) => document.getElementById(id);
+// 글의 언어: 폰의 언어가 한국어면 한국어, 아니면 영어. 한국어 글이 원문이고 사전의 열쇠다. 값의 자리는 {0}
+const KO = /^ko/i.test(navigator.language || "");
+const EN = {
+  "목록으로": "Back to list", "목록": "List", "연결됨": "Connected", "연결 끊김": "Disconnected",
+  "답 쓰기": "Write a reply", "이 세션에 보낼 답": "Reply to send to this session", "보내기": "Send",
+  "어디서": "Where", "시킬 일": "Task", "예: 로그인 실패 로그 원인 찾아줘": "e.g. Find the cause of the login failure logs",
+  "새 세션으로 던지기": "Send to a new session",
+  "고른 폴더에서 새 세션이 열리고, 답이 오면 목록의 내 차례로 올라온다.": "A new session opens in the chosen folder. When a reply arrives, it moves up to My turn in the list.",
+  "새 일": "New task", "묻는 말": "Question",
+  "방금": "just now", "{0}분 전": "{0}m ago", "{0}시간 전": "{0}h ago", "{0}일 전": "{0}d ago",
+  "응, 진행해": "Yes, go ahead", "계속해": "Continue", "아니, 멈춰": "No, stop", "다시 설명해 줘": "Explain again",
+  "앞의 {0}줄 더 보기": "Show {0} earlier lines", "읽는 중": "Loading",
+  "일하는 중이다. 답이 오면 여기에 뜬다.": "Working. The reply will appear here.",
+  "마지막 답을 읽지 못했다.": "Could not read the last reply.", "읽지 못했다.": "Could not read it.",
+  "맥의 Julgi가 {0}부터 응답하지 않는다.": "Julgi on the Mac stopped responding {0}.",
+  "맥의 Julgi에서 아직 상태를 받지 못했다.": "No status from Julgi on the Mac yet.",
+  "내 차례 {0}": "My turn {0}", "기다리는 세션 없음": "No sessions waiting", "일하는 중 {0}": "Working {0}",
+  "세션": "Session", "이 세션은 닫혔다": "This session is closed",
+  "내 차례": "My turn", "일하는 중": "Working", "열려 있음": "Open", "확인이 필요함": "Needs confirmation",
+  "열려 있는 세션이 없다": "No open sessions", "새 일을 던지면 맥에서 세션이 열린다.": "Send a new task and a session opens on the Mac.",
+  "Julgi가 방금 한 일 {0}": "What Julgi just did {0}",
+  "토큰이 맞지 않는다. 맥의 Julgi 설정(⌘,)에 나온 주소로 다시 연다.": "The token does not match. Reopen with the address shown in Julgi's settings (⌘,) on the Mac.",
+  "보냈다": "Sent", "보내지 못했다": "Could not send",
+  "던졌다. 곧 세션이 열린다": "Sent. A session will open soon", "던지지 못했다": "Could not send",
+};
+const T = (ko, ...vals) => ((KO ? ko : EN[ko]) ?? ko).replace(/\{(\d+)\}/g, (_, i) => String(vals[i] ?? ""));
+document.documentElement.lang = KO ? "ko" : "en";
+$("back").setAttribute("aria-label", T("목록으로")); $("back-text").textContent = T("목록");
+$("live").setAttribute("aria-label", T("연결됨"));
+$("answer-text").placeholder = T("답 쓰기"); $("answer-text").setAttribute("aria-label", T("이 세션에 보낼 답"));
+$("answer-send").setAttribute("aria-label", T("보내기"));
+$("where-label").textContent = T("어디서"); $("text-label").textContent = T("시킬 일");
+$("throw-text").placeholder = T("예: 로그인 실패 로그 원인 찾아줘");
+$("throw-send").textContent = T("새 세션으로 던지기");
+$("throw-hint").textContent = T("고른 폴더에서 새 세션이 열리고, 답이 오면 목록의 내 차례로 올라온다.");
+$("new-text").textContent = T("새 일");
 // 토큰은 주소로 받아 이 브라우저에도 둔다. 주소에서는 지우지 않는다: 홈 화면에 추가한 아이콘은
 // 저장 공간이 따로라서, 주소에 토큰이 남아 있어야 그 아이콘으로 다시 들어올 수 있다
 let token = new URLSearchParams(location.search).get("t") || "";
 try { if (token) localStorage.setItem("julgi-token", token); else token = localStorage.getItem("julgi-token") || ""; } catch (e) {}
 const api = (path, body) => fetch(path, { method: body ? "POST" : "GET", headers: { "x-julgi-token": token, ...(body ? { "Content-Type": "application/json" } : {}) }, body: body ? JSON.stringify(body) : undefined }).then((r) => (r.ok ? r.json() : Promise.reject(r.status)));
-const ago = (ms) => { const s = Math.max(0, (Date.now() - ms) / 1000); return s < 60 ? "방금" : s < 3600 ? Math.floor(s / 60) + "분 전" : s < 86400 ? Math.floor(s / 3600) + "시간 전" : Math.floor(s / 86400) + "일 전"; };
+const ago = (ms) => { const s = Math.max(0, (Date.now() - ms) / 1000); return s < 60 ? T("방금") : s < 3600 ? T("{0}분 전", Math.floor(s / 60)) : s < 86400 ? T("{0}시간 전", Math.floor(s / 3600)) : T("{0}일 전", Math.floor(s / 86400)); };
 const el = (tag, cls, text) => { const n = document.createElement(tag); if (cls) n.className = cls; if (text !== undefined) n.textContent = text; return n; };
 const store = { get: (k) => { try { return sessionStorage.getItem(k) || ""; } catch (e) { return ""; } }, set: (k, v) => { try { v ? sessionStorage.setItem(k, v) : sessionStorage.removeItem(k); } catch (e) {} } };
 let state = { sessions: [], folders: [], acts: [], at: 0 };
@@ -148,7 +184,7 @@ const toast = (text) => { $("toast").textContent = text; $("toast").hidden = fal
 const mine = (s) => s.state === "wait" || s.state === "ask";
 const busy = (s) => s.state === "run" || s.state === "hold";
 const GO = '<svg class="go" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m8 4 6 6-6 6"/></svg>';
-const QUICK = ["응, 진행해", "계속해", "아니, 멈춰", "다시 설명해 줘"];
+const QUICK = [T("응, 진행해"), T("계속해"), T("아니, 멈춰"), T("다시 설명해 줘")];
 
 /** 답 글을 화면에 쓸 조각으로: 코드 울타리, 제목, 목록, 문단. 글자는 전부 textContent로만 넣는다 */
 function inline(node, text) {
@@ -194,9 +230,9 @@ function paintReply(text) {
   const lines = body.split("\n");
   const long = lines.length > 40 && !whole;
   const nodes = [];
-  if (long) { const more = el("button", "more", `앞의 ${lines.length - 40}줄 더 보기`); more.type = "button"; more.addEventListener("click", () => { whole = true; paintReply(text); }); nodes.push(more); }
+  if (long) { const more = el("button", "more", T("앞의 {0}줄 더 보기", lines.length - 40)); more.type = "button"; more.addEventListener("click", () => { whole = true; paintReply(text); }); nodes.push(more); }
   nodes.push(...blocks(long ? lines.slice(-40).join("\n") : body));
-  if (at >= 0) { const asked = el("div", "asked"); asked.append(...blocks(parts.slice(at).join("\n\n"))); nodes.push(asked); }
+  if (at >= 0) { const asked = el("div", "asked"); asked.dataset.label = T("묻는 말"); asked.append(...blocks(parts.slice(at).join("\n\n"))); nodes.push(asked); }
   box.replaceChildren(...nodes);
 }
 function loadReply(s) {
@@ -205,14 +241,14 @@ function loadReply(s) {
   const first = !shownFor.startsWith(s.key + "|");
   shownFor = stamp;
   const box = $("one-reply");
-  if (first) { box.className = "bubble wait-for"; box.textContent = "읽는 중"; }
+  if (first) { box.className = "bubble wait-for"; box.textContent = T("읽는 중"); }
   if (!s.id) return;
   api("/api/reply?id=" + encodeURIComponent(s.id)).then(({ text }) => {
     if (picked !== s.key) return;
-    if (!text) { box.className = "bubble wait-for"; box.textContent = busy(s) ? "일하는 중이다. 답이 오면 여기에 뜬다." : "마지막 답을 읽지 못했다."; return; }
+    if (!text) { box.className = "bubble wait-for"; box.textContent = busy(s) ? T("일하는 중이다. 답이 오면 여기에 뜬다.") : T("마지막 답을 읽지 못했다."); return; }
     paintReply(text);
     if (first) window.scrollTo(0, document.body.scrollHeight);
-  }, () => { shownFor = ""; if (first) { box.className = "bubble wait-for"; box.textContent = "읽지 못했다."; } });
+  }, () => { shownFor = ""; if (first) { box.className = "bubble wait-for"; box.textContent = T("읽지 못했다."); } });
 }
 const metaOf = (s) => [s.repo, s.since ? ago(s.since) : "", s.changed].filter(Boolean).join(" · ");
 
@@ -235,20 +271,20 @@ function show(next, key, fromHistory) {
 function paint() {
   const old = Date.now() - state.at > 12000;
   $("live").classList.toggle("off", old);
-  $("live").setAttribute("aria-label", old ? "연결 끊김" : "연결됨");
-  if (!$("stale").dataset.auth) { $("stale").hidden = !old; if (old) $("stale").textContent = state.at ? "맥의 Julgi가 " + ago(state.at) + "부터 응답하지 않는다." : "맥의 Julgi에서 아직 상태를 받지 못했다."; }
+  $("live").setAttribute("aria-label", old ? T("연결 끊김") : T("연결됨"));
+  if (!$("stale").dataset.auth) { $("stale").hidden = !old; if (old) $("stale").textContent = state.at ? T("맥의 Julgi가 {0}부터 응답하지 않는다.", ago(state.at)) : T("맥의 Julgi에서 아직 상태를 받지 못했다."); }
   const waiting = state.sessions.filter(mine).length, running = state.sessions.filter(busy).length;
-  if (view === "list") { $("title").textContent = "Julgi"; $("sub").textContent = state.sessions.length ? [waiting ? `내 차례 ${waiting}` : "기다리는 세션 없음", running ? `일하는 중 ${running}` : ""].filter(Boolean).join(" · ") : ""; document.title = waiting ? `(${waiting}) Julgi` : "Julgi"; }
-  if (view === "throw") { $("title").textContent = "새 일"; $("sub").textContent = ""; }
+  if (view === "list") { $("title").textContent = "Julgi"; $("sub").textContent = state.sessions.length ? [waiting ? T("내 차례 {0}", waiting) : T("기다리는 세션 없음"), running ? T("일하는 중 {0}", running) : ""].filter(Boolean).join(" · ") : ""; document.title = waiting ? `(${waiting}) Julgi` : "Julgi"; }
+  if (view === "throw") { $("title").textContent = T("새 일"); $("sub").textContent = ""; }
   if (view === "one") {
     const s = state.sessions.find((x) => x.key === picked);
-    $("title").textContent = s ? s.name : "세션";
-    $("sub").textContent = s ? [s.label, metaOf(s)].filter(Boolean).join(" · ") : "이 세션은 닫혔다";
+    $("title").textContent = s ? s.name : T("세션");
+    $("sub").textContent = s ? [s.label, metaOf(s)].filter(Boolean).join(" · ") : T("이 세션은 닫혔다");
     if (s) loadReply(s);
     return;
   }
   if (view !== "list") return;
-  const groups = [["내 차례", mine, "mine"], ["일하는 중", busy, "run"], ["열려 있음", (s) => !mine(s) && !busy(s), ""]];
+  const groups = [[T("내 차례"), mine, "mine"], [T("일하는 중"), busy, "run"], [T("열려 있음"), (s) => !mine(s) && !busy(s), ""]];
   const nodes = [];
   for (const [title, test, cls] of groups) {
     const rows = state.sessions.filter(test);
@@ -258,7 +294,7 @@ function paint() {
     for (const s of rows) {
       const b = el("button", "row " + cls); b.type = "button";
       const text = el("span"); const small = el("small");
-      if (s.state === "ask") small.append(el("em", "", "확인이 필요함"), document.createTextNode(" · "));
+      if (s.state === "ask") small.append(el("em", "", T("확인이 필요함")), document.createTextNode(" · "));
       small.append(document.createTextNode(metaOf(s)));
       text.append(el("b", "", s.name), small);
       b.append(el("span", "dot"), text); b.insertAdjacentHTML("beforeend", GO);
@@ -267,25 +303,25 @@ function paint() {
     }
     nodes.push(card);
   }
-  if (!state.sessions.length) { const none = el("div", "none"); none.append(el("b", "", "열려 있는 세션이 없다"), document.createTextNode("새 일을 던지면 맥에서 세션이 열린다.")); nodes.push(none); }
+  if (!state.sessions.length) { const none = el("div", "none"); none.append(el("b", "", T("열려 있는 세션이 없다")), document.createTextNode(T("새 일을 던지면 맥에서 세션이 열린다."))); nodes.push(none); }
   if (state.acts && state.acts.length) {
     const box = el("details", "acts"); box.open = store.get("acts") === "1";
     box.addEventListener("toggle", () => store.set("acts", box.open ? "1" : ""));
-    box.append(el("summary", "", `Julgi가 방금 한 일 ${state.acts.length}`));
+    box.append(el("summary", "", T("Julgi가 방금 한 일 {0}", state.acts.length)));
     const card = el("div", "card");
     for (const a of state.acts) { const row = el("div", "act"); row.append(el("i", "", a.kind), document.createTextNode(a.text + " · " + ago(a.at))); card.append(row); }
     box.append(card); nodes.push(box);
   }
   $("list").replaceChildren(...nodes);
 }
-const pull = () => api("/api/state").then((s) => { delete $("stale").dataset.auth; if (s && s.sessions) state = s; paint(); }, (code) => { if (code === 401) { $("stale").dataset.auth = "1"; $("stale").hidden = false; $("live").classList.add("off"); $("stale").textContent = "토큰이 맞지 않는다. 맥의 Julgi 설정(⌘,)에 나온 주소로 다시 연다."; } else paint(); });
+const pull = () => api("/api/state").then((s) => { delete $("stale").dataset.auth; if (s && s.sessions) state = s; paint(); }, (code) => { if (code === 401) { $("stale").dataset.auth = "1"; $("stale").hidden = false; $("live").classList.add("off"); $("stale").textContent = T("토큰이 맞지 않는다. 맥의 Julgi 설정(⌘,)에 나온 주소로 다시 연다."); } else paint(); });
 
 const grow = (t) => { t.style.height = "auto"; t.style.height = t.scrollHeight + "px"; };
 function send(text) {
   if (!text || !picked || $("answer").dataset.busy) return;
   $("answer").dataset.busy = "1"; $("answer-send").disabled = true;
   const key = picked;
-  api("/api/answer", { target: key, text }).then(() => { store.set("draft:" + key, ""); $("answer-text").value = ""; toast("보냈다"); history.back(); pull(); }, () => { toast("보내지 못했다"); $("answer-send").disabled = !$("answer-text").value.trim(); }).finally(() => delete $("answer").dataset.busy);
+  api("/api/answer", { target: key, text }).then(() => { store.set("draft:" + key, ""); $("answer-text").value = ""; toast(T("보냈다")); history.back(); pull(); }, () => { toast(T("보내지 못했다")); $("answer-send").disabled = !$("answer-text").value.trim(); }).finally(() => delete $("answer").dataset.busy);
 }
 $("answer-text").addEventListener("input", (e) => { grow(e.target); $("answer-send").disabled = !e.target.value.trim(); });
 $("answer").addEventListener("submit", (e) => { e.preventDefault(); send($("answer-text").value.trim()); });
@@ -295,7 +331,7 @@ $("throw-form").addEventListener("submit", (e) => {
   const text = $("throw-text").value.trim(), where = $("throw-where").value;
   if (!text || !where) return;
   $("throw-send").disabled = true; store.set("where", where);
-  api("/api/new", { target: where, text }).then(() => { $("throw-text").value = ""; toast("던졌다. 곧 세션이 열린다"); history.back(); }, () => { toast("던지지 못했다"); $("throw-send").disabled = false; });
+  api("/api/new", { target: where, text }).then(() => { $("throw-text").value = ""; toast(T("던졌다. 곧 세션이 열린다")); history.back(); }, () => { toast(T("던지지 못했다")); $("throw-send").disabled = false; });
 });
 $("back").addEventListener("click", () => history.back());
 $("new").addEventListener("click", () => show("throw"));

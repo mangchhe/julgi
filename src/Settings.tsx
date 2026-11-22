@@ -5,6 +5,7 @@ import { openUrl } from "@tauri-apps/plugin-opener";
 import { config, kilo } from "./model";
 import { THEMES } from "./themes";
 import { CORE, MORE } from "./Help";
+import { tr } from "./i18n";
 
 type Key = keyof typeof config;
 type Props = {
@@ -33,101 +34,110 @@ type Row =
   | { kind: "keys"; label: string; note: string };
 
 /** 묶음마다 줄 몇 개. 왼쪽에서 묶음을 고르면 오른쪽에 그 줄들만 나온다 */
-const SECTIONS: { title: string; hint: string; rows: Row[] }[] = [
+const SECTIONS: { id: string; title: string; hint: string; rows: Row[] }[] = [
   {
-    title: "화면",
-    hint: "보이는 것과 창",
+    id: "화면", // i18n-ok
+    title: tr("화면"),
+    hint: tr("보이는 것과 창"),
     rows: [
-    { kind: "theme", label: "테마", note: "화면과 터미널의 색" },
-    { kind: "number", key: "recentDays", label: "목록에 보이는 기간", note: "이보다 오래 안 쓴 잠든 세션은 목록에서 빼고 ⌘K로만 찾는다", step: 1, min: 1, max: 90, show: (n) => `${n}일` },
-    { kind: "toggle", key: "usage", label: "Claude 사용량 보기", note: "아래 상태 줄에 5시간 창과 주간 한도를 얼마나 썼는지 보여 준다. 켜면 Claude Code의 로그인 토큰을 키체인에서 읽어 Anthropic의 사용량 주소에만 보낸다(처음에 키체인이 허락을 묻는다). 문서에 없는 주소라 어느 날 안 나올 수 있다" },
-      { kind: "toggle", key: "notify", label: "알림", note: "Julgi 창을 안 보고 있을 때 세션이 답을 끝내거나 확인을 물으면 macOS 알림을 띄운다" },
-    { kind: "toggle", key: "confirmClose", label: "닫기 전에 묻기", note: "⌘W나 ×로 세션을 닫을 때 한 번 묻는다" },
-    { kind: "key", key: "hotkey", label: "창 꺼내기 키", note: "어느 앱에서든 Julgi 창을 꺼내고 다시 넣는 키. Enter를 누른 뒤 쓸 키 조합을 누른다. Backspace면 쓰지 않는다" },
+    { kind: "theme", label: tr("테마"), note: tr("화면과 터미널의 색") },
+    { kind: "pick", key: "lang", label: tr("언어"), note: tr("화면 글의 언어. 바꾼 뒤 Julgi를 다시 켜야 적용된다"), options: [["auto", tr("시스템 따름")], ["en", "English"], ["ko", "한국어"]] }, // i18n-ok
+    { kind: "number", key: "recentDays", label: tr("목록에 보이는 기간"), note: tr("이보다 오래 안 쓴 잠든 세션은 목록에서 빼고 ⌘K로만 찾는다"), step: 1, min: 1, max: 90, show: (n) => tr`${n}일` },
+    { kind: "toggle", key: "usage", label: tr("Claude 사용량 보기"), note: tr("아래 상태 줄에 5시간 창과 주간 한도를 얼마나 썼는지 보여 준다. 켜면 Claude Code의 로그인 토큰을 키체인에서 읽어 Anthropic의 사용량 주소에만 보낸다(처음에 키체인이 허락을 묻는다). 문서에 없는 주소라 어느 날 안 나올 수 있다") },
+      { kind: "toggle", key: "notify", label: tr("알림"), note: tr("Julgi 창을 안 보고 있을 때 세션이 답을 끝내거나 확인을 물으면 macOS 알림을 띄운다") },
+    { kind: "toggle", key: "confirmClose", label: tr("닫기 전에 묻기"), note: tr("⌘W나 ×로 세션을 닫을 때 한 번 묻는다") },
+    { kind: "key", key: "hotkey", label: tr("창 꺼내기 키"), note: tr("어느 앱에서든 Julgi 창을 꺼내고 다시 넣는 키. Enter를 누른 뒤 쓸 키 조합을 누른다. Backspace면 쓰지 않는다") },
     ],
   },
   {
-    title: "세션",
-    hint: "열고, 재우고, 넘기기",
+    id: "세션", // i18n-ok
+    title: tr("세션"),
+    hint: tr("열고, 재우고, 넘기기"),
     rows: [
-    { kind: "number", key: "hotTokens", label: "갈아타는 크기", note: "이보다 큰 세션에 보낼 때는 인계 글만 들고 새 세션으로 넘어간 뒤 보낸다. 대화 한도가 200k면 150k, 1M이면 500k쯤이 맞다", step: 50_000, min: 50_000, max: 2_000_000, show: (n) => kilo(n) },
-    { kind: "number", key: "sleepHours", label: "알아서 재우기", note: "답까지 본 뒤 이 시간 넘게 쉰 세션을 재운다", step: 1, min: 0, max: 48, show: (n) => (n ? `${n}시간` : "안 재움") },
-    { kind: "number", key: "memoryLimitGb", label: "메모리 한도", note: "세션들이 쓰는 메모리 합계가 이만큼을 넘으면, 답까지 보고 10분 넘게 쉰 세션을 오래 쉰 것부터 재운다. 칸에 떠 있는 세션, 고정한 세션, 일하는 중인 세션은 건드리지 않는다", step: 1, min: 0, max: 64, show: (n) => (n ? `${n}GB` : "안 씀") },
-      { kind: "toggle", key: "autoFill", label: "칸 알아서 관리", note: "내 차례인 세션을 칸에 올리고, 자리가 있으면 칸을 늘리고, 빈 칸은 없앤다" },
-    { kind: "pick", key: "skipPermissions", label: "허락 묻지 않기", note: "세션이 파일을 고치거나 명령을 돌릴 때 허락을 묻지 않게 띄운다(--dangerously-skip-permissions). \"내가 연 세션만\"은 Julgi가 알아서 띄운 세션(일감, 스킬 만들기, 폰이나 다른 세션이 던진 일)은 그대로 묻게 둔다. 이미 떠 있는 세션은 다시 열어야 바뀐다", options: [["off", "묻는다"], ["mine", "내가 연 세션만"], ["all", "전부"]] },
-    { kind: "text", key: "defaultDir", label: "기본 폴더", note: "레포가 드러나지 않는 일을 여는 폴더", hint: "비우면 ~/julgi" },
-    { kind: "text", key: "saveCommand", label: "⌘S가 보내는 말", note: "⌘S를 누르면 지금 세션에 이 말을 보낸다", hint: "예: /commit" },
+    { kind: "number", key: "hotTokens", label: tr("갈아타는 크기"), note: tr("이보다 큰 세션에 보낼 때는 인계 글만 들고 새 세션으로 넘어간 뒤 보낸다. 대화 한도가 200k면 150k, 1M이면 500k쯤이 맞다"), step: 50_000, min: 50_000, max: 2_000_000, show: (n) => kilo(n) },
+    { kind: "number", key: "sleepHours", label: tr("알아서 재우기"), note: tr("답까지 본 뒤 이 시간 넘게 쉰 세션을 재운다"), step: 1, min: 0, max: 48, show: (n) => (n ? tr`${n}시간` : tr("안 재움")) },
+    { kind: "number", key: "memoryLimitGb", label: tr("메모리 한도"), note: tr("세션들이 쓰는 메모리 합계가 이만큼을 넘으면, 답까지 보고 10분 넘게 쉰 세션을 오래 쉰 것부터 재운다. 칸에 떠 있는 세션, 고정한 세션, 일하는 중인 세션은 건드리지 않는다"), step: 1, min: 0, max: 64, show: (n) => (n ? `${n}GB` : tr("안 씀")) },
+      { kind: "toggle", key: "autoFill", label: tr("칸 알아서 관리"), note: tr("내 차례인 세션을 칸에 올리고, 자리가 있으면 칸을 늘리고, 빈 칸은 없앤다") },
+    { kind: "pick", key: "skipPermissions", label: tr("허락 묻지 않기"), note: tr("세션이 파일을 고치거나 명령을 돌릴 때 허락을 묻지 않게 띄운다(--dangerously-skip-permissions). \"내가 연 세션만\"은 Julgi가 알아서 띄운 세션(일감, 스킬 만들기, 폰이나 다른 세션이 던진 일)은 그대로 묻게 둔다. 이미 떠 있는 세션은 다시 열어야 바뀐다"), options: [["off", tr("묻는다")], ["mine", tr("내가 연 세션만")], ["all", tr("전부")]] },
+    { kind: "text", key: "defaultDir", label: tr("기본 폴더"), note: tr("레포가 드러나지 않는 일을 여는 폴더"), hint: tr("비우면 ~/julgi") },
+    { kind: "text", key: "saveCommand", label: tr("⌘S가 보내는 말"), note: tr("⌘S를 누르면 지금 세션에 이 말을 보낸다"), hint: tr("예: /commit") },
     ],
   },
   {
-    title: "알아서 하는 일",
-    hint: "끄면 그 일만 멈춘다",
+    id: "알아서 하는 일", // i18n-ok
+    title: tr("알아서 하는 일"),
+    hint: tr("끄면 그 일만 멈춘다"),
     rows: [
-    { kind: "toggle", key: "summarize", label: "요약과 이름 짓기", note: "쉬는 세션을 작은 모델로 요약하고 알아볼 이름을 붙인다. 보낼 곳을 고를 때 이 요약을 읽는다" },
-    { kind: "toggle", key: "judgeMerges", label: "같은 일 알아서 합치기", note: "두 세션이 같은 일이라고 모델이 판정하면 묻지 않고 한 줄기로 묶는다" },
-    { kind: "toggle", key: "brain", label: "브레인", note: "줄기 기억에서 일이 끝나도 남길 것(결정, 함정, 사실)을 추려 담고, 새 일을 열 때 관련된 것을 붙인다. ⌘G에서 본다" },
-    { kind: "toggle", key: "autoLead", label: "알아서 조율하기", note: "⌘L로 던진 일이 레포 두 곳 넘게 걸치면 새 세션을 조율자로 세운다. 조율자는 일감으로 나눠 레포마다 다른 세션에 맡기고 결과를 모은다" },
-    { kind: "toggle", key: "taskWorktree", label: "일감은 따로 딴 폴더에서", note: "일감을 맡은 세션은 레포의 작업 폴더가 아니라 Julgi가 만든 워크트리(브랜치 julgi/일감번호)에서 일한다. 고친 것이 없으면 끝난 뒤 지운다" },
-    { kind: "toggle", key: "growSkills", label: "스킬 알아서 만들고 가꾸기", note: "되풀이해서 시킨 일은 스킬로 만들고(한 주에 하나), 자주 쓰는 내 스킬은 쓰인 기록에 비추어 다듬는다(한 주에 하나, 옛 글은 ~/.julgi/skill-history에 남는다). 링크로 건 스킬과 레포의 스킬은 건드리지 않는다" },
+    { kind: "toggle", key: "summarize", label: tr("요약과 이름 짓기"), note: tr("쉬는 세션을 작은 모델로 요약하고 알아볼 이름을 붙인다. 보낼 곳을 고를 때 이 요약을 읽는다") },
+    { kind: "toggle", key: "judgeMerges", label: tr("같은 일 알아서 합치기"), note: tr("두 세션이 같은 일이라고 모델이 판정하면 묻지 않고 한 줄기로 묶는다") },
+    { kind: "toggle", key: "brain", label: tr("브레인"), note: tr("줄기 기억에서 일이 끝나도 남길 것(결정, 함정, 사실)을 추려 담고, 새 일을 열 때 관련된 것을 붙인다. ⌘G에서 본다") },
+    { kind: "toggle", key: "autoLead", label: tr("알아서 조율하기"), note: tr("⌘L로 던진 일이 레포 두 곳 넘게 걸치면 새 세션을 조율자로 세운다. 조율자는 일감으로 나눠 레포마다 다른 세션에 맡기고 결과를 모은다") },
+    { kind: "toggle", key: "taskWorktree", label: tr("일감은 따로 딴 폴더에서"), note: tr("일감을 맡은 세션은 레포의 작업 폴더가 아니라 Julgi가 만든 워크트리(브랜치 julgi/일감번호)에서 일한다. 고친 것이 없으면 끝난 뒤 지운다") },
+    { kind: "toggle", key: "growSkills", label: tr("스킬 알아서 만들고 가꾸기"), note: tr("되풀이해서 시킨 일은 스킬로 만들고(한 주에 하나), 자주 쓰는 내 스킬은 쓰인 기록에 비추어 다듬는다(한 주에 하나, 옛 글은 ~/.julgi/skill-history에 남는다). 링크로 건 스킬과 레포의 스킬은 건드리지 않는다") },
     ],
   },
   {
-    title: "코드 검토",
-    hint: "세션이 고친 코드를 읽어 주는 것",
+    id: "코드 검토", // i18n-ok
+    title: tr("코드 검토"),
+    hint: tr("세션이 고친 코드를 읽어 주는 것"),
     rows: [
-    { kind: "toggle", key: "brief", label: "바뀐 것 브리핑", note: "세션이 코드를 고치면 무엇을 왜 바꿨는지, 파일별로 한 줄, 눈여겨볼 곳을 요약해 둔다. ⌘I와 \"바뀐 것 보기\"에 나온다" },
-    { kind: "toggle", key: "check", label: "내가 보기 전에 걸러 읽기", note: "브리핑 뒤에 더 큰 모델이 세션의 설명 없이 변경만 읽고, 틀렸거나 틀릴 수 있는 곳을 짚는다(버그·위험·의문). ⌘E 위쪽에 나오고 한 번에 세션에 넘겨 확인시킬 수 있다. 15줄이 안 되는 변경에는 하지 않는다" },
+    { kind: "toggle", key: "brief", label: tr("바뀐 것 브리핑"), note: tr("세션이 코드를 고치면 무엇을 왜 바꿨는지, 파일별로 한 줄, 눈여겨볼 곳을 요약해 둔다. ⌘I와 \"바뀐 것 보기\"에 나온다") },
+    { kind: "toggle", key: "check", label: tr("내가 보기 전에 걸러 읽기"), note: tr("브리핑 뒤에 더 큰 모델이 세션의 설명 없이 변경만 읽고, 틀렸거나 틀릴 수 있는 곳을 짚는다(버그·위험·의문). ⌘E 위쪽에 나오고 한 번에 세션에 넘겨 확인시킬 수 있다. 15줄이 안 되는 변경에는 하지 않는다") },
     ],
   },
   {
-    title: "점검과 모델",
-    hint: "언제 정리하고, 판단에 무엇을 쓰나",
+    id: "점검과 모델", // i18n-ok
+    title: tr("점검과 모델"),
+    hint: tr("언제 정리하고, 판단에 무엇을 쓰나"),
     rows: [
-    { kind: "number", key: "reviewHour", label: "점검 시각", note: "매일 이 시각에 세션 정리와 스킬 후보 찾기를 한다. 그때 Julgi나 맥이 꺼져 있었으면 다음에 켰을 때 돈다", step: 1, min: 0, max: 23, show: (n) => (n < 12 ? `오전 ${n}시` : n === 12 ? "낮 12시" : `오후 ${n - 12}시`) },
-    { kind: "number", key: "reviewDay", label: "매주 점검 요일", note: "이 요일의 점검은 세션 전부를 보고 브레인 정리, 스킬 다듬기, 지도 다시 그리기까지 한다", step: 1, min: 0, max: 6, show: (n) => "일월화수목금토"[n] + "요일" },
-    { kind: "pick", key: "thinking", label: "판단 모델", note: "가볍게: 전부 Haiku. 맞춰서: 요약은 Haiku, 보낼 곳·합치기·브레인 담기는 Sonnet, 주간 점검은 Opus. 깊게: 한 단계씩 더 큰 모델", options: [["light", "가볍게"], ["balanced", "맞춰서"], ["deep", "깊게"]] },
+    { kind: "number", key: "reviewHour", label: tr("점검 시각"), note: tr("매일 이 시각에 세션 정리와 스킬 후보 찾기를 한다. 그때 Julgi나 맥이 꺼져 있었으면 다음에 켰을 때 돈다"), step: 1, min: 0, max: 23, show: (n) => (n < 12 ? tr`오전 ${n}시` : n === 12 ? tr("낮 12시") : tr`오후 ${n - 12}시`) },
+    { kind: "number", key: "reviewDay", label: tr("매주 점검 요일"), note: tr("이 요일의 점검은 세션 전부를 보고 브레인 정리, 스킬 다듬기, 지도 다시 그리기까지 한다"), step: 1, min: 0, max: 6, show: (n) => [tr("일요일"), tr("월요일"), tr("화요일"), tr("수요일"), tr("목요일"), tr("금요일"), tr("토요일")][n] },
+    { kind: "pick", key: "thinking", label: tr("판단 모델"), note: tr("가볍게: 전부 Haiku. 맞춰서: 요약은 Haiku, 보낼 곳·합치기·브레인 담기는 Sonnet, 주간 점검은 Opus. 깊게: 한 단계씩 더 큰 모델"), options: [["light", tr("가볍게")], ["balanced", tr("맞춰서")], ["deep", tr("깊게")]] },
     ],
   },
   {
-    title: "지도",
-    hint: "레포를 찾아가게 하는 것",
+    id: "지도", // i18n-ok
+    title: tr("지도"),
+    hint: tr("레포를 찾아가게 하는 것"),
     rows: [
-    { kind: "text", key: "mapRoot", label: "레포가 모여 있는 폴더", note: "그 바로 아래의 git 레포를 전부 지도에 넣고, 세션이 읽을 수 있게 연다. 쉼표로 여럿. 바꾼 뒤 ⌘G의 지도 탭에서 다시 그린다", hint: "예: ~/code · 비우면 Julgi가 고른다" },
-    { kind: "toggle", key: "mapFetch", label: "지도 그릴 때 최신으로 받기", note: "지도를 그리기 전에 레포마다 원격에서 받아 온다. 고친 파일이 없고 기본 브랜치에 있는 레포만 앞으로 당기고, 작업 중인 레포는 건드리지 않는다" },
+    { kind: "text", key: "mapRoot", label: tr("레포가 모여 있는 폴더"), note: tr("그 바로 아래의 git 레포를 전부 지도에 넣고, 세션이 읽을 수 있게 연다. 쉼표로 여럿. 바꾼 뒤 ⌘G의 지도 탭에서 다시 그린다"), hint: tr("예: ~/code · 비우면 Julgi가 고른다") },
+    { kind: "toggle", key: "mapFetch", label: tr("지도 그릴 때 최신으로 받기"), note: tr("지도를 그리기 전에 레포마다 원격에서 받아 온다. 고친 파일이 없고 기본 브랜치에 있는 레포만 앞으로 당기고, 작업 중인 레포는 건드리지 않는다") },
     ],
   },
   {
-    title: "연결",
+    id: "연결", // i18n-ok
+    title: tr("연결"),
     hint: "GitHub · GitLab · Jira",
     rows: [
-      { kind: "github", label: "GitHub", note: "연결하면 PR을 Julgi 안에서 본다. 터미널의 PR 링크를 ⌘ 클릭하거나 ⌘K에서 #번호를 친다. 로그인은 gh(GitHub CLI)가 하고 토큰도 gh가 키체인에 둔다. Julgi는 토큰을 보지 않는다" },
-      { kind: "gitlab", label: "GitLab", note: "연결하면 MR도 PR과 똑같이 본다(PR 화면, 작업 페이지, 알림). 로그인은 glab(GitLab CLI)이 하고 토큰도 glab이 둔다. 회사 GitLab이면 glab auth login에서 그 호스트를 고른다" },
-      { kind: "jira", label: "Jira", note: "연결하면 티켓을 Julgi 안에서 보고, 티켓으로 일을 시작하고, 상태를 옮긴다. 토큰은 macOS 키체인에만 둔다(Cloud는 id.atlassian.com에서 만든 API 토큰, Server/DC는 개인 액세스 토큰)" },
-      { kind: "pick", key: "jiraWatch", label: "챙길 티켓", note: "정한 주기마다 내게 배정된 티켓을 보고 새로 배정되거나 상태가 바뀌거나 남이 코멘트를 달면 알리고 ⌘J에 넣는다", options: [["mine", "내게 배정된 것"], ["off", "끔"]] },
-      { kind: "number", key: "jiraEveryMin", label: "티켓 확인 주기", note: "내 티켓을 이만큼마다 본다", step: 1, min: 1, max: 60, show: (n) => `${n}분` },
-      { kind: "text", key: "jiraStartTransition", label: "시작할 때 옮길 상태", note: "이 티켓으로 시작할 때 이 상태로 옮길지 묻는다. 비우면 묻지 않는다", hint: "In Progress" },
-      { kind: "text", key: "jiraPrTransition", label: "PR 올리면 옮길 상태", note: "티켓과 이어진 세션이 PR을 올리면 이 상태로 옮길지 묻는다", hint: "In Review" },
-      { kind: "text", key: "jiraMergeTransition", label: "머지되면 옮길 상태", note: "그 PR이 머지되면 이 상태로 옮길지 묻는다", hint: "Done" },
-      { kind: "text", key: "jiraRepos", label: "프로젝트 키 → 레포", note: "이 티켓으로 시작할 때 고를 레포. 시작 창에서 고르면 저절로 채운다", hint: "ABC=acme-api, OPS=acme-infra" },
-      { kind: "pick", key: "prWatch", label: "챙길 PR", note: "정한 주기마다 PR을 보고 CI가 깨지거나 남이 코멘트를 달거나 리뷰를 받거나 머지되면 알린다. 세션이 올린 PR은 그 세션을 내 차례로 올리고, 나머지 내 PR은 ⌘J의 \"내 PR\"에 넣는다", options: [["mine", "내 PR 전부"], ["session", "세션이 올린 PR만"], ["off", "끔"]] },
-      { kind: "number", key: "prEveryMin", label: "PR 확인 주기", note: "세션 줄의 PR과 내 PR을 이만큼마다 본다. 짧을수록 알림이 빨리 온다", step: 1, min: 1, max: 30, show: (n) => `${n}분` },
-      { kind: "number", key: "askEveryMin", label: "리뷰 요청 확인 주기", note: "나한테 온 리뷰 요청을 이만큼마다 본다", step: 1, min: 1, max: 60, show: (n) => `${n}분` },
-      { kind: "toggle", key: "refreshOnFocus", label: "돌아오면 바로 보기", note: "다른 앱에 있다 Julgi 창으로 돌아오면 PR과 리뷰 요청을 기다리지 않고 바로 다시 본다" },
-      { kind: "number", key: "prViewRefreshSec", label: "PR 화면 새로 읽기", note: "PR 화면을 열어 둔 동안 이만큼마다 새로 읽어 남이 단 코멘트와 CI를 들인다. 끄면 r을 누를 때만 읽는다", step: 10, min: 0, max: 300, show: (n) => (n ? `${n}초` : "끔") },
-      { kind: "toggle", key: "wakeOnPr", label: "잠든 세션 깨우기", note: "최근 세션이 남긴 PR은 세션이 잠들어 있어도 챙긴다. 켜면 그 PR에 일이 생길 때 세션을 바로 깨워 둔다(세션 하나가 메모리를 0.3–1GB 쓴다). 끄면 알리고 ⌘J의 내 차례에 올려 두기만 하고, 고르면 그때 깨운다" },
-      { kind: "toggle", key: "reviewAsks", label: "리뷰 요청", note: "정한 주기마다 나한테 리뷰를 부탁한 PR을 보고 ⌘J의 \"리뷰 요청\"에 넣는다. 새로 오면 알린다" },
+      { kind: "github", label: "GitHub", note: tr("연결하면 PR을 Julgi 안에서 본다. 터미널의 PR 링크를 ⌘ 클릭하거나 ⌘K에서 #번호를 친다. 로그인은 gh(GitHub CLI)가 하고 토큰도 gh가 키체인에 둔다. Julgi는 토큰을 보지 않는다") },
+      { kind: "gitlab", label: "GitLab", note: tr("연결하면 MR도 PR과 똑같이 본다(PR 화면, 작업 페이지, 알림). 로그인은 glab(GitLab CLI)이 하고 토큰도 glab이 둔다. 회사 GitLab이면 glab auth login에서 그 호스트를 고른다") },
+      { kind: "jira", label: "Jira", note: tr("연결하면 티켓을 Julgi 안에서 보고, 티켓으로 일을 시작하고, 상태를 옮긴다. 토큰은 macOS 키체인에만 둔다(Cloud는 id.atlassian.com에서 만든 API 토큰, Server/DC는 개인 액세스 토큰)") },
+      { kind: "pick", key: "jiraWatch", label: tr("챙길 티켓"), note: tr("정한 주기마다 내게 배정된 티켓을 보고 새로 배정되거나 상태가 바뀌거나 남이 코멘트를 달면 알리고 ⌘J에 넣는다"), options: [["mine", tr("내게 배정된 것")], ["off", tr("끔")]] },
+      { kind: "number", key: "jiraEveryMin", label: tr("티켓 확인 주기"), note: tr("내 티켓을 이만큼마다 본다"), step: 1, min: 1, max: 60, show: (n) => tr`${n}분` },
+      { kind: "text", key: "jiraStartTransition", label: tr("시작할 때 옮길 상태"), note: tr("이 티켓으로 시작할 때 이 상태로 옮길지 묻는다. 비우면 묻지 않는다"), hint: "In Progress" },
+      { kind: "text", key: "jiraPrTransition", label: tr("PR 올리면 옮길 상태"), note: tr("티켓과 이어진 세션이 PR을 올리면 이 상태로 옮길지 묻는다"), hint: "In Review" },
+      { kind: "text", key: "jiraMergeTransition", label: tr("머지되면 옮길 상태"), note: tr("그 PR이 머지되면 이 상태로 옮길지 묻는다"), hint: "Done" },
+      { kind: "text", key: "jiraRepos", label: tr("프로젝트 키 → 레포"), note: tr("이 티켓으로 시작할 때 고를 레포. 시작 창에서 고르면 저절로 채운다"), hint: "ABC=acme-api, OPS=acme-infra" },
+      { kind: "pick", key: "prWatch", label: tr("챙길 PR"), note: tr("정한 주기마다 PR을 보고 CI가 깨지거나 남이 코멘트를 달거나 리뷰를 받거나 머지되면 알린다. 세션이 올린 PR은 그 세션을 내 차례로 올리고, 나머지 내 PR은 ⌘J의 \"내 PR\"에 넣는다"), options: [["mine", tr("내 PR 전부")], ["session", tr("세션이 올린 PR만")], ["off", tr("끔")]] },
+      { kind: "number", key: "prEveryMin", label: tr("PR 확인 주기"), note: tr("세션 줄의 PR과 내 PR을 이만큼마다 본다. 짧을수록 알림이 빨리 온다"), step: 1, min: 1, max: 30, show: (n) => tr`${n}분` },
+      { kind: "number", key: "askEveryMin", label: tr("리뷰 요청 확인 주기"), note: tr("나한테 온 리뷰 요청을 이만큼마다 본다"), step: 1, min: 1, max: 60, show: (n) => tr`${n}분` },
+      { kind: "toggle", key: "refreshOnFocus", label: tr("돌아오면 바로 보기"), note: tr("다른 앱에 있다 Julgi 창으로 돌아오면 PR과 리뷰 요청을 기다리지 않고 바로 다시 본다") },
+      { kind: "number", key: "prViewRefreshSec", label: tr("PR 화면 새로 읽기"), note: tr("PR 화면을 열어 둔 동안 이만큼마다 새로 읽어 남이 단 코멘트와 CI를 들인다. 끄면 r을 누를 때만 읽는다"), step: 10, min: 0, max: 300, show: (n) => (n ? tr`${n}초` : tr("끔")) },
+      { kind: "toggle", key: "wakeOnPr", label: tr("잠든 세션 깨우기"), note: tr("최근 세션이 남긴 PR은 세션이 잠들어 있어도 챙긴다. 켜면 그 PR에 일이 생길 때 세션을 바로 깨워 둔다(세션 하나가 메모리를 0.3–1GB 쓴다). 끄면 알리고 ⌘J의 내 차례에 올려 두기만 하고, 고르면 그때 깨운다") },
+      { kind: "toggle", key: "reviewAsks", label: tr("리뷰 요청"), note: tr("정한 주기마다 나한테 리뷰를 부탁한 PR을 보고 ⌘J의 \"리뷰 요청\"에 넣는다. 새로 오면 알린다") },
     ],
   },
   {
-    title: "밖에서",
-    hint: "폰으로 보기",
+    id: "밖에서", // i18n-ok
+    title: tr("밖에서"),
+    hint: tr("폰으로 보기"),
     rows: [
-    { kind: "toggle", key: "remote", label: "폰에서 보기", note: "Tailscale 망 안에서만 열리는 작은 웹 화면을 띄운다. 폰에서 내 차례인 세션에 답하고 새 일을 던진다. 켜면 아래에 주소가 나온다(누르면 복사). 주소에 든 토큰을 아는 기기만 들어온다" },
+    { kind: "toggle", key: "remote", label: tr("폰에서 보기"), note: tr("Tailscale 망 안에서만 열리는 작은 웹 화면을 띄운다. 폰에서 내 차례인 세션에 답하고 새 일을 던진다. 켜면 아래에 주소가 나온다(누르면 복사). 주소에 든 토큰을 아는 기기만 들어온다") },
     ],
   },
 ];
 // 단축키는 고칠 값이 아니라 보는 것이다. 도움말(⌘/)과 같은 목록을 쓴다
-SECTIONS.push({ title: "단축키", hint: "⌘/로도 본다", rows: [...CORE, ...MORE].map(([label, note]) => ({ kind: "keys" as const, label, note })) });
+SECTIONS.push({ id: "keys", title: tr("단축키"), hint: tr("⌘/로도 본다"), rows: [...CORE, ...MORE].map(([label, note]) => ({ kind: "keys" as const, label, note })) });
 const ROWS: Row[] = SECTIONS.flatMap((sec) => sec.rows);
 /** 줄 번호 → 그 줄이 든 묶음 번호 */
 const SECTION_OF: number[] = SECTIONS.flatMap((sec, n) => sec.rows.map(() => n));
@@ -151,7 +161,7 @@ const showKey = (combo: string) =>
 
 /** 설정 (⌘,). 바꾸는 즉시 적용되고 ~/.julgi/config.json에 남는다 */
 export default function Settings({ onChange, onClose, remoteUrl, onConnect, onConnectLab, startAt }: Props) {
-  const [at, setAt] = useState(() => Math.max(0, FIRST_OF[SECTIONS.findIndex((s) => s.title === startAt)] ?? 0));
+  const [at, setAt] = useState(() => Math.max(0, FIRST_OF[SECTIONS.findIndex((s) => s.id === startAt)] ?? 0));
   // gh가 있는가, 누구로 로그인했는가. undefined면 아직 보는 중
   const [gh, setGh] = useState<[boolean, string] | undefined>(undefined);
   useEffect(() => void invoke<[boolean, string]>("gh_status").then(setGh, () => setGh([false, ""])), []);
@@ -254,9 +264,9 @@ export default function Settings({ onChange, onClose, remoteUrl, onConnect, onCo
       <div className="pal settings" ref={box} tabIndex={-1} onKeyDown={onKey} onMouseDown={(e) => e.stopPropagation()}>
         <div className="set-body">
           <nav className="set-nav">
-            <div className="set-title">설정</div>
+            <div className="set-title">{tr("설정")}</div>
             {SECTIONS.map((sec, n) => (
-              <button key={sec.title} type="button" tabIndex={-1} className={n === SECTION_OF[at] ? "on" : ""} onClick={() => setAt(FIRST_OF[n])}>
+              <button key={sec.id} type="button" tabIndex={-1} className={n === SECTION_OF[at] ? "on" : ""} onClick={() => setAt(FIRST_OF[n])}>
                 <b>{sec.title}</b>
                 <small>{sec.hint}</small>
               </button>
@@ -277,12 +287,12 @@ export default function Settings({ onChange, onClose, remoteUrl, onConnect, onCo
                     <div className="set-note">{row.note}</div>
                     {row.kind === "toggle" && row.key === "remote" && config.remote && remoteUrl && (
                       <div className="set-remote">
-                        {remoteUrl.startsWith("http") && <span className="set-qr" title="폰 카메라로 찍는다" dangerouslySetInnerHTML={{ __html: qrSvg(remoteUrl) }} />}
+                        {remoteUrl.startsWith("http") && <span className="set-qr" title={tr("폰 카메라로 찍는다")} dangerouslySetInnerHTML={{ __html: qrSvg(remoteUrl) }} />}
                         <div>
-                          <button type="button" tabIndex={-1} className="set-url" title="누르면 복사한다" onClick={() => void navigator.clipboard.writeText(remoteUrl.match(/https?:\S+/)?.[0]?.replace(/\)$/, "") ?? remoteUrl).catch(() => {})}>
+                          <button type="button" tabIndex={-1} className="set-url" title={tr("누르면 복사한다")} onClick={() => void navigator.clipboard.writeText(remoteUrl.match(/https?:\S+/)?.[0]?.replace(/\)$/, "") ?? remoteUrl).catch(() => {})}>
                             {remoteUrl}
                           </button>
-                          {remoteUrl.startsWith("http") && <div className="set-note">폰 카메라로 QR을 찍어 연 뒤, 공유 단추에서 "홈 화면에 추가"를 누르면 다음부터는 아이콘으로 들어온다. 주소를 외울 일이 없다.</div>}
+                          {remoteUrl.startsWith("http") && <div className="set-note">{tr("폰 카메라로 QR을 찍어 연 뒤, 공유 단추에서 \"홈 화면에 추가\"를 누르면 다음부터는 아이콘으로 들어온다. 주소를 외울 일이 없다.")}</div>}
                         </div>
                       </div>
                     )}
@@ -318,26 +328,26 @@ export default function Settings({ onChange, onClose, remoteUrl, onConnect, onCo
                     )}
                     {row.kind === "key" && (
                       <button type="button" tabIndex={-1} className={"set-toggle" + (taking && i === at ? " yes" : "")} onClick={() => (setAt(i), setTaking(true))}>
-                        {taking && i === at ? "쓸 키를 누른다…" : showKey(String(config[row.key])) || "안 씀"}
+                        {taking && i === at ? tr("쓸 키를 누른다…") : showKey(String(config[row.key])) || tr("안 씀")}
                       </button>
                     )}
                     {row.kind === "toggle" && (
                       <button type="button" tabIndex={-1} role="switch" aria-checked={!!config[row.key]} className={"set-switch" + (config[row.key] ? " yes" : "")} onClick={() => nudge(row, 1)}>
                         <i />
-                        <span>{config[row.key] ? "켜짐" : "꺼짐"}</span>
+                        <span>{config[row.key] ? tr("켜짐") : tr("꺼짐")}</span>
                       </button>
                     )}
                     {row.kind === "github" && (
                       <span className="set-gh">
                         {gh === undefined ? (
-                          <span className="set-note">보는 중</span>
+                          <span className="set-note">{tr("보는 중")}</span>
                         ) : !gh[0] ? (
-                          <span className="set-note">gh가 없다 · 터미널에서 brew install gh</span>
+                          <span className="set-note">{tr("gh가 없다 · 터미널에서 brew install gh")}</span>
                         ) : gh[1] ? (
-                          <span className="set-on">● {gh[1]}로 연결됨</span>
+                          <span className="set-on">{tr`● ${gh[1]}로 연결됨`}</span>
                         ) : (
                           <button type="button" tabIndex={-1} className="set-toggle" onClick={onConnect}>
-                            연결
+                            {tr("연결하기")}
                           </button>
                         )}
                       </span>
@@ -347,14 +357,14 @@ export default function Settings({ onChange, onClose, remoteUrl, onConnect, onCo
                         <span className="set-gh">
                           <span className="set-on">● {jira.name} · {config.jiraSite.replace(/^https:\/\//, "")}</span>
                           <button type="button" tabIndex={-1} className="set-toggle" onClick={disconnectJira}>
-                            끊기
+                            {tr("끊기")}
                           </button>
                         </span>
                       ) : (
                         <span className="set-jira" onClick={(e) => e.stopPropagation()}>
-                          <input tabIndex={-1} value={jiraForm.site} placeholder="https://회사.atlassian.net" spellCheck={false} onChange={(e) => setJiraForm({ ...jiraForm, site: e.target.value })} />
-                          {jiraForm.kind === "cloud" && <input tabIndex={-1} value={jiraForm.email} placeholder="이메일" spellCheck={false} onChange={(e) => setJiraForm({ ...jiraForm, email: e.target.value })} />}
-                          <input tabIndex={-1} type="password" value={jiraForm.token} placeholder={jiraForm.kind === "cloud" ? "API 토큰" : "개인 액세스 토큰"} onChange={(e) => setJiraForm({ ...jiraForm, token: e.target.value })} />
+                          <input tabIndex={-1} value={jiraForm.site} placeholder={tr("https://회사.atlassian.net")} spellCheck={false} onChange={(e) => setJiraForm({ ...jiraForm, site: e.target.value })} />
+                          {jiraForm.kind === "cloud" && <input tabIndex={-1} value={jiraForm.email} placeholder={tr("이메일")} spellCheck={false} onChange={(e) => setJiraForm({ ...jiraForm, email: e.target.value })} />}
+                          <input tabIndex={-1} type="password" value={jiraForm.token} placeholder={jiraForm.kind === "cloud" ? tr("API 토큰") : tr("개인 액세스 토큰")} onChange={(e) => setJiraForm({ ...jiraForm, token: e.target.value })} />
                           <span className="set-seg">
                             {[["cloud", "Cloud"], ["server", "Server/DC"]].map(([v, l]) => (
                               <button key={v} type="button" tabIndex={-1} className={jiraForm.kind === v ? "yes" : ""} onClick={() => setJiraForm({ ...jiraForm, kind: v })}>
@@ -363,12 +373,12 @@ export default function Settings({ onChange, onClose, remoteUrl, onConnect, onCo
                             ))}
                           </span>
                           <button type="button" tabIndex={-1} className="set-toggle" disabled={jira.busy || !jiraForm.token || jiraForm.site.length < 10} onClick={connectJira}>
-                            {jira.busy ? "확인 중" : "연결"}
+                            {jira.busy ? tr("확인 중") : tr("연결하기")}
                           </button>
                           {jira.error && <span className="set-err">{jira.error}</span>}
                           {jiraForm.kind === "cloud" && (
                             <button type="button" tabIndex={-1} className="set-link" onClick={() => void openUrl("https://id.atlassian.com/manage-profile/security/api-tokens")}>
-                              토큰 만들기 ↗
+                              {tr("토큰 만들기 ↗")}
                             </button>
                           )}
                         </span>
@@ -376,14 +386,14 @@ export default function Settings({ onChange, onClose, remoteUrl, onConnect, onCo
                     {row.kind === "gitlab" && (
                       <span className="set-gh">
                         {lab === undefined ? (
-                          <span className="set-note">보는 중</span>
+                          <span className="set-note">{tr("보는 중")}</span>
                         ) : !lab?.[0] ? (
-                          <span className="set-note">glab이 없다 · 터미널에서 brew install glab</span>
+                          <span className="set-note">{tr("glab이 없다 · 터미널에서 brew install glab")}</span>
                         ) : lab[1] ? (
-                          <span className="set-on">● {lab[1]}로 연결됨</span>
+                          <span className="set-on">{tr`● ${lab[1]}로 연결됨`}</span>
                         ) : (
                           <button type="button" tabIndex={-1} className="set-toggle" onClick={onConnectLab}>
-                            연결
+                            {tr("연결하기")}
                           </button>
                         )}
                       </span>
@@ -396,7 +406,7 @@ export default function Settings({ onChange, onClose, remoteUrl, onConnect, onCo
             </div>
           </div>
         </div>
-        <div className="pal-foot">Tab 묶음 넘기기 · ↑↓ 고르기 · ←→ 바꾸기 · Enter 켜고 끄기, 글 고치기 · 바로 적용된다 · Esc · 나머지 값은 ~/.julgi/config.json</div>
+        <div className="pal-foot">{tr("Tab 묶음 넘기기 · ↑↓ 고르기 · ←→ 바꾸기 · Enter 켜고 끄기, 글 고치기 · 바로 적용된다 · Esc · 나머지 값은 ~/.julgi/config.json")}</div>
       </div>
     </div>
   );

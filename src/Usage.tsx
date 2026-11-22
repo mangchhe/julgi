@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { ago } from "./model";
+import { tr } from "./i18n";
 
 /** Rust token_usage가 주는 한 줄: 세션 · 날짜 · 모델마다 */
 type Row = { session: string; cwd: string; day: number; model: string; input: number; output: number; cache_read: number; cache_write: number; turns: number; last: number };
@@ -14,10 +15,10 @@ const big = (n: number) => (n >= 1e9 ? `${(n / 1e9).toFixed(1)}B` : n >= 1e6 ? `
 
 /** 막대가 보여 줄 값. 캐시 읽기가 대부분이라 쌓으면 나머지가 안 보여서, 한 번에 하나를 고른다 */
 const METRICS: { id: string; label: string; of: (s: Sum) => number }[] = [
-  { id: "all", label: "전체", of: total },
-  { id: "io", label: "입력+출력", of: (s) => s.input + s.output },
-  { id: "out", label: "출력", of: (s) => s.output },
-  { id: "read", label: "캐시 읽기", of: (s) => s.cache_read },
+  { id: "all", label: tr("전체"), of: total },
+  { id: "io", label: tr("입력+출력"), of: (s) => s.input + s.output },
+  { id: "out", label: tr("출력"), of: (s) => s.output },
+  { id: "read", label: tr("캐시 읽기"), of: (s) => s.cache_read },
 ];
 const RANGES = [7, 14, 30];
 
@@ -103,38 +104,38 @@ export default function Usage({ sessionInfo, onOpenSession, onClose }: Props) {
     <div className="pal-back us-back" onMouseDown={onClose}>
     <div className="us" ref={box} tabIndex={-1} onMouseDown={(e) => e.stopPropagation()} onKeyDown={(e) => e.key === "Escape" && (e.stopPropagation(), only ? setOnly(null) : onClose())}>
       <div className="us-top">
-        <b className="us-title">사용량</b>
+        <b className="us-title">{tr("사용량")}</b>
         <span className="set-seg us-seg">
           {RANGES.map((n) => (
             <button key={n} type="button" tabIndex={-1} className={n === days ? "yes" : ""} onClick={() => setDays(n)}>
-              {n}일
+              {tr`${n}일`}
             </button>
           ))}
         </span>
         {only ? (
-          <button type="button" tabIndex={-1} className="us-only" onClick={() => setOnly(null)} title="거르기 풀기 (Esc)">
-            {only.kind === "model" ? "모델" : "프로젝트"}: {only.name.replace(/^claude-/, "")} ×
+          <button type="button" tabIndex={-1} className="us-only" onClick={() => setOnly(null)} title={tr("거르기 풀기 (Esc)")}>
+            {only.kind === "model" ? tr("모델") : tr("프로젝트")}: {only.name.replace(/^claude-/, "")} ×
           </button>
         ) : (
-          <small className="us-note">대화 기록에서 센 토큰 · 서브에이전트 포함 · 모델이나 프로젝트를 누르면 그것만 본다</small>
+          <small className="us-note">{tr("대화 기록에서 센 토큰 · 서브에이전트 포함 · 모델이나 프로젝트를 누르면 그것만 본다")}</small>
         )}
-        <button type="button" tabIndex={-1} className="us-close" onClick={onClose} title="닫기 (Esc)">
+        <button type="button" tabIndex={-1} className="us-close" onClick={onClose} title={tr("닫기 (Esc)")}>
           ×
         </button>
       </div>
       {rows === null ? (
-        <div className="side-none us-wait">기록을 읽는 중 (처음 한 번은 몇 초 걸린다)</div>
+        <div className="side-none us-wait">{tr("기록을 읽는 중 (처음 한 번은 몇 초 걸린다)")}</div>
       ) : (
         <div className="us-body">
           <div className="us-tiles">
             {[
-              ["전체 토큰", big(total(view.all))],
-              ["입력", big(view.all.input)],
-              ["출력", big(view.all.output)],
-              ["캐시 읽기", big(view.all.cache_read)],
-              ["캐시 쓰기", big(view.all.cache_write)],
-              ["답", view.all.turns.toLocaleString()],
-              ["캐시 재사용률", `${(reuse * 100).toFixed(0)}%`],
+              [tr("전체 토큰"), big(total(view.all))],
+              [tr("입력"), big(view.all.input)],
+              [tr("출력"), big(view.all.output)],
+              [tr("캐시 읽기"), big(view.all.cache_read)],
+              [tr("캐시 쓰기"), big(view.all.cache_write)],
+              [tr("답"), view.all.turns.toLocaleString()],
+              [tr("캐시 재사용률"), `${(reuse * 100).toFixed(0)}%`],
             ].map(([k, v]) => (
               <div key={k} className="us-tile">
                 <b>{v}</b>
@@ -145,7 +146,7 @@ export default function Usage({ sessionInfo, onOpenSession, onClose }: Props) {
 
           <div className="us-card">
             <div className="us-card-head">
-              <b>날짜별 · {m.label}</b>
+              <b>{tr`날짜별 · ${m.label}`}</b>
               <span className="set-seg us-seg">
                 {METRICS.map((x) => (
                   <button key={x.id} type="button" tabIndex={-1} className={x.id === metric ? "yes" : ""} onClick={() => setMetric(x.id)}>
@@ -155,7 +156,7 @@ export default function Usage({ sessionInfo, onOpenSession, onClose }: Props) {
               </span>
             </div>
             <div className="us-chart">
-              <div className="us-bars" role="img" aria-label={`최근 ${days}일 날짜별 ${m.label} 토큰`} onMouseLeave={() => setHover(null)}>
+              <div className="us-bars" role="img" aria-label={tr`최근 ${days}일 날짜별 ${m.label} 토큰`} onMouseLeave={() => setHover(null)}>
                 {view.days.map(({ day, s: sum }, i) => {
                   const v = m.of(sum);
                   return (
@@ -170,10 +171,10 @@ export default function Usage({ sessionInfo, onOpenSession, onClose }: Props) {
               {shown && (
                 <div className="us-tip" style={{ left: `${(((hover ?? 0) + 0.5) / view.days.length) * 100}%` }}>
                   <b>{label(shown.day)}</b>
-                  <span>전체 {big(total(shown.s))}</span>
-                  <span>입력 {big(shown.s.input)} · 출력 {big(shown.s.output)}</span>
-                  <span>캐시 읽기 {big(shown.s.cache_read)} · 쓰기 {big(shown.s.cache_write)}</span>
-                  <span>답 {shown.s.turns.toLocaleString()}</span>
+                  <span>{tr`전체 ${big(total(shown.s))}`}</span>
+                  <span>{tr`입력 ${big(shown.s.input)} · 출력 ${big(shown.s.output)}`}</span>
+                  <span>{tr`캐시 읽기 ${big(shown.s.cache_read)} · 쓰기 ${big(shown.s.cache_write)}`}</span>
+                  <span>{tr`답 ${shown.s.turns.toLocaleString()}`}</span>
                 </div>
               )}
             </div>
@@ -181,15 +182,15 @@ export default function Usage({ sessionInfo, onOpenSession, onClose }: Props) {
 
           <div className="us-two">
             {[
-              { title: "모델별", kind: "model" as const, list: view.models },
-              { title: "프로젝트별", kind: "repo" as const, list: view.repos },
+              { title: tr("모델별"), kind: "model" as const, list: view.models },
+              { title: tr("프로젝트별"), kind: "repo" as const, list: view.repos },
             ].map(({ title, kind, list }) => {
               const top = Math.max(1, ...list.map(([, s]) => total(s)));
               return (
                 <div key={title} className="us-card">
                   <div className="us-card-head">
                     <b>{title}</b>
-                    <small>{list[0] ? `가장 많이: ${list[0][0]}` : ""}</small>
+                    <small>{list[0] ? tr`가장 많이: ${list[0][0]}` : ""}</small>
                   </div>
                   {list.map(([name, s]) => (
                     <button
@@ -197,7 +198,7 @@ export default function Usage({ sessionInfo, onOpenSession, onClose }: Props) {
                       type="button"
                       tabIndex={-1}
                       className={"us-line" + (only?.kind === kind && only.name === name ? " on" : "")}
-                      title={`입력 ${big(s.input)} · 출력 ${big(s.output)} · 캐시 읽기 ${big(s.cache_read)} · 캐시 쓰기 ${big(s.cache_write)} · 누르면 이것만 본다`}
+                      title={tr`입력 ${big(s.input)} · 출력 ${big(s.output)} · 캐시 읽기 ${big(s.cache_read)} · 캐시 쓰기 ${big(s.cache_write)} · 누르면 이것만 본다`}
                       onClick={() => setOnly(only?.kind === kind && only.name === name ? null : { kind, name })}
                     >
                       <div className="us-line-text">
@@ -208,11 +209,11 @@ export default function Usage({ sessionInfo, onOpenSession, onClose }: Props) {
                         <u style={{ width: `${(total(s) / top) * 100}%` }} />
                       </i>
                       <small>
-                        세션 {s.sessions.size} · 답 {s.turns.toLocaleString()}
+                        {tr`세션 ${s.sessions.size} · 답 ${s.turns.toLocaleString()}`}
                       </small>
                     </button>
                   ))}
-                  {!list.length && <div className="side-none">기록이 없다</div>}
+                  {!list.length && <div className="side-none">{tr("기록이 없다")}</div>}
                 </div>
               );
             })}
@@ -220,20 +221,20 @@ export default function Usage({ sessionInfo, onOpenSession, onClose }: Props) {
 
           <div className="us-card">
             <div className="us-card-head">
-              <b>최근 세션</b>
-              <small>누르면 그 세션을 연다</small>
+              <b>{tr("최근 세션")}</b>
+              <small>{tr("누르면 그 세션을 연다")}</small>
             </div>
             <table className="us-table">
               <thead>
                 <tr>
-                  <th>마지막 활동</th>
-                  <th>세션</th>
-                  <th>프로젝트</th>
-                  <th>모델</th>
-                  <th className="n">답</th>
-                  <th className="n">입력</th>
-                  <th className="n">출력</th>
-                  <th className="n">캐시</th>
+                  <th>{tr("마지막 활동")}</th>
+                  <th>{tr("세션")}</th>
+                  <th>{tr("프로젝트")}</th>
+                  <th>{tr("모델")}</th>
+                  <th className="n">{tr("답")}</th>
+                  <th className="n">{tr("입력")}</th>
+                  <th className="n">{tr("출력")}</th>
+                  <th className="n">{tr("캐시")}</th>
                 </tr>
               </thead>
               <tbody>
