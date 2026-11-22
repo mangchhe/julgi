@@ -84,7 +84,7 @@
     },
     {
       "name": "새 일: 같은 레포, 다른 주제",
-      "text": "acme-api에 회원 탈퇴 API 새로 만들어줘",
+      "text": "acme-api에 계정 삭제 API 새로 만들어줘",
       "expect": "new",
       "repo": "acme-api"
     },
