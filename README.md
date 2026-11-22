@@ -43,6 +43,17 @@ npm run tauri build    # src-tauri/target/release/bundle/macos/Julgi.app
 
 서명하지 않은 빌드다. 각자 빌드해서 쓴다.
 
+받아서 빌드하고 `/Applications`에 넣는 것까지 한 번에 하려면:
+
+```sh
+git clone git@github.com:mangchhe/julgi.git && cd julgi
+scripts/install.sh           # 도구 확인 → git pull → 빌드 → /Applications/Julgi.app
+scripts/install.sh --open    # 끝나면 Julgi를 다시 켠다
+scripts/install.sh --check   # 필요한 도구가 있는지만 본다
+```
+
+새 판으로 올릴 때도 같은 명령을 다시 돌린다. `~/.julgi`(줄기, 브레인, 설정)는 기기마다 따로다.
+
 ## 외울 키
 
 | 키 | 하는 일 |
