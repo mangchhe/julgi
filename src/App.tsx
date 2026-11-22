@@ -117,6 +117,8 @@ export default function App() {
   const prSeen = useRef<Record<string, PrStatus>>({});
   // 나한테 온 리뷰 요청. ⌘J 대기열의 아래 묶음이 된다
   const [asks, setAsks] = useState<ReviewAsk[]>([]);
+  // 세션과 이어지지 않은 내 PR 가운데 봐야 할 일이 생긴 것: "소유자/레포#번호" → { PR, 까닭 }. ⌘J의 "내 PR"이 된다
+  const [mineNews, setMineNews] = useState<Record<string, ReviewAsk & { news: string }>>({});
   const [reviews, setReviews] = useState<Review[]>([]); // 점검 기록. 판마다 값과 한 일이 남는다
   const [skillUses, setSkillUses] = useState<SkillUse[]>([]);
   const [skills, setSkills] = useState<SkillInfo[]>([]);
@@ -198,8 +200,8 @@ export default function App() {
   const waitCount = open.filter((o) => waiting(states[o.key])).length;
 
   // 키 처리와 이벤트 콜백은 한 번만 걸고, 최신 상태는 여기서 읽는다
-  const live = useRef({ open, panes, widths, focus, states, overlay, filter, sessions, home, base, fontSize, handing, byId, threads, memories, pinned, items, folders, names, zoom, notes, skills, reviews, acts, skillUses, closing, dead, mapText, skillCands, reviewing, prNews, asks });
-  live.current = { open, panes, widths, focus, states, overlay, filter, sessions, home, base, fontSize, handing, byId, threads, memories, pinned, items, folders, names, zoom, notes, skills, reviews, acts, skillUses, closing, dead, mapText, skillCands, reviewing, prNews, asks };
+  const live = useRef({ open, panes, widths, focus, states, overlay, filter, sessions, home, base, fontSize, handing, byId, threads, memories, pinned, items, folders, names, zoom, notes, skills, reviews, acts, skillUses, closing, dead, mapText, skillCands, reviewing, prNews, asks, mineNews, prShown });
+  live.current = { open, panes, widths, focus, states, overlay, filter, sessions, home, base, fontSize, handing, byId, threads, memories, pinned, items, folders, names, zoom, notes, skills, reviews, acts, skillUses, closing, dead, mapText, skillCands, reviewing, prNews, asks, mineNews, prShown };
 
   const say = (message: string, ms = 3500) => {
     setToast(message);
@@ -1597,6 +1599,13 @@ export default function App() {
     void invoke("notify", { title: nameOf(key).slice(0, 60), body: text });
     notified.current = { key, at: Date.now() };
   };
+  /** 세션과 이어지지 않은 내 PR에 일이 생겼다 */
+  const mineNotice = (pr: ReviewAsk, news: string) => {
+    const repo = pr.repository.nameWithOwner.split("/")[1];
+    record("PR", `내 PR ${repo} #${pr.number} · ${news}: ${pr.title.slice(0, 60)}`);
+    if (!config.notify || document.hasFocus()) return;
+    void invoke("notify", { title: `${repo} #${pr.number} · ${news}`, body: pr.title.slice(0, 80) });
+  };
   /** 새 리뷰 요청이 왔다 */
   const askNotice = (a: ReviewAsk) => {
     const repo = a.repository.nameWithOwner.split("/")[1];
@@ -1616,8 +1625,8 @@ export default function App() {
       (extra ? `\n\n덧붙여: ${extra}` : "");
     void dispatch({ kind: "new", cwd }, ask, { rank: 0, by: "리뷰 요청" });
   };
-  const actions = useRef({ readUsage, publishRemote, say, dispatch, show, close, sleep, requestQuit, handoff, exited, newSession, newShell, nextWaiting, cycleFilter, openTerm, resize, split, unsplit, finishThread, move, togglePin, tend, serve, confirmClose, toggleReview, prNotice, askNotice });
-  actions.current = { readUsage, publishRemote, say, dispatch, show, close, sleep, requestQuit, handoff, exited, newSession, newShell, nextWaiting, cycleFilter, openTerm, resize, split, unsplit, finishThread, move, togglePin, tend, serve, confirmClose, toggleReview, prNotice, askNotice };
+  const actions = useRef({ readUsage, publishRemote, say, dispatch, show, close, sleep, requestQuit, handoff, exited, newSession, newShell, nextWaiting, cycleFilter, openTerm, resize, split, unsplit, finishThread, move, togglePin, tend, serve, confirmClose, toggleReview, prNotice, askNotice, mineNotice });
+  actions.current = { readUsage, publishRemote, say, dispatch, show, close, sleep, requestQuit, handoff, exited, newSession, newShell, nextWaiting, cycleFilter, openTerm, resize, split, unsplit, finishThread, move, togglePin, tend, serve, confirmClose, toggleReview, prNotice, askNotice, mineNotice };
 
   /** 세션이 남긴 링크 가운데 마지막 PR */
   const prOfSession = (id?: string) => {
@@ -1635,7 +1644,8 @@ export default function App() {
       }
     });
     const poll = async () => {
-      const targets = new Map<string, { target: PrTarget; keys: string[] }>();
+      if (config.prWatch === "off") return setPrs({});
+      const targets = new Map<string, { target: PrTarget; keys: string[]; pr?: ReviewAsk }>();
       for (const o of live.current.open) {
         const target = prOfSession(o.sessionId);
         if (!target) continue;
@@ -1644,8 +1654,16 @@ export default function App() {
         entry.keys.push(o.key);
         targets.set(id, entry);
       }
+      // 내 PR 전부를 챙기면 세션과 이어지지 않은 내 PR도 같이 본다
+      if (config.prWatch === "mine") {
+        const text = await invoke<string>("pr_mine").catch(() => "");
+        for (const pr of text ? (JSON.parse(text) as ReviewAsk[]) : []) {
+          const id = `${pr.repository.nameWithOwner}#${pr.number}`;
+          if (!targets.has(id)) targets.set(id, { target: { repo: pr.repository.nameWithOwner, number: pr.number }, keys: [], pr });
+        }
+      }
       const next: Record<string, PrStatus> = {};
-      for (const [id, { target, keys }] of targets) {
+      for (const [id, { target, keys, pr }] of targets) {
         const now = await invoke<PrStatus>("pr_status", { repo: target.repo, number: target.number }).catch(() => null);
         if (!now) continue;
         next[id] = now;
@@ -1653,6 +1671,11 @@ export default function App() {
         const news = before ? newsOf(before, now) : "";
         prSeen.current[id] = now;
         if (!news) continue;
+        if (pr) {
+          setMineNews((old) => ({ ...old, [id]: { ...pr, news } }));
+          actions.current.mineNotice(pr, news);
+          continue;
+        }
         setPrNews((old) => ({ ...old, ...Object.fromEntries(keys.map((k) => [k, news])) }));
         actions.current.prNotice(keys[0], `PR #${target.number} ${news}`);
       }
@@ -1662,6 +1685,7 @@ export default function App() {
     // 리뷰 요청은 5분마다. 처음 보는 요청이 오면 알린다(Julgi를 켠 직후에 이미 있던 것은 알리지 않는다)
     let known: Set<string> | null = null;
     const pollAsks = async () => {
+      if (!config.reviewAsks) return setAsks([]);
       const text = await invoke<string>("pr_review_requests").catch(() => "");
       if (!text) return;
       const list = (JSON.parse(text) as ReviewAsk[]).filter((a) => !a.isDraft);
@@ -1783,7 +1807,7 @@ export default function App() {
       } else if (cmd && e.code === "KeyJ") {
         // 내 차례인 세션들과 마지막에 물은 말을 편다. 거기서 바로 답한다
         if (overlay === "queue") setOverlay(null);
-        else if (live.current.open.some((o) => waiting(live.current.states[o.key]) || live.current.prNews[o.key]) || live.current.asks.length) setOverlay("queue");
+        else if (live.current.open.some((o) => waiting(live.current.states[o.key]) || live.current.prNews[o.key]) || live.current.asks.length || Object.keys(live.current.mineNews).length) setOverlay("queue");
         else a.say("내 차례인 세션이 없다");
       }
       // 창만 닫아 메뉴 막대로 보낸다. 세션은 계속 돈다
@@ -2226,7 +2250,13 @@ export default function App() {
             .sort((a, b) => (states[a.key]?.since ?? Infinity) - (states[b.key]?.since ?? Infinity))
             .map((o) => ({ key: o.key, name: nameOf(o.key), repo: repoOf(o.cwd), state: states[o.key]?.state ?? "", since: states[o.key]?.since ?? 0, sessionId: o.sessionId, news: prNews[o.key] }))}
           asks={asks}
-          onView={(a) => openPr({ repo: a.repository.nameWithOwner, number: a.number })}
+          mine={Object.values(mineNews)}
+          onView={(a) => {
+            // 내 PR을 열어 봤으면 그 일은 본 것이다
+            const id = `${a.repository.nameWithOwner}#${a.number}`;
+            setMineNews(({ [id]: _, ...rest }) => rest);
+            openPr({ repo: a.repository.nameWithOwner, number: a.number });
+          }}
           onHand={(a, extra) => {
             handReview(a, extra);
             record("리뷰 맡김", `${a.repository.nameWithOwner} #${a.number}을 새 세션에 맡김${extra ? `: ${extra.slice(0, 60)}` : ""}`);

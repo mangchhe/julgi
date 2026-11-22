@@ -102,6 +102,12 @@ fn status_of(v: &serde_json::Value) -> Option<PrStatus> {
     })
 }
 
+/// 내가 연 열린 PR들. gh가 준 JSON 그대로
+#[tauri::command(async)]
+pub fn pr_mine() -> Result<String, String> {
+    run(&["search", "prs", "--author=@me", "--state=open", "--limit", "50", "--json", "number,title,repository,author,updatedAt,url,isDraft"])
+}
+
 /// 나한테 리뷰를 부탁한 열린 PR들. gh가 준 JSON 그대로
 #[tauri::command(async)]
 pub fn pr_review_requests() -> Result<String, String> {

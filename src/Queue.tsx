@@ -9,6 +9,8 @@ type Props = {
   rows: Waiting[];
   /** 나한테 온 리뷰 요청. 세션들 아래에 놓는다 */
   asks: ReviewAsk[];
+  /** 세션과 이어지지 않은 내 PR 가운데 일이 생긴 것. 세션과 리뷰 요청 사이에 놓는다 */
+  mine: (ReviewAsk & { news: string })[];
   /** 리뷰 요청을 PR 화면으로 연다 */
   onView: (ask: ReviewAsk) => void;
   /** 리뷰 요청을 새 세션에 맡긴다. extra는 덧붙여 시킬 말 */
@@ -31,11 +33,15 @@ const question = (reply: string) => {
  * 내 차례 (⌘J). 답을 기다리는 세션을 오래 기다린 순으로 놓고, 마지막에 무엇을 물었는지 보여 준다.
  * 여기서 바로 답을 쳐서 보내면 세션을 열어 읽고 돌아오는 왕복이 없다. 더 읽어야 하면 빈 채로 Enter를 눌러 연다
  */
-export default function Queue({ rows, asks, onView, onHand, onAnswer, onOpen, onClose }: Props) {
+export default function Queue({ rows, asks, mine, onView, onHand, onAnswer, onOpen, onClose }: Props) {
   // 답을 보낸 세션과 맡긴 리뷰는 상태가 바뀌기를 기다리지 않고 바로 뺀다
   const [gone, setGone] = useState<string[]>([]);
   const list = useMemo(() => rows.filter((r) => !gone.includes(r.key)), [rows, gone]);
-  const askList = useMemo(() => asks.filter((a) => !gone.includes(a.url)), [asks, gone]);
+  // 아래 묶음: 내 PR(일이 생긴 것) 다음에 리뷰 요청
+  const askList = useMemo(
+    () => [...mine.map((m) => ({ ...m, kind: "mine" as const })), ...asks.map((a) => ({ ...a, kind: "review" as const, news: "" }))].filter((a) => !gone.includes(a.url)),
+    [mine, asks, gone],
+  );
   const total = list.length + askList.length;
   const [at, setAt] = useState(0);
   const pos = Math.min(at, total - 1);
@@ -57,7 +63,7 @@ export default function Queue({ rows, asks, onView, onHand, onAnswer, onOpen, on
   }, [row?.key]);
   // 다 답했으면 닫는다
   useEffect(() => {
-    if (rows.length + asks.length && !total) onClose();
+    if (rows.length + asks.length + mine.length && !total) onClose();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [total]);
 
@@ -73,8 +79,8 @@ export default function Queue({ rows, asks, onView, onHand, onAnswer, onOpen, on
       setText("");
     } else if (ask && e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) {
       e.preventDefault();
-      // 빈 채로 Enter면 PR 화면, 글을 썼거나 ⌘Enter면 세션에 맡긴다
-      if (!text.trim() && !e.metaKey) return onView(ask), onClose();
+      // 빈 채로 Enter면 PR 화면, 글을 썼거나 ⌘Enter면 세션에 맡긴다. 내 PR은 늘 PR 화면으로 연다
+      if (ask.kind === "mine" || (!text.trim() && !e.metaKey)) return onView(ask), onClose();
       onHand(ask, text.trim());
       setGone((old) => [...old, ask.url]);
       setText("");
@@ -102,14 +108,20 @@ export default function Queue({ rows, asks, onView, onHand, onAnswer, onOpen, on
               </small>
             </button>
           ))}
-          {askList.length > 0 && <div className="qu-head">리뷰 요청 {askList.length}</div>}
           {askList.map((a, i) => (
+            <>
+            {(i === 0 || askList[i - 1].kind !== a.kind) && (
+              <div key={"h-" + a.kind} className="qu-head">
+                {a.kind === "mine" ? "내 PR" : "리뷰 요청"} {askList.filter((x) => x.kind === a.kind).length}
+              </div>
+            )}
             <button key={a.url} type="button" tabIndex={-1} className={"qu-row" + (a.url === ask?.url ? " on" : "")} onClick={() => (setAt(list.length + i), setText(""))}>
               <b>{a.title}</b>
               <small>
-                {a.repository.nameWithOwner.split("/")[1]} #{a.number} · {a.author.login} · {ago(Date.parse(a.updatedAt) / 1000)}
+                {a.repository.nameWithOwner.split("/")[1]} #{a.number} · {a.kind === "mine" ? <em className="qu-news">{a.news}</em> : a.author.login} · {ago(Date.parse(a.updatedAt) / 1000)}
               </small>
             </button>
+            </>
           ))}
         </div>
         <div className="qu-main">
@@ -121,11 +133,15 @@ export default function Queue({ rows, asks, onView, onHand, onAnswer, onOpen, on
                   {"\n"}
                   {ask.title}
                 </pre>
+                {ask.kind === "mine" ? (
+                  <small>내 PR에 일이 생겼다: {ask.news} · Enter로 PR 화면에서 본다</small>
+                ) : (
                 <small>
                   {ask.author.login}이 리뷰를 부탁했다{ask.isDraft ? " · 초안" : ""} · 빈 채로 Enter면 PR 화면에서 본다. 세션에 맡기면 새 세션이 PR을 읽고 짚을 곳을 정리한다(GitHub에 직접 올리지는 않는다)
                 </small>
+                )}
               </div>
-              <textarea ref={input} rows={2} value={text} placeholder="세션에 맡길 때 덧붙일 말 (예: 트랜잭션 위주로) · Enter 맡기기 · 빈 채로 Enter면 PR 화면 · ⌘Enter 바로 맡기기" onChange={(e) => setText(e.target.value)} />
+              {ask.kind === "review" && <textarea ref={input} rows={2} value={text} placeholder="세션에 맡길 때 덧붙일 말 (예: 트랜잭션 위주로) · Enter 맡기기 · 빈 채로 Enter면 PR 화면 · ⌘Enter 바로 맡기기" onChange={(e) => setText(e.target.value)} />}
             </>
           )}
           {row && (
