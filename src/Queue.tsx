@@ -1,10 +1,11 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { ago } from "./model";
-import { ReviewAsk } from "./pr";
+import { PrTarget, ReviewAsk } from "./pr";
 
 /** news: PR에 생긴 일(CI 실패, 새 코멘트 등). 있으면 답을 기다리는 게 아니라 PR 때문에 올라온 것이다 */
-export type Waiting = { key: string; name: string; repo: string; state: string; since: number; sessionId?: string; news?: string };
+/** pr: 이 세션이 올린 PR. ⌥Enter로 PR 화면을 연다. state가 sleep이면 잠든 세션이다(고르면 깨운다) */
+export type Waiting = { key: string; name: string; repo: string; state: string; since: number; sessionId?: string; news?: string; pr?: PrTarget };
 type Props = {
   rows: Waiting[];
   /** 나한테 온 리뷰 요청. 세션들 아래에 놓는다 */
@@ -17,8 +18,10 @@ type Props = {
   onHand: (ask: ReviewAsk, extra: string) => void;
   /** 그 세션에 답을 보낸다 */
   onAnswer: (key: string, text: string) => void;
-  /** 그 세션을 칸에 올린다 */
+  /** 그 세션을 칸에 올린다. 잠든 세션이면 깨운다 */
   onOpen: (key: string) => void;
+  /** 그 세션의 PR을 PR 화면으로 연다 */
+  onPr: (pr: PrTarget) => void;
   onClose: () => void;
 };
 
@@ -33,7 +36,7 @@ const question = (reply: string) => {
  * 내 차례 (⌘J). 답을 기다리는 세션을 오래 기다린 순으로 놓고, 마지막에 무엇을 물었는지 보여 준다.
  * 여기서 바로 답을 쳐서 보내면 세션을 열어 읽고 돌아오는 왕복이 없다. 더 읽어야 하면 빈 채로 Enter를 눌러 연다
  */
-export default function Queue({ rows, asks, mine, onView, onHand, onAnswer, onOpen, onClose }: Props) {
+export default function Queue({ rows, asks, mine, onView, onHand, onAnswer, onOpen, onPr, onClose }: Props) {
   // 답을 보낸 세션과 맡긴 리뷰는 상태가 바뀌기를 기다리지 않고 바로 뺀다
   const [gone, setGone] = useState<string[]>([]);
   const list = useMemo(() => rows.filter((r) => !gone.includes(r.key)), [rows, gone]);
@@ -86,6 +89,10 @@ export default function Queue({ rows, asks, mine, onView, onHand, onAnswer, onOp
       onHand(ask, text.trim());
       setGone((old) => [...old, ask.url]);
       setText("");
+    } else if (row?.pr && e.key === "Enter" && e.altKey) {
+      // ⌥Enter: 세션 대신 그 PR을 연다
+      e.preventDefault();
+      return onPr(row.pr), onClose();
     } else if (row && e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) {
       e.preventDefault();
       // 빈 채로 누르거나 ⌘Enter면 세션을 연다. 확인을 묻는 세션(허락 창)은 글로 답할 수 없어 늘 연다
@@ -105,7 +112,8 @@ export default function Queue({ rows, asks, mine, onView, onHand, onAnswer, onOp
             <button key={r.key} type="button" tabIndex={-1} className={"qu-row" + (r.key === row?.key ? " on" : "")} onClick={() => (setAt(i), setText(""))}>
               <b>{r.name}</b>
               <small>
-                {r.repo} · {r.news ? <em className="qu-news">PR · {r.news}</em> : r.state === "ask" ? "확인이 필요함" : "답함"}
+                {r.repo} · {r.state === "sleep" ? "잠듦 · " : ""}
+                {r.news ? <em className="qu-news">PR{r.pr ? ` #${r.pr.number}` : ""} · {r.news}</em> : r.state === "ask" ? "확인이 필요함" : "답함"}
                 {r.since > 0 && ` · ${ago(r.since / 1000)}`}
               </small>
             </button>
@@ -159,7 +167,7 @@ export default function Queue({ rows, asks, mine, onView, onHand, onAnswer, onOp
                 ref={input}
                 rows={2}
                 value={text}
-                placeholder={row.state === "ask" ? "허락을 묻고 있다. Enter로 세션을 열어 고른다" : "여기에 답을 치고 Enter · 빈 채로 Enter면 세션을 연다"}
+                placeholder={row.state === "ask" ? "허락을 묻고 있다. Enter로 세션을 열어 고른다" : row.state === "sleep" ? "잠든 세션이다. 빈 채로 Enter면 깨워서 열고, 답을 치면 그 글을 들고 깨운다" + (row.pr ? " · ⌥Enter PR 보기" : "") : "여기에 답을 치고 Enter · 빈 채로 Enter면 세션을 연다" + (row.pr ? " · ⌥Enter PR 보기" : "")}
                 onChange={(e) => setText(e.target.value)}
               />
             </>

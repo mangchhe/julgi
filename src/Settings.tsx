@@ -99,6 +99,7 @@ const SECTIONS: { title: string; hint: string; rows: Row[] }[] = [
       { kind: "number", key: "askEveryMin", label: "리뷰 요청 확인 주기", note: "나한테 온 리뷰 요청을 이만큼마다 본다", step: 1, min: 1, max: 60, show: (n) => `${n}분` },
       { kind: "toggle", key: "refreshOnFocus", label: "돌아오면 바로 보기", note: "다른 앱에 있다 Julgi 창으로 돌아오면 PR과 리뷰 요청을 기다리지 않고 바로 다시 본다" },
       { kind: "number", key: "prViewRefreshSec", label: "PR 화면 새로 읽기", note: "PR 화면을 열어 둔 동안 이만큼마다 새로 읽어 남이 단 코멘트와 CI를 들인다. 끄면 r을 누를 때만 읽는다", step: 10, min: 0, max: 300, show: (n) => (n ? `${n}초` : "끔") },
+      { kind: "toggle", key: "wakeOnPr", label: "잠든 세션 깨우기", note: "최근 세션이 남긴 PR은 세션이 잠들어 있어도 챙긴다. 켜면 그 PR에 일이 생길 때 세션을 바로 깨워 둔다(세션 하나가 메모리를 0.3–1GB 쓴다). 끄면 알리고 ⌘J의 내 차례에 올려 두기만 하고, 고르면 그때 깨운다" },
       { kind: "toggle", key: "reviewAsks", label: "리뷰 요청", note: "정한 주기마다 나한테 리뷰를 부탁한 PR을 보고 ⌘J의 \"리뷰 요청\"에 넣는다. 새로 오면 알린다" },
     ],
   },

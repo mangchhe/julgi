@@ -300,6 +300,8 @@ export const config = {
   refreshOnFocus: true,
   /** PR 화면을 열어 둔 동안 몇 초마다 새로 읽을까. 0이면 r을 누를 때만 */
   prViewRefreshSec: 30,
+  /** 잠든 세션의 PR에 일이 생기면 그 세션을 바로 깨운다. 끄면 알리고 ⌘J에 올려 두기만 한다(고르면 깨운다) */
+  wakeOnPr: false,
   /** 아래 상태 줄에 Claude 구독 사용량(5시간 창, 주간)을 보여 준다. Claude Code의 로그인 토큰을 읽어 Anthropic의 사용량 주소를 부른다 */
   usage: false,
   /** 세션들이 쓰는 메모리 합계가 이만큼(GB)을 넘으면, 답까지 보고 쉬는 세션을 오래 쉰 것부터 시간을 기다리지 않고 재운다. 0이면 안 한다 */

@@ -33,9 +33,11 @@ type Props = {
   prOf: (key: string) => { target: PrTarget; status: PrStatus; news?: string } | undefined;
   /** PR에 일이 생긴 세션. 내 차례로 올린다 */
   prNews: Record<string, string>;
+  /** 잠든 세션 가운데 PR에 일이 생긴 것: 세션 ID → 까닭과 PR */
+  sleepNews: Record<string, { news: string; pr: PrTarget }>;
 };
 
-export default function Sidebar({ open, items, threads, byId, states, tasks, changes, pinned, dead, loading, current, shown, filter, onShow, onClose, onOpenSession, onSearch, prOf, prNews }: Props) {
+export default function Sidebar({ open, items, threads, byId, states, tasks, changes, pinned, dead, loading, current, shown, filter, onShow, onClose, onOpenSession, onSearch, prOf, prNews, sleepNews }: Props) {
   const openIds = new Set(open.map((o) => o.sessionId));
   const cutoff = Date.now() / 1000 - config.recentDays * 86400;
 
@@ -194,6 +196,11 @@ export default function Sidebar({ open, items, threads, byId, states, tasks, cha
                     {[elsewhere(s) ? "다른 곳에서 열림" : "", ago(s.mtime), s.work || thread ? s.repo : "", s.branch, thread && thread.sessions.length > 1 ? `세션 ${thread.sessions.length}` : ""].filter(Boolean).join(" · ")}
                     {hot(s.tokens) && <span className="hot"> · {kilo(s.tokens)}</span>}
                   </div>
+                  {sleepNews[s.id] && (
+                    <div className="row-meta pr-line news" title="눌러서 깨운다. PR 화면은 ⌘J에서 ⌥Enter">
+                      PR #{sleepNews[s.id].pr.number} · <span className="loud">{sleepNews[s.id].news}</span>
+                    </div>
+                  )}
                 </div>
               </div>
             ))}

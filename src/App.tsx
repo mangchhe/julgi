@@ -121,6 +121,8 @@ export default function App() {
   // 내가 연 열린 PR 전부 (챙길 PR이 "내 PR 전부"일 때). ⌘K에서 pr을 치면 고를 거리가 된다
   const [minePrs, setMinePrs] = useState<ReviewAsk[]>([]);
   const [mineNews, setMineNews] = useState<Record<string, ReviewAsk & { news: string }>>({});
+  // 잠든 세션의 PR에 일이 생긴 것: 세션 ID → { 까닭, PR }. ⌘J의 내 차례에 올라오고, 고르면 깨운다
+  const [sleepNews, setSleepNews] = useState<Record<string, { news: string; pr: PrTarget }>>({});
   const [reviews, setReviews] = useState<Review[]>([]); // 점검 기록. 판마다 값과 한 일이 남는다
   const [skillUses, setSkillUses] = useState<SkillUse[]>([]);
   const [skills, setSkills] = useState<SkillInfo[]>([]);
@@ -202,8 +204,8 @@ export default function App() {
   const waitCount = open.filter((o) => waiting(states[o.key])).length;
 
   // 키 처리와 이벤트 콜백은 한 번만 걸고, 최신 상태는 여기서 읽는다
-  const live = useRef({ open, panes, widths, focus, states, overlay, filter, sessions, home, base, fontSize, handing, byId, threads, memories, pinned, items, folders, names, zoom, notes, skills, reviews, acts, skillUses, closing, dead, mapText, skillCands, reviewing, prNews, asks, mineNews, prShown });
-  live.current = { open, panes, widths, focus, states, overlay, filter, sessions, home, base, fontSize, handing, byId, threads, memories, pinned, items, folders, names, zoom, notes, skills, reviews, acts, skillUses, closing, dead, mapText, skillCands, reviewing, prNews, asks, mineNews, prShown };
+  const live = useRef({ open, panes, widths, focus, states, overlay, filter, sessions, home, base, fontSize, handing, byId, threads, memories, pinned, items, folders, names, zoom, notes, skills, reviews, acts, skillUses, closing, dead, mapText, skillCands, reviewing, prNews, asks, mineNews, prShown, sleepNews });
+  live.current = { open, panes, widths, focus, states, overlay, filter, sessions, home, base, fontSize, handing, byId, threads, memories, pinned, items, folders, names, zoom, notes, skills, reviews, acts, skillUses, closing, dead, mapText, skillCands, reviewing, prNews, asks, mineNews, prShown, sleepNews };
 
   const say = (message: string, ms = 3500) => {
     setToast(message);
@@ -1603,6 +1605,35 @@ export default function App() {
     void invoke("notify", { title: nameOf(key).slice(0, 60), body: text });
     notified.current = { key, at: Date.now() };
   };
+  /** 잠든 세션의 PR에 일이 생겼다: 내 차례에 올리고 알린다. 설정에 따라 바로 깨운다 */
+  const sleepNotice = (sessionId: string, pr: PrTarget, news: string) => {
+    const s = live.current.byId.get(sessionId);
+    const name = live.current.names[sessionId] || s?.title || "세션";
+    record("PR", `${name.slice(0, 40)} (잠듦) · PR #${pr.number} ${news}`, sessionId);
+    if (config.wakeOnPr && s) {
+      wakeQuiet(s);
+      setPrNews((old) => ({ ...old, ["c:" + sessionId]: news }));
+    } else setSleepNews((old) => ({ ...old, [sessionId]: { news, pr } }));
+    if (!config.notify || document.hasFocus()) return;
+    void invoke("notify", { title: name.slice(0, 60), body: `PR #${pr.number} ${news}` });
+    notified.current = { key: "c:" + sessionId, at: Date.now() };
+  };
+  /** 세션을 깨워 목록에만 올린다. 지금 보는 칸은 건드리지 않는다 */
+  const wakeQuiet = (s: Session) => {
+    const key = "c:" + s.id;
+    if (live.current.open.some((o) => o.key === key)) return;
+    terms.create({ key, cwd: s.cwd, command: resumeCommand(s.id) });
+    setOpen((list) => [...list, { key, label: s.title, cwd: s.cwd, sessionId: s.id }]);
+  };
+  /** 잠든 세션을 깨워 칸에 올린다. PR 일 때문에 올라온 것이면 그 표시를 열린 세션 쪽으로 옮긴다 */
+  const wake = (sessionId: string) => {
+    const s = live.current.byId.get(sessionId);
+    if (!s) return;
+    const news = live.current.sleepNews[sessionId]?.news;
+    setSleepNews(({ [sessionId]: _, ...rest }) => rest);
+    if (news) setPrNews((old) => ({ ...old, ["c:" + sessionId]: news }));
+    openSession(s);
+  };
   /** 세션과 이어지지 않은 내 PR에 일이 생겼다 */
   const mineNotice = (pr: ReviewAsk, news: string) => {
     const repo = pr.repository.nameWithOwner.split("/")[1];
@@ -1629,8 +1660,8 @@ export default function App() {
       (extra ? `\n\n덧붙여: ${extra}` : "");
     void dispatch({ kind: "new", cwd }, ask, { rank: 0, by: "리뷰 요청" });
   };
-  const actions = useRef({ readUsage, publishRemote, say, dispatch, show, close, sleep, requestQuit, handoff, exited, newSession, newShell, nextWaiting, cycleFilter, openTerm, resize, split, unsplit, finishThread, move, togglePin, tend, serve, confirmClose, toggleReview, prNotice, askNotice, mineNotice });
-  actions.current = { readUsage, publishRemote, say, dispatch, show, close, sleep, requestQuit, handoff, exited, newSession, newShell, nextWaiting, cycleFilter, openTerm, resize, split, unsplit, finishThread, move, togglePin, tend, serve, confirmClose, toggleReview, prNotice, askNotice, mineNotice };
+  const actions = useRef({ readUsage, publishRemote, say, dispatch, show, close, sleep, requestQuit, handoff, exited, newSession, newShell, nextWaiting, cycleFilter, openTerm, resize, split, unsplit, finishThread, move, togglePin, tend, serve, confirmClose, toggleReview, prNotice, askNotice, mineNotice, sleepNotice, wake });
+  actions.current = { readUsage, publishRemote, say, dispatch, show, close, sleep, requestQuit, handoff, exited, newSession, newShell, nextWaiting, cycleFilter, openTerm, resize, split, unsplit, finishThread, move, togglePin, tend, serve, confirmClose, toggleReview, prNotice, askNotice, mineNotice, sleepNotice, wake };
 
   /** 세션이 남긴 링크 가운데 마지막 PR */
   const prOfSession = (id?: string) => {
@@ -1649,7 +1680,7 @@ export default function App() {
     });
     const poll = async () => {
       if (config.prWatch === "off") return setPrs({});
-      const targets = new Map<string, { target: PrTarget; keys: string[]; pr?: ReviewAsk }>();
+      const targets = new Map<string, { target: PrTarget; keys: string[]; sleeper?: string; pr?: ReviewAsk }>();
       for (const o of live.current.open) {
         const target = prOfSession(o.sessionId);
         if (!target) continue;
@@ -1657,6 +1688,21 @@ export default function App() {
         const entry = targets.get(id) ?? { target, keys: [] };
         entry.keys.push(o.key);
         targets.set(id, entry);
+      }
+      // 잠든 최근 세션이 남긴 PR도 본다. 이미 머지됐거나 닫힌 PR은 더 바뀔 일이 없어 다시 묻지 않는다
+      const cutoff = Date.now() / 1000 - config.recentDays * 86400;
+      const openIds = new Set(live.current.open.map((o) => o.sessionId));
+      let sleepers = 0;
+      for (const s of live.current.sessions) {
+        if (sleepers >= 20 || s.mtime < cutoff) break;
+        if (openIds.has(s.id)) continue;
+        const target = prOfSession(s.id);
+        if (!target) continue;
+        const id = `${target.repo}#${target.number}`;
+        const seen = prSeen.current[id];
+        if (targets.has(id) || seen?.state === "MERGED" || seen?.state === "CLOSED") continue;
+        targets.set(id, { target, keys: [], sleeper: s.id });
+        sleepers += 1;
       }
       // 내 PR 전부를 챙기면 세션과 이어지지 않은 내 PR도 같이 본다
       if (config.prWatch === "mine") {
@@ -1669,7 +1715,7 @@ export default function App() {
         }
       }
       const next: Record<string, PrStatus> = {};
-      for (const [id, { target, keys, pr }] of targets) {
+      for (const [id, { target, keys, sleeper, pr }] of targets) {
         const now = await invoke<PrStatus>("pr_status", { repo: target.repo, number: target.number }).catch(() => null);
         if (!now) continue;
         next[id] = now;
@@ -1677,6 +1723,10 @@ export default function App() {
         const news = before ? newsOf(before, now) : "";
         prSeen.current[id] = now;
         if (!news) continue;
+        if (!keys.length && sleeper) {
+          actions.current.sleepNotice(sleeper, target, news);
+          continue;
+        }
         if (pr) {
           setMineNews((old) => ({ ...old, [id]: { ...pr, news } }));
           actions.current.mineNotice(pr, news);
@@ -1739,7 +1789,10 @@ export default function App() {
     const onFocusBack = () => {
       const n = notified.current;
       notified.current = null;
-      if (n && Date.now() - n.at < 10 * 60_000 && live.current.open.some((o) => o.key === n.key)) actions.current.show(n.key);
+      if (!n || Date.now() - n.at > 10 * 60_000) return;
+      // 알린 세션이 열려 있으면 띄우고, 잠들어 있으면 깨워서 띄운다
+      if (live.current.open.some((o) => o.key === n.key)) actions.current.show(n.key);
+      else if (n.key.startsWith("c:")) actions.current.wake(n.key.slice(2));
     };
     window.addEventListener("focus", onFocusBack);
     // PR 링크는 어디서 눌러도 여기로 와서 Julgi 안의 PR 화면으로 열린다
@@ -1835,7 +1888,7 @@ export default function App() {
       } else if (cmd && e.code === "KeyJ") {
         // 내 차례인 세션들과 마지막에 물은 말을 편다. 거기서 바로 답한다
         if (overlay === "queue") setOverlay(null);
-        else if (live.current.open.some((o) => waiting(live.current.states[o.key]) || live.current.prNews[o.key]) || live.current.asks.length || Object.keys(live.current.mineNews).length) setOverlay("queue");
+        else if (live.current.open.some((o) => waiting(live.current.states[o.key]) || live.current.prNews[o.key]) || live.current.asks.length || Object.keys(live.current.mineNews).length || Object.keys(live.current.sleepNews).length) setOverlay("queue");
         else a.say("내 차례인 세션이 없다");
       }
       // 창만 닫아 메뉴 막대로 보낸다. 세션은 계속 돈다
@@ -2161,7 +2214,7 @@ export default function App() {
           loading={!ledger}
           onShow={show}
           onClose={sleep}
-          onOpenSession={openSession}
+          onOpenSession={(s) => (sleepNews[s.id] ? wake(s.id) : openSession(s))}
           onSearch={() => setOverlay("palette")}
           prOf={(key) => {
             const target = prOfSession(open.find((o) => o.key === key)?.sessionId);
@@ -2169,6 +2222,7 @@ export default function App() {
             return target && status ? { target, status, news: prNews[key] } : undefined;
           }}
           prNews={prNews}
+          sleepNews={sleepNews}
         />
       )}
       <div
@@ -2276,7 +2330,14 @@ export default function App() {
           rows={open
             .filter((o) => waiting(states[o.key]) || (prNews[o.key] && states[o.key]?.state !== "run"))
             .sort((a, b) => (states[a.key]?.since ?? Infinity) - (states[b.key]?.since ?? Infinity))
-            .map((o) => ({ key: o.key, name: nameOf(o.key), repo: repoOf(o.cwd), state: states[o.key]?.state ?? "", since: states[o.key]?.since ?? 0, sessionId: o.sessionId, news: prNews[o.key] }))}
+            .map((o) => ({ key: o.key, name: nameOf(o.key), repo: repoOf(o.cwd), state: states[o.key]?.state ?? "", since: states[o.key]?.since ?? 0, sessionId: o.sessionId, news: prNews[o.key], pr: prOfSession(o.sessionId) ?? undefined }))
+            // 잠든 세션도 PR에 일이 생겼으면 내 차례다. 고르면 깨운다
+            .concat(
+              Object.entries(sleepNews).map(([id, { news, pr }]) => {
+                const s = byId.get(id);
+                return { key: "c:" + id, name: names[id] || s?.title || "세션", repo: s?.repo ?? "", state: "sleep", since: 0, sessionId: id, news, pr };
+              }),
+            )}
           asks={asks}
           mine={Object.values(mineNews)}
           onView={(a) => {
@@ -2290,10 +2351,19 @@ export default function App() {
             record("리뷰 맡김", `${a.repository.nameWithOwner} #${a.number}을 새 세션에 맡김${extra ? `: ${extra.slice(0, 60)}` : ""}`);
           }}
           onAnswer={(key, text) => {
+            // 잠든 세션에 답하면 그 글을 들고 깨운다
+            if (!open.some((o) => o.key === key)) {
+              const s = byId.get(key.slice(2));
+              const item = items.find((i) => i.session.id === key.slice(2)) ?? (s && { session: s, name: s.title, memory: "" });
+              setSleepNews(({ [key.slice(2)]: _, ...rest }) => rest);
+              if (item) void dispatch({ kind: "item", item }, text, { rank: 0, by: "내 차례" });
+              return;
+            }
             terms.submitWhenClear(key, text);
             record("답함", `"${nameOf(key)}"에 내 차례 목록에서 답함: ${text.slice(0, 80)}`, open.find((o) => o.key === key)?.sessionId);
           }}
-          onOpen={show}
+          onOpen={(key) => (open.some((o) => o.key === key) ? show(key) : wake(key.slice(2)))}
+          onPr={(pr) => openPr(pr)}
           onClose={() => setOverlay(null)}
         />
       )}
