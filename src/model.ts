@@ -211,6 +211,19 @@ const hook = (state: string, mainOnly = false) => ({
 });
 // 지도의 레포와 일감 워크트리(~/.julgi/** 안)는 --add-dir로 붙이지 않고 읽기만 허락한다. --add-dir는 폴더마다 "Adding a new directory"를 묻는다.
 // 규칙의 //는 절대 경로라는 뜻이다. 셸의 작은따옴표 안에 들어가니 '가 든 경로는 뺀다
+// 묻지 않고 넘길 명령. 전부 무엇을 바꾸지 않는 것들이다. 파일 내용을 읽는 cat, grep 같은 것은 넣지 않았다:
+// 그런 명령은 프로젝트 밖의 파일도 읽을 수 있어서, 필요하면 allowRules에 직접 적게 둔다
+const LOOK = ["git status", "git diff", "git log", "git show", "git branch", "git blame", "git remote -v", "git stash list", "git rev-parse", "git ls-files", "ls", "pwd", "wc", "which", "tree", "file", "date", "gh pr view", "gh pr list", "gh pr diff", "gh pr checks", "gh pr status", "gh run list", "gh run view", "gh issue view", "gh issue list", "glab mr view", "glab mr list"];
+// 시험과 빌드: 프로젝트 안의 스크립트를 돌린다. 그 스크립트가 하는 일까지 허락하는 셈이라 한 단계 위에 둔다
+const CHECK = ["npm test", "npm run test", "npm run lint", "npm run build", "npm run typecheck", "npx tsc", "pnpm test", "pnpm run test", "pnpm lint", "pnpm build", "yarn test", "yarn lint", "yarn build", "cargo test", "cargo check", "cargo build", "cargo clippy", "cargo fmt --check", "go test", "go build", "go vet", "pytest", "python -m pytest", "python3 -m pytest", "ruff check", "./gradlew test", "./gradlew build", "./gradlew check", "make test", "make check", "make build"];
+/** 설정에 따라 묻지 않고 넘길 규칙. 셸의 작은따옴표 안에 들어가니 '가 든 것은 뺀다 */
+const autoAllow = () => {
+  const level = config.autoAllow;
+  const preset = level === "check" ? [...LOOK, ...CHECK] : level === "look" ? LOOK : [];
+  const own = config.allowRules.split(/[,\n]/).map((r) => r.trim()).filter(Boolean);
+  // 내가 적은 것은 "Bash(…)"처럼 규칙 모양이면 그대로, 아니면 명령의 앞머리로 본다
+  return [...preset.map((cmd) => `Bash(${cmd}:*)`), ...own.map((r) => (/^[A-Za-z]+\(.*\)$/.test(r) ? r : `Bash(${r}:*)`))].filter((r) => !r.includes("'"));
+};
 const settings = () => JSON.stringify({
   hooks: {
     UserPromptSubmit: [hook("run")],
@@ -220,7 +233,7 @@ const settings = () => JSON.stringify({
   },
   // Julgi의 스킬은 전부 이 명령 하나를 부른다. 부를 때마다 허락을 물으면 알아서 하는 것이 없어진다
   // 스킬을 만들고 다듬는 세션은 Julgi의 폴더 안에만 쓰고, 근거로 대화 기록을 읽는다. 그것도 묻지 않게 한다
-  permissions: { allow: ["Bash(~/.julgi/bin/julgi:*)", "Edit(~/.julgi/grown/**)", "Read(~/.julgi/**)", "Read(~/.claude/projects/**)", "Read(~/.claude/skills/**)", ...mapDirs.filter((dir) => !dir.includes("'")).map((dir) => `Read(/${dir}/**)`)] },
+  permissions: { allow: ["Bash(~/.julgi/bin/julgi:*)", "Edit(~/.julgi/grown/**)", "Read(~/.julgi/**)", "Read(~/.claude/projects/**)", "Read(~/.claude/skills/**)", ...mapDirs.filter((dir) => !dir.includes("'")).map((dir) => `Read(/${dir}/**)`), ...autoAllow()] },
 });
 /** 선호 노트가 있어 ~/.julgi/prefs.md 를 써 두었는가. 있으면 세션의 시스템 프롬프트에 덧붙인다 */
 let prefs = false;
@@ -290,6 +303,10 @@ export const config = {
   remotePort: 4747,
   /** 세션이 파일을 고치거나 명령을 돌릴 때 허락을 묻지 않게 띄운다(--dangerously-skip-permissions). off: 묻는다, mine: 내가 연 세션만 안 묻는다, all: Julgi가 알아서 띄운 세션(일감, 스킬, 폰에서 던진 일)까지 전부 */
   skipPermissions: "off",
+  /** 늘 허락하는 종류는 묻지 않고 넘긴다. off: 전부 묻는다, look: 살펴보기만 하는 명령(git status, ls, gh pr view…), check: 거기에 시험과 빌드까지 */
+  autoAllow: "off",
+  /** 더 묻지 않을 명령의 앞머리나 규칙을 쉼표로 (예: "docker ps, Bash(make lint:*)") */
+  allowRules: "",
   /** 챙길 PR: mine 내가 연 PR 전부, session 세션이 올린 PR만, off 안 챙김 */
   prWatch: "mine",
   /** 나한테 온 리뷰 요청을 ⌘J에 넣고 알린다 */
