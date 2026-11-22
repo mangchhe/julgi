@@ -14,7 +14,7 @@ const SCREEN = [
   "⏺ RefundCalculator.kt:88 에서 쿠폰별로 따로 반올림합니다.",
   "  \x1b[2m테스트 추가: RefundCalculatorTest.kt\x1b[0m",
   "",
-  "⏺ PR을 올렸습니다. https://github.com/example/api-server/pull/1852 (ABC-123, UTF-8)",
+  "⏺ PR을 올렸습니다. https://github.com/example/api-server/pull/1852 · ABC-123",
   "",
   "\x1b[1m>\x1b[0m ",
 ].join("\r\n");

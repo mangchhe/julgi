@@ -1,183 +1,166 @@
-# Julgi
+<h1 align="center"><img src="docs/images/icon.png" alt="Julgi" width="96" /><br />Julgi</h1>
 
-할 말만 던지면, 세션은 Julgi가 돌본다.
+<p align="center"><b>Say what you want. Julgi looks after the sessions.</b></p>
 
-Julgi(줄기, "jool-gi")는 한국어로 식물의 줄기다. 일 하나를 여러 세션이 이어 가는 묶음을 이 앱에서 줄기라고 부른다.
+<p align="center">
+  <img alt="macOS" src="https://img.shields.io/badge/macOS-000000?logo=apple&logoColor=white" />
+  <img alt="Built with Tauri" src="https://img.shields.io/badge/Tauri-2-24C8DB?logo=tauri&logoColor=white" />
+  <img alt="For Claude Code" src="https://img.shields.io/badge/for-Claude%20Code-D97757" />
+  <img alt="MIT license" src="https://img.shields.io/badge/license-MIT-blue" />
+</p>
 
-Julgi는 [Claude Code](https://claude.com/claude-code) 세션 여러 개를 한 창에 띄워 놓고, 어느 세션에 무엇을 보낼지와 지금 무엇을 봐야 하는지를 대신 챙기는 macOS 앱이다. 서버도 DB도 없이 `~/.julgi/` 아래의 글 파일만 쓴다.
+<p align="center"><sub>English · <a href="docs/readme/README.ko.md">한국어</a> · <a href="docs/readme/README.ja.md">日本語</a> · <a href="docs/readme/README.zh-CN.md">简体中文</a></sub></p>
 
-> UI는 한국어뿐이고 macOS에서만 써 봤다.
+<p align="center">
+  A macOS app that runs many <a href="https://claude.com/claude-code">Claude Code</a> sessions side by side<br />
+  and decides which session gets your message, and which one needs you now.
+</p>
 
-## 무엇을 대신 하나
+<p align="center"><img src="docs/images/hero.png" alt="Julgi with three Claude Code sessions in panes and a sidebar that groups sessions into my turn, working and open, each with its pull request status" width="960" /></p>
 
-| 내가 하는 일 | Julgi가 하는 일 |
-|---|---|
-| `⌘L`에 할 말을 치고 Enter | 어느 세션에 보낼지 고르고, 없으면 맞는 레포에 새로 연다 |
-| 올라온 세션의 답을 읽고 답한다. 여럿이 기다리면 `⌘J`에서 한꺼번에 | 내 차례인 세션을 칸에 올리고 칸 수를 맞춘다 |
-| 궁금하면 `⌘Y`, `⌘G`를 본다 | 세션을 요약하고 이름을 붙이고, 오래 쉰 것은 재운다 |
-| | 너무 큰 세션은 인계 글만 들고 새 세션으로 갈아탄다 |
-| | 같은 일을 하는 세션을 줄기로 묶고, 끝난 일은 내린다 |
-| | 일이 끝나도 남길 것을 브레인에 담고, 새 일에 꺼내 붙인다 |
-| | 레포들의 지도를 그려 세션이 다른 레포를 찾아가게 한다 |
-| | 여러 레포에 걸친 큰 일은 조율 세션을 세워 일감으로 나눠 맡긴다 |
-| 세션이 고친 코드를 `⌘E`로 본다 | 무엇을 왜 바꿨는지 브리핑하고, 더 큰 모델로 한 번 걸러 읽어 틀린 곳을 짚는다 |
-| | 내가 바로잡은 말("앞으로", "하지 마")을 모아 다음 세션들이 지킬 선호로 만든다 |
-| | 되풀이한 일은 스킬로 만들고, 자주 쓰는 스킬은 쓰인 기록에 비추어 다듬는다 |
-| 밖에서는 폰으로 답하고 새 일을 던진다 | Tailscale 망 안에서만 열리는 작은 웹 화면을 띄운다 |
+*Julgi* (줄기, "jool-gi") is Korean for a plant's stem. In this app a **stem** is one piece of work and the chain of sessions that carried it.
 
-판단이 필요한 곳(보낼 곳, 같은 일인지, 무엇을 남길지)은 글자 겹침이 아니라 내용을 읽은 모델이 정한다. Julgi가 한 일은 전부 `⌘Y`에 남고, 세션은 지우지 않으며, 알아서 하는 것마다 `⌘,`에서 끌 수 있다.
+> [!NOTE]
+> The UI is Korean only for now, and it has only been used on macOS. There is no signed installer; you build it yourself (one script).
 
-## 필요한 것
+## Features
 
-- macOS, Node 20+, Rust (stable)
-- `claude` 명령이 로그인된 상태로 PATH에 있을 것
-- 레포 지도와 워크트리를 쓰려면 `git`
+<table>
+<tr>
+<td width="42%">
 
-## 띄우기
+### Just say it — `⌘L`
+
+Type what you want and press Enter. Julgi reads the message and picks the session that was already doing that work, or opens a new one in the right repo. A session that has grown too large is handed off to a fresh one with a written brief first.
+
+</td>
+<td><img src="docs/images/send.png" alt="The send box: a message typed in, candidate sessions listed, and a note that Julgi will let a model pick where it goes" /></td>
+</tr>
+<tr>
+<td>
+
+### My turn — `⌘J`
+
+Every session waiting on you, oldest first, with the question it ended on. Answer right there without opening the session. Pull requests and tickets that need you show up in the same queue.
+
+</td>
+<td><img src="docs/images/queue.png" alt="The my-turn queue listing waiting sessions, a pull request with news, a ticket with a new comment and two review requests" /></td>
+</tr>
+<tr>
+<td>
+
+### Code review — `⌘E`
+
+See what a session changed: everything, one reply at a time, or commit by commit on a graph. Julgi briefs you on what changed and why, has a larger model reread it, and lets you click a line to tell the session about it.
+
+</td>
+<td><img src="docs/images/review.png" alt="Code review with a briefing at the top, a file list, a diff, and a history column with per-reply snapshots and a commit graph" /></td>
+</tr>
+<tr>
+<td>
+
+### Pull requests without the browser
+
+GitHub PRs and GitLab MRs open inside Julgi: diff, line comments and replies, CI, reviews. Comment, approve, request changes, merge, close. Julgi watches your PRs and tells you when CI breaks, someone comments or a review lands.
+
+</td>
+<td><img src="docs/images/pr.png" alt="A pull request view with a diff, a line comment thread under a changed line, CI and review state in the header, and the conversation on the right" /></td>
+</tr>
+<tr>
+<td>
+
+### Work page — `⌘U`
+
+Everything in one place: my PRs, review requests, PRs my sessions opened, and Jira tickets by group. The PR or ticket opens in the right pane.
+
+</td>
+<td><img src="docs/images/work.png" alt="The Work page with pull request groups and ticket groups on the left, a ticket list in the middle and the ticket on the right" /></td>
+</tr>
+<tr>
+<td>
+
+### Start from a ticket
+
+Open a Jira ticket inside Julgi, then "start from this ticket": a new worktree and branch, a session briefed with the ticket, and the ticket moved to In Progress. When the PR goes up or merges, Julgi offers to move the ticket along.
+
+</td>
+<td><img src="docs/images/ticket.png" alt="A Jira ticket view with the status and available transitions, description, subtasks and comments" /></td>
+</tr>
+<tr>
+<td>
+
+### Where the tokens went — `⌘⇧U`
+
+Tokens by day, model, project and session, counted from Claude Code's own transcripts. Click a model or project to see only that.
+
+</td>
+<td><img src="docs/images/usage.png" alt="The usage panel with summary tiles, a daily bar chart, per-model and per-project lists and a recent sessions table" /></td>
+</tr>
+</table>
+
+### Also in the box
+
+- **Stems** — sessions doing the same work are joined into one stem; finished work is taken off the list.
+- **Brain** — decisions, pitfalls and facts worth keeping are saved when work ends and attached to new work that needs them.
+- **Preferences** — when you correct a session ("from now on…", "don't…"), Julgi turns it into a rule every later session follows.
+- **Repo map** — Julgi draws a map of your repos so a session can find its way into another one.
+- **Coordinator** — work that spans repos gets a lead session that splits it into tasks, each in its own worktree.
+- **Skills that grow** — work you repeat becomes a skill; skills you use are refined from how they were used.
+- **Housekeeping** — idle sessions are put to sleep, and woken when you pick them or their PR has news.
+- **From your phone** — a small web view, reachable only inside your Tailscale network, to answer and send work.
+
+Where judgment is needed (where to send, whether two sessions are the same work, what to keep), a model that read the content decides, not string matching. Everything Julgi did on its own is listed in `⌘Y`, sessions are never deleted, and each automatic behavior can be turned off in `⌘,`.
+
+## Install
+
+You need macOS, Node 20+, Rust (stable), `git`, and the `claude` command logged in and on your PATH.
 
 ```sh
-npm install
-npm run tauri dev      # 개발
-npm run tauri build    # src-tauri/target/release/bundle/macos/Julgi.app
+git clone https://github.com/mangchhe/julgi.git && cd julgi
+scripts/install.sh --open    # check tools → build → /Applications/Julgi.app → launch
 ```
 
-서명하지 않은 빌드다. 각자 빌드해서 쓴다.
+Run the same command to update. `scripts/install.sh --check` only checks the tools. To hack on it: `npm install && npm run tauri dev`.
 
-받아서 빌드하고 `/Applications`에 넣는 것까지 한 번에 하려면:
+Optional, for the integrations: [`gh`](https://cli.github.com) for GitHub, [`glab`](https://gitlab.com/gitlab-org/cli) for GitLab, and a Jira API token. Connect them in `⌘,` → Connections.
 
-```sh
-git clone git@github.com:mangchhe/julgi.git && cd julgi
-scripts/install.sh           # 도구 확인 → git pull → 빌드 → /Applications/Julgi.app
-scripts/install.sh --open    # 끝나면 Julgi를 다시 켠다
-scripts/install.sh --check   # 필요한 도구가 있는지만 본다
-```
+## Quick start
 
-새 판으로 올릴 때도 같은 명령을 다시 돌린다. `~/.julgi`(줄기, 브레인, 설정)는 기기마다 따로다.
+1. Open Julgi and press `⌘,` → Map → set the folder that holds your repos.
+2. Press `⌘L`, type what you want done, press Enter.
+3. When a session needs you it moves to "my turn". Press `⌘J` and answer.
 
-## 외울 키
+## Keys worth knowing
 
-| 키 | 하는 일 |
+| Key | What it does |
 |---|---|
-| `⌘L` | 할 말을 치고 Enter. 어디로 보낼지는 Julgi가 정한다 |
-| `⌘J` | 내 차례: 기다리는 세션들과 마지막에 물은 말. 거기서 바로 답한다 |
-| `⌘Y` | Julgi가 알아서 한 일 |
-| `⌘E` | 코드 검토: 이 세션이 고친 것, 답마다 바뀐 것, 커밋 그래프. 줄을 눌러 세션에게 말한다 |
-| `⌘G` | 줄기, 브레인, 스킬, 통계, 지도, 깃 (`⌘1`–`⌘6`으로 넘긴다) |
+| `⌘L` | Say something. Julgi decides where it goes |
+| `⌘J` | My turn: waiting sessions, PRs, tickets, review requests |
+| `⌘K` | Find a session, or type `pr` / `jira` to pick a PR or ticket |
+| `⌘E` | Code review of the current session |
+| `⌘U` / `⌘⇧U` | Work page / token usage |
+| `⌘G` | Stems, brain, skills, numbers, map, git |
+| `⌘Y` | What Julgi did on its own |
+| `⌘T` / `⌘D` / `⌘W` | Shell in a new pane / add a pane / close |
 
-나머지 키는 앱 안의 `⌘/`에 있다. 몰라도 쓴다.
+The rest are under `⌘/` in the app.
 
-## 낱말
+## How it works
 
-- **줄기**: 일 하나. 그 일을 이어 온 세션들의 묶음이다. 갈아타거나, 같은 일로 판정되면 생긴다.
-- **브레인**: 일이 끝나도 남는 것. 결정한 이유, 함정, 코드만 봐서는 알 수 없는 사실, 그리고 선호. 노트 하나가 `~/.julgi/brain/<id>.md` 하나다.
-- **선호**: 내가 세션의 방식을 바로잡은 말에서 뽑은 규칙. `~/.julgi/prefs.md`로 묶여 Julgi가 띄우는 모든 세션의 시스템 프롬프트에 붙는다.
-- **지도**: 일하는 레포들의 위치, 역할, 영역별 묶음, 서로의 연결, 바꿀 때 같이 볼 곳. `~/.julgi/MAP.md`.
-- **일감**: 조율 세션이 다른 세션에 맡긴 일 하나. 맡은 세션은 따로 딴 워크트리(`julgi/<일감>` 브랜치)에서 일하고, 끝나면 Julgi가 결과를 조율 세션에 돌려준다.
-- **점검**: 매일 정한 시각(기본 낮 12시, 최근 일주일의 세션)과 정한 요일(기본 월요일, 전부)에 Julgi가 세션을 묶고, 끝내고, 치우고, 브레인을 정리한 뒤 판 번호를 붙여 기록으로 남기는 일.
+1. **Sessions are plain `claude` processes in terminals.** Julgi launches them with a few hooks that write the session's state (working, waiting, asking) to a file, and reads those files.
+2. **No server, no database.** Everything Julgi knows is text under `~/.julgi/`. Conversations stay where Claude Code keeps them.
+3. **Judgment goes through `claude -p`.** Routing, summaries, briefings and housekeeping are short text-only calls on your own Claude login.
 
-## 세션 안에서 쓰는 것
+GitHub goes through `gh`, GitLab through `glab`, and Jira through its REST API with the token kept in the macOS keychain. Julgi polls them; it has nothing that could receive a webhook.
 
-Julgi가 띄운 세션에는 `julgi` 명령(`~/.julgi/bin/julgi`)과 스킬이 얹힌다. 세션에 말로 시키면 된다.
+## Reference
 
-| 스킬 | 언제 | 쓰는 명령 |
-|---|---|---|
-| `julgi-memory` | "이거 기억해 둬" | `julgi note`, `julgi memory` |
-| `julgi-find` | "그거 어느 세션에서 했더라" | `julgi threads` |
-| `julgi-send` | "이건 따로 돌려" | `julgi send` |
-| `julgi-wrap` | "이거 끝내자" | `julgi done` |
-| `julgi-brain` | 전에 알게 된 것을 찾고, 남기고, 고친다 | `julgi brain`, `julgi learn`, `julgi fix`, `julgi forget` |
-| `julgi-map` | 다른 레포를 봐야 할 때 | `julgi map` |
-| `julgi-lead` | 여러 레포에 걸친 큰 일을 나눠 맡길 때 | `julgi task add/list/result/redo/cancel` |
+What Julgi grants its sessions, extension points, every setting, the files it writes and the known gaps are in [docs/reference.md](docs/reference.md). Read the permissions section before you run it.
 
-## Julgi가 세션에 주는 권한
+## Contributing
 
-오픈소스로 쓰기 전에 알아 둘 것들이다. 전부 설정으로 끄거나 좁힐 수 있다.
+Commit rules and how to run the screens with mock data are in [CONTRIBUTING.md](CONTRIBUTING.md).
 
-- **`julgi` 명령은 묻지 않고 실행된다.** Julgi의 스킬이 전부 이 명령 하나를 부르기 때문이다.
-- **`~/.julgi/grown`에 쓰는 것과 대화 기록(`~/.claude/projects`)·스킬 폴더를 읽는 것도 묻지 않는다.** 스킬을 만들고 다듬는 세션이 쓴다.
-- **선호 노트가 세션의 시스템 프롬프트에 붙는다**(`--append-system-prompt-file`). `brain`을 끄면 붙지 않는다.
-- **사용량 보기를 켜면 Claude Code의 로그인 토큰을 읽는다.** 키체인(맥 밖에서는 `~/.claude/.credentials.json`)에서 읽어 `api.anthropic.com/api/oauth/usage`에만 보내고, 어디에도 적지 않는다. 문서에 없는 주소라 어느 날 안 나올 수 있다. 기본은 꺼짐이다.
-- **폰에서 보기를 켜면 포트 하나가 열린다**(기본 4747). Tailscale 망(100.64.0.0/10)과 이 맥에서 온 것만 받고, 주소에 든 토큰(`~/.julgi/remote-token`)이 맞아야 한다. 기본은 꺼짐이다.
-- **지도에 든 레포는 세션이 묻지 않고 읽을 수 있다**(`--settings`의 `Read` 허락). 고치려면 평소처럼 허락을 묻는다.
-- **"이 폴더를 믿느냐"는 물음을 대신 넘기는 폴더가 있다.** 기본 폴더, `autoTrust`에 적은 폴더, 그리고 `mapRoot`나 `repos`로 직접 정해 둔 레포들.
-- **지도를 그릴 때 레포를 원격에서 받아 온다.** 고친 파일이 없고 기본 브랜치에 있는 레포만 앞으로 당긴다(`mapFetch`).
-- **판단에 쓰는 모델 호출**은 `claude -p`로 나간다. 도구 없이 글만 주고받고 대화 기록을 남기지 않는다. 브리핑과 걸러 읽기에는 변경 내용(diff)이, 선호를 뽑을 때는 내가 한 말이 들어간다.
-
-## 붙여 쓰는 자리
-
-본체는 Claude Code와 git만 안다. 회사나 개인의 것은 설정으로 붙인다.
-
-- `pluginDirs`: 팀이나 개인의 스킬 폴더를 세션에 같이 얹는다.
-- `saveCommand`: `⌘S`로 지금 세션에 보낼 말.
-- `worksCommand`: 세션을 "작업"으로 묶을 때 쓸 작업 목록을 JSON으로 내놓는 명령.
-- `repoPatterns`: 폴더가 지워져 git으로 레포를 알 수 없을 때 경로에서 레포 이름을 뽑는 정규식.
-- `stripEnv`: Julgi가 띄우는 셸에 넘기지 않을 환경 변수 앞머리.
-- `models`: 판단마다 쓸 모델을 직접 정한다.
-
-## 설정
-
-`⌘,`에서 바꾸면 바로 적용되고 `~/.julgi/config.json`에 남는다. 화면에 없는 값은 파일을 직접 고친다.
-
-| 값 | 기본 | 뜻 |
-|---|---|---|
-| `theme` | `ink` | 화면 색. `navy`, `forest`, `plum`, `sand`, `paper` |
-| `thinking` | `balanced` | 판단 모델의 수준. `light`(전부 Haiku), `balanced`, `deep` |
-| `hotTokens` | 150000 | 이보다 큰 세션에 보낼 때는 갈아탄 뒤 보낸다 |
-| `sleepHours` | 3 | 이 시간 넘게 쉰 세션을 재운다. 0이면 안 재운다 |
-| `autoFill` | 켜짐 | 내 차례인 세션을 칸에 올리고 칸 수를 맞춘다 |
-| `summarize` | 켜짐 | 세션을 요약하고 이름을 붙인다 |
-| `judgeMerges` | 켜짐 | 같은 일이면 묻지 않고 줄기로 묶는다 |
-| `brain` | 켜짐 | 브레인에 담고 꺼낸다 |
-| `autoLead` | 켜짐 | 여러 레포에 걸친 큰 일은 조율자로 세운다 |
-| `taskWorktree` | 켜짐 | 일감은 따로 딴 워크트리에서 한다 |
-| `growSkills` | 켜짐 | 되풀이한 일을 스킬로 만들고, 자주 쓰는 스킬을 다듬는다. 각각 한 주에 하나까지 |
-| `brief` | 켜짐 | 세션이 코드를 고치면 무엇을 왜 바꿨는지 요약한다 |
-| `check` | 켜짐 | 브리핑 뒤에 더 큰 모델이 변경을 다시 읽고 틀린 곳을 짚는다 |
-| `reviewHour`, `reviewDay` | 12, 1 | 점검을 도는 시각(0–23)과 매주 점검 요일(0이 일요일). 놓쳤으면 다음에 켰을 때 돈다 |
-| `remote`, `remotePort` | 꺼짐, 4747 | 폰에서 보기 |
-| `usage` | 꺼짐 | 아래 상태 줄에 Claude 구독 사용량(5시간 창, 주간)을 보여 준다 |
-| `memoryLimitGb` | 8 | 세션들의 메모리 합계가 이만큼을 넘으면 쉬는 세션부터 재운다. 0이면 안 한다 |
-| `skipPermissions` | `off` | 허락을 묻지 않고 띄운다. `mine`(내가 연 세션만), `all` |
-| `notify` | 켜짐 | 창을 안 보고 있을 때 내 차례가 오면 알린다 |
-| `mapRoot` | 없음 | 레포가 모여 있는 폴더. 그 아래의 git 레포가 지도에 들어간다 |
-| `mapFetch` | 켜짐 | 지도를 그리기 전에 원격에서 받아 온다 |
-| `defaultDir` | `~/julgi` | 레포가 드러나지 않는 일을 여는 폴더 |
-| `hotkey` | `ctrl+super+KeyJ` | 어느 앱에서든 창을 꺼내고 넣는 키 |
-
-## 파일
-
-전부 `~/.julgi/` 아래의 글 파일이다. 대화 자체는 여기에 없고 Claude Code가 `~/.claude/`에 갖고 있다.
-
-| 파일 | 담긴 것 |
-|---|---|
-| `config.json`, `layout.json` | 설정, 칸과 열어 둔 세션 |
-| `threads.json`, `threads/` | 줄기와 그 기억, 세션 요약 |
-| `brain/`, `brain/history/`, `brain/retired/` | 브레인 노트, 고치기 전 것, 내린 것 |
-| `prefs.md` | 선호 노트를 묶어 세션에 붙이는 글 |
-| `changes.json` | 폴더마다의 변경, 브리핑, 걸러 읽은 결과, 답마다 찍어 둔 상태 |
-| `MAP.md`, `map.json` | 레포 지도 |
-| `tasks.json`, `tasks/` | 일감과 결과 |
-| `reviews.json` | 점검 기록. 판마다 잰 값과 손댄 것 |
-| `activity.jsonl`, `routes.jsonl`, `misroutes.jsonl` | 한 일, 보낸 곳, 틀려서 옮긴 사례 |
-| `plugin/`, `grown/`, `bin/julgi` | Julgi의 스킬, Julgi가 만든 스킬, 세션이 쓰는 명령 |
-| `skill-history/` | 다듬기 전의 스킬 글 |
-| `remote-token` | 폰용 화면의 토큰. 지우면 새로 만든다 |
-| `worktrees/` | 일감용 워크트리 |
-
-## 아직 안 된 것
-
-- 보낸 말은 되돌릴 수 없다.
-- 조율은 읽기와 작은 고치기로만 돌려 봤다.
-- 점검은 Julgi가 켜져 있을 때만 돈다. 꺼져 있었으면 다음에 켰을 때 돈다.
-- 스킬을 만들고 다듬는 세션은 아직 실제로 끝까지 돈 적이 없다.
-- 폰 화면은 보낼 곳을 알아서 고르지 않고, 알림이 없고, 허락을 묻는 세션은 풀지 못한다.
-- 자동 테스트가 거의 없다. `JULGI_SELFTEST=1 npm run tauri dev`로 도는 앱 안 점검 몇 가지뿐이다.
-- 영어 UI, 서명된 설치 파일, macOS 밖의 지원이 없다.
-
-## 기여
-
-커밋 규칙과 띄워 보는 법은 [CONTRIBUTING.md](CONTRIBUTING.md)에 있다.
-
-## 라이선스
+## License
 
 MIT
