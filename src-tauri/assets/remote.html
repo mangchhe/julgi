@@ -1,0 +1,165 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="theme-color" content="#0d1117">
+<title>Julgi</title>
+<style>
+/* 폰에서 보는 Julgi. 화면은 셋이다: 세션 목록, 세션 하나(마지막 답과 답 쓰는 칸), 새 일 던지기 */
+:root { --bg: #f4f6f8; --surface: #ffffff; --ink: #14202b; --muted: #5d6f80; --line: #d6dee6; --accent: #0a5fa8; --accent-soft: #e2eef8; --wait: #b46a00; --ok: #1b7a4b; --bad: #b3261e; color-scheme: light; }
+@media (prefers-color-scheme: dark) { :root { --bg: #0d1117; --surface: #161d27; --ink: #e4ebf2; --muted: #8fa0b2; --line: #263340; --accent: #7ab8f5; --accent-soft: #17304a; --wait: #f0a84a; --ok: #6fd19c; --bad: #ff8f85; color-scheme: dark; } }
+* { box-sizing: border-box; }
+html, body { margin: 0; height: 100%; }
+body { background: var(--bg); color: var(--ink); font: 16px/1.55 -apple-system, "Apple SD Gothic Neo", system-ui, sans-serif; -webkit-text-size-adjust: 100%; }
+button, textarea, select { font: inherit; color: inherit; }
+.app { min-height: 100%; display: flex; flex-direction: column; padding: env(safe-area-inset-top, 0px) max(14px, env(safe-area-inset-right, 0px)) calc(14px + env(safe-area-inset-bottom, 0px)) max(14px, env(safe-area-inset-left, 0px)); }
+header { position: sticky; top: 0; z-index: 2; background: var(--bg); display: flex; align-items: center; gap: 10px; padding: 12px 0 10px; }
+header h1 { margin: 0; font-size: 19px; font-weight: 700; flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+header button { background: var(--surface); border: 1px solid var(--line); border-radius: 999px; padding: 6px 14px; font-size: 14px; }
+header button.main { background: var(--accent); border-color: var(--accent); color: var(--bg); font-weight: 600; }
+.stale { background: var(--surface); border: 1px solid var(--bad); color: var(--bad); border-radius: 10px; padding: 8px 12px; font-size: 14px; margin-bottom: 10px; }
+.group { font-size: 12px; font-weight: 700; color: var(--muted); padding: 14px 4px 6px; }
+.group.mine { color: var(--wait); }
+.row { display: flex; flex-direction: column; gap: 2px; width: 100%; text-align: left; background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 11px 14px; margin-bottom: 8px; }
+.row b { font-weight: 600; font-size: 15.5px; overflow: hidden; text-overflow: ellipsis; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+.row small { color: var(--muted); font-size: 13px; }
+.row.mine { border-left: 3px solid var(--wait); }
+.row.run small::before { content: "● "; color: var(--accent); }
+.none { color: var(--muted); font-size: 14px; padding: 18px 4px; }
+.reply { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px; white-space: pre-wrap; overflow-wrap: anywhere; font-size: 15px; max-height: 52vh; overflow-y: auto; }
+.reply .rest { color: var(--muted); font-size: 14px; }
+.reply .asked { display: block; margin-top: 10px; border-left: 3px solid var(--wait); padding-left: 10px; }
+.meta { color: var(--muted); font-size: 13px; padding: 2px 4px 10px; }
+form { display: flex; flex-direction: column; gap: 10px; margin-top: 12px; }
+textarea { width: 100%; min-height: 96px; background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 11px 14px; font-size: 16px; resize: vertical; }
+select { width: 100%; background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 11px 12px; font-size: 16px; }
+form button { background: var(--accent); border: 0; color: var(--bg); font-weight: 600; border-radius: 12px; padding: 12px; font-size: 16px; }
+form button:disabled { opacity: 0.5; }
+.toast { position: fixed; left: 50%; bottom: calc(22px + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%); background: var(--ink); color: var(--bg); border-radius: 999px; padding: 8px 18px; font-size: 14px; z-index: 5; }
+.acts { margin-top: 6px; }
+.act { font-size: 13px; color: var(--muted); padding: 6px 4px; border-top: 1px solid var(--line); overflow-wrap: anywhere; }
+.act i { font-style: normal; color: var(--ink); font-weight: 600; margin-right: 6px; }
+[hidden] { display: none !important; }
+</style>
+</head>
+<body>
+<div class="app">
+  <header>
+    <button type="button" id="back" hidden>‹ 목록</button>
+    <h1 id="title">Julgi</h1>
+    <button type="button" id="new" class="main">새 일</button>
+  </header>
+  <div id="stale" class="stale" hidden></div>
+  <main id="list"></main>
+  <main id="one" hidden>
+    <div class="meta" id="one-meta"></div>
+    <div class="reply" id="one-reply">읽는 중</div>
+    <form id="answer">
+      <textarea id="answer-text" placeholder="여기에 답을 쓴다" enterkeyhint="send"></textarea>
+      <button type="submit">이 세션에 보내기</button>
+    </form>
+  </main>
+  <main id="throw" hidden>
+    <div class="meta">어느 폴더에서 새 세션을 열지 고르고, 시킬 일을 쓴다.</div>
+    <form id="throw-form">
+      <select id="throw-where" aria-label="어디서 열지"></select>
+      <textarea id="throw-text" placeholder="시킬 일"></textarea>
+      <button type="submit">새 세션으로 던지기</button>
+    </form>
+  </main>
+</div>
+<div class="toast" id="toast" hidden></div>
+<script>
+const $ = (id) => document.getElementById(id);
+// 토큰은 주소로 한 번 받아 이 브라우저에 두고, 주소에서는 지운다
+let token = new URLSearchParams(location.search).get("t") || "";
+try { if (token) localStorage.setItem("julgi-token", token); else token = localStorage.getItem("julgi-token") || ""; } catch (e) {}
+if (location.search) history.replaceState(null, "", location.pathname);
+const api = (path, body) => fetch(path, { method: body ? "POST" : "GET", headers: { "x-julgi-token": token, ...(body ? { "Content-Type": "application/json" } : {}) }, body: body ? JSON.stringify(body) : undefined }).then((r) => (r.ok ? r.json() : Promise.reject(r.status)));
+const ago = (ms) => { const s = Math.max(0, (Date.now() - ms) / 1000); return s < 60 ? "방금" : s < 3600 ? Math.floor(s / 60) + "분 전" : s < 86400 ? Math.floor(s / 3600) + "시간 전" : Math.floor(s / 86400) + "일 전"; };
+const el = (tag, cls, text) => { const n = document.createElement(tag); if (cls) n.className = cls; if (text !== undefined) n.textContent = text; return n; };
+let state = { sessions: [], folders: [], acts: [], at: 0 };
+let view = "list", picked = "";
+const toast = (text) => { $("toast").textContent = text; $("toast").hidden = false; setTimeout(() => ($("toast").hidden = true), 2200); };
+
+function show(next, key) {
+  view = next; picked = key || "";
+  $("list").hidden = view !== "list"; $("one").hidden = view !== "one"; $("throw").hidden = view !== "throw";
+  $("back").hidden = view === "list"; $("new").hidden = view !== "list";
+  if (view === "list") $("title").textContent = "Julgi";
+  if (view === "throw") { $("title").textContent = "새 일"; $("throw-where").replaceChildren(...state.folders.map((f) => { const o = el("option", "", f.repo); o.value = f.cwd; return o; })); }
+  if (view === "one") {
+    const s = state.sessions.find((x) => x.key === key);
+    $("title").textContent = s ? s.name : "세션";
+    $("one-meta").textContent = s ? `${s.repo} · ${s.label}${s.since ? " · " + ago(s.since) : ""}${s.changed ? " · " + s.changed : ""}` : "";
+    $("one-reply").textContent = "읽는 중";
+    if (s && s.id) api("/api/reply?id=" + encodeURIComponent(s.id)).then(({ text }) => {
+      if (picked !== key) return;
+      const box = $("one-reply");
+      if (!text) return void (box.textContent = "마지막 답을 읽지 못했다.");
+      // 묻는 말(물음표가 있는 마지막 문단)을 따로 또렷하게
+      const parts = text.trim().split(/\n\s*\n/);
+      let at = -1;
+      for (let i = parts.length - 1; i >= Math.max(0, parts.length - 3); i--) if (/[?？]/.test(parts[i])) { at = i; break; }
+      const rest = (at < 0 ? parts : parts.slice(0, at)).join("\n\n").split("\n").slice(-60).join("\n");
+      box.replaceChildren(el("span", "rest", rest));
+      if (at >= 0) box.append(el("span", "asked", parts.slice(at).join("\n\n")));
+      box.scrollTop = box.scrollHeight;
+    }, () => ($("one-reply").textContent = "읽지 못했다."));
+  }
+  window.scrollTo(0, 0);
+}
+
+function paint() {
+  const old = Date.now() - state.at > 12000;
+  $("stale").hidden = !old;
+  if (old) $("stale").textContent = state.at ? "맥의 Julgi가 " + ago(state.at) + "부터 응답하지 않는다." : "맥의 Julgi에서 아직 상태를 받지 못했다.";
+  if (view !== "list") return;
+  const list = $("list");
+  const groups = [["내 차례", (s) => s.state === "wait" || s.state === "ask", "mine"], ["일하는 중", (s) => s.state === "run" || s.state === "hold", "run"], ["열려 있음", (s) => !["wait", "ask", "run", "hold"].includes(s.state), ""]];
+  const nodes = [];
+  for (const [title, test, cls] of groups) {
+    const rows = state.sessions.filter(test);
+    if (!rows.length) continue;
+    nodes.push(el("div", "group " + cls, `${title} ${rows.length}`));
+    for (const s of rows) {
+      const b = el("button", "row " + cls);
+      b.type = "button";
+      b.append(el("b", "", s.name), el("small", "", `${s.repo} · ${s.label}${s.since ? " · " + ago(s.since) : ""}${s.changed ? " · " + s.changed : ""}`));
+      b.addEventListener("click", () => show("one", s.key));
+      nodes.push(b);
+    }
+  }
+  if (!state.sessions.length) nodes.push(el("div", "none", "열려 있는 세션이 없다. 새 일을 던지면 세션이 열린다."));
+  if (state.acts && state.acts.length) {
+    nodes.push(el("div", "group", "Julgi가 방금 한 일"));
+    const acts = el("div", "acts");
+    for (const a of state.acts) { const row = el("div", "act"); row.append(el("i", "", a.kind), document.createTextNode(a.text + " · " + ago(a.at))); acts.append(row); }
+    nodes.push(acts);
+  }
+  list.replaceChildren(...nodes);
+}
+const pull = () => api("/api/state").then((s) => { if (s && s.sessions) state = s; paint(); }, (code) => { if (code === 401) { $("stale").hidden = false; $("stale").textContent = "토큰이 맞지 않는다. 맥의 Julgi 설정(⌘,)에 나온 주소로 다시 연다."; } else paint(); });
+
+$("back").addEventListener("click", () => show("list"));
+$("new").addEventListener("click", () => show("throw"));
+$("answer").addEventListener("submit", (e) => {
+  e.preventDefault();
+  const text = $("answer-text").value.trim();
+  if (!text || !picked) return;
+  api("/api/answer", { target: picked, text }).then(() => { $("answer-text").value = ""; toast("보냈다"); show("list"); pull(); }, () => toast("보내지 못했다"));
+});
+$("throw-form").addEventListener("submit", (e) => {
+  e.preventDefault();
+  const text = $("throw-text").value.trim();
+  if (!text || !$("throw-where").value) return;
+  api("/api/new", { target: $("throw-where").value, text }).then(() => { $("throw-text").value = ""; toast("던졌다. 곧 세션이 열린다"); show("list"); }, () => toast("던지지 못했다"));
+});
+pull();
+setInterval(pull, 3000);
+document.addEventListener("visibilitychange", () => { if (!document.hidden) pull(); });
+</script>
+</body>
+</html>
