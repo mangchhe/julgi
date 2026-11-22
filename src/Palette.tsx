@@ -72,12 +72,16 @@ export default function Palette({ open, sessions, byId, cwd, onPick, onAttach, o
 
   // 찾기와 새 세션은 같은 상자다. 하던 세션이 먼저 나오고, 새로 열기는 맨 아래다.
   const rows = useMemo<Row[]>(() => {
-    // "pr", "#", 숫자로 시작하면 열린 PR을 고를 거리로 맨 위에 낸다. 뒤에 붙인 글로 번호 앞자리나 제목·브랜치를 거른다
-    const prQuery = query.trim().match(/^(?:pr\b|#|(?=\d))\s*(.*)$/i);
-    const prRows: Row[] = [];
+    // "pr"이나 "#"으로 시작하면 PR만 찾는다. 뒤에 붙인 글로 번호 앞자리나 제목·브랜치를 거른다
+    const prQuery = query.trim().match(/^(?:pr\b|#)\s*(.*)$/i);
     if (prQuery) {
+      const prRows: Row[] = [];
       const rest = prQuery[1].replace(/^#/, "").trim().toLowerCase();
-      const hits = prs.filter((p) => !rest || (/^\d+$/.test(rest) ? String(p.number).startsWith(rest) : `${p.title} ${p.branch} ${p.author}`.toLowerCase().includes(rest)));
+      const numeric = /^\d+$/.test(rest);
+      const fits = (number: number, text: string) => !rest || (numeric ? String(number).startsWith(rest) : text.toLowerCase().includes(rest));
+      // 열린 PR: 리뷰 요청 → 내 PR → 이 레포의 나머지, 묶음 안에서는 번호가 큰(최근) 것부터
+      const group = (p: PrRow) => (p.tag === "리뷰 요청" ? 0 : p.tag === "내 PR" ? 1 : 2);
+      const hits = prs.filter((p) => fits(p.number, `${p.title} ${p.branch} ${p.author}`)).sort((a, b) => group(a) - group(b) || b.number - a.number);
       for (const p of hits.slice(0, 30))
         prRows.push({
           pick: { kind: "pr", number: p.number, repo: p.repo },
@@ -87,13 +91,27 @@ export default function Palette({ open, sessions, byId, cwd, onPick, onAttach, o
         });
       // 목록에 없는 번호(닫힌 옛 PR 등)를 정확히 쳤으면 그 번호로 바로 연다
       if (/^\d+$/.test(rest) && !hits.some((p) => String(p.number) === rest)) prRows.push({ pick: { kind: "pr", number: Number(rest) }, title: `PR #${rest} 보기`, meta: `${repoOf(cwd)} · 열린 PR 목록에 없는 번호`, isLink: true });
-      if (!prRows.length) prRows.push({ pick: { kind: "pr", number: 0 }, title: prs.length ? "맞는 열린 PR이 없다" : "열린 PR이 없거나 아직 읽는 중", meta: "번호를 알면 숫자를 친다", isLink: true });
+      // 세션이 남긴 PR 링크 (닫히거나 머지된 것도). 열린 목록에 이미 있는 것은 빼고, 같은 PR은 한 번, 번호가 큰 것부터
+      const seen = new Set(hits.map((p) => `${p.repo}#${p.number}`));
+      const left: { url: string; repo: string; number: number; s: Session }[] = [];
+      for (const s of sessions)
+        for (const url of s.links) {
+          const pr = prOf(url);
+          const id = pr && `${pr.repo}#${pr.number}`;
+          if (!pr || seen.has(id!) || !fits(pr.number, `${s.title} ${s.repo}`)) continue;
+          seen.add(id!);
+          left.push({ url, ...pr, s });
+        }
+      left.sort((a, b) => b.number - a.number);
+      for (const l of left.slice(0, 30)) prRows.push({ pick: { kind: "pr", number: l.number, repo: l.repo }, title: `${l.repo.split("/")[1]} PR #${l.number}`, meta: `세션이 남긴 PR · ${l.s.title.slice(0, 40)} · ${ago(l.s.mtime)}`, isLink: true, session: l.s });
+      if (!prRows.length) prRows.push({ pick: { kind: "pr", number: 0 }, title: prs.length ? "맞는 PR이 없다" : "열린 PR이 없거나 아직 읽는 중", meta: "pr 뒤에 번호나 제목을 친다", isLink: true });
+      return prRows;
     }
     // "아티팩트 환불"처럼 치면 산출물만 찾는다: 종류를 가리키는 낱말은 떼고 나머지로 세션을 찾아, 그 세션이 남긴 링크를 낸다
     const wanted = LINK_WORDS.filter(([word]) => word.test(query));
     const q = wanted.reduce((text, [word]) => text.replace(new RegExp(word.source, "gi"), " "), query).replace(/\s+/g, " ").trim().toLowerCase();
     if (wanted.length) {
-      const links: Row[] = [...prRows];
+      const links: Row[] = [];
       for (const s of sessions) {
         if (links.length >= 40) break;
         if (q && !`${s.title} ${s.said} ${s.group} ${s.repo} ${s.branch} ${s.recap}`.toLowerCase().includes(q)) continue;
@@ -102,7 +120,7 @@ export default function Palette({ open, sessions, byId, cwd, onPick, onAttach, o
       return links;
     }
     const has = (...parts: (string | undefined)[]) => parts.join(" ").toLowerCase().includes(q);
-    const out: Row[] = [...prRows];
+    const out: Row[] = [];
     const weak: Row[] = []; // 제목이 아니라 요약에서만 걸린 것은 뒤로 보낸다
     const openIds = new Set<string>();
     for (const o of open) {
