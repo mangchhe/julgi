@@ -1020,3 +1020,8 @@ body.dragging .pane-body { pointer-events: none; }
 .status-usegrp { display: inline-flex; align-items: center; gap: 14px; cursor: pointer; border-radius: 6px; padding: 1px 8px; margin: 0 -4px; }
 .status-usegrp:hover { background: var(--bg); box-shadow: inset 0 0 0 1px var(--line); }
 .status-usegrp:hover::after { content: "자세히 ›"; color: var(--accent); font-size: 10.5px; }
+/* PR 닫기 */
+.pr-close-btn { border-color: var(--wait) !important; color: var(--wait) !important; }
+.pr-merge .danger { background: var(--wait); border-color: var(--wait); color: var(--bg); font-weight: 600; }
+.pr-close-note { flex: 1; min-width: 200px; font: inherit; font-size: 12px; color: var(--ink); background: var(--bg); border: 1px solid var(--line); border-radius: 6px; padding: 3px 8px; outline: none; }
+.pr-close-note:focus { border-color: var(--accent); }

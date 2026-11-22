@@ -96,6 +96,8 @@ export default function PrView({ target, onClose, inline = false, autoFocus = tr
   const busyRef = useRef("");
   busyRef.current = busy;
   const [merging, setMerging] = useState(false);
+  const [closing, setClosing] = useState(false); // 닫기 확인 칸
+  const [closeNote, setCloseNote] = useState("");
   const [method, setMethod] = useState("squash");
   const [dropBranch, setDropBranch] = useState(true);
   const box = useRef<HTMLDivElement>(null);
@@ -165,6 +167,10 @@ export default function PrView({ target, onClose, inline = false, autoFocus = tr
   const merge = async () => {
     if (await send("머지", "pr_merge", { method, deleteBranch: dropBranch })) setMerging(false);
   };
+  const close = async () => {
+    if (await send("닫기", "pr_close", { comment: closeNote, deleteBranch: dropBranch })) (setClosing(false), setCloseNote(""));
+  };
+  const reopen = () => void send("다시 열기", "pr_reopen", { comment: "" });
 
   const checks = view ? tally(view.statusCheckRollup ?? []) : null;
   // 대화: 본문이 먼저, 그다음 코멘트와 리뷰를 시간 순으로. 글 없는 "리뷰"(줄 코멘트만 단 것)는 뺀다
@@ -180,11 +186,11 @@ export default function PrView({ target, onClose, inline = false, autoFocus = tr
 
   const onKey = (e: React.KeyboardEvent) => {
     // 글을 쓰는 중에는 글자 키를 가로채지 않는다
-    if (e.target instanceof HTMLTextAreaElement) {
-      if (e.key === "Escape") (setDraft(null), box.current?.focus());
+    if (e.target instanceof HTMLTextAreaElement || (e.target instanceof HTMLInputElement && e.target.type === "text")) {
+      if (e.key === "Escape") (setDraft(null), setClosing(false), box.current?.focus());
       else return;
     } else if (e.key === "Escape") {
-      if (merging) setMerging(false);
+      if (merging || closing) (setMerging(false), setClosing(false));
       else onClose();
     } else if ((e.key === "ArrowDown" || e.key === "j") && files.length) setFileAt((fileAt + 1) % files.length);
     else if ((e.key === "ArrowUp" || e.key === "k") && files.length) setFileAt((fileAt - 1 + files.length) % files.length);
@@ -269,12 +275,37 @@ export default function PrView({ target, onClose, inline = false, autoFocus = tr
               {notes.length > 0 && <span>줄 코멘트 {notes.length}</span>}
               {busy && <span className="pr-run">{busy} 보내는 중</span>}
               {view.state === "OPEN" && (
-                <button type="button" tabIndex={-1} className="pr-merge-btn" onClick={() => setMerging(!merging)}>
+                <button type="button" tabIndex={-1} className="pr-merge-btn" onClick={() => (setMerging(!merging), setClosing(false))}>
                   머지…
+                </button>
+              )}
+              {view.state === "OPEN" && (
+                <button type="button" tabIndex={-1} className="pr-close-btn" onClick={() => (setClosing(!closing), setMerging(false))}>
+                  닫기…
+                </button>
+              )}
+              {view.state === "CLOSED" && (
+                <button type="button" tabIndex={-1} disabled={!!busy} onClick={reopen}>
+                  다시 열기
                 </button>
               )}
               <button type="button" tabIndex={-1} onClick={() => void openUrl(view.url)}>
                 웹에서 열기
+              </button>
+            </div>
+          )}
+          {closing && view && (
+            <div className="pr-merge">
+              <span className="sub">머지하지 않고 닫는다</span>
+              <input className="pr-close-note" value={closeNote} placeholder="닫으며 남길 코멘트 (선택)" onChange={(e) => setCloseNote(e.target.value)} />
+              <label>
+                <input type="checkbox" checked={dropBranch} onChange={(e) => setDropBranch(e.target.checked)} /> {view.headRefName} 지우기
+              </label>
+              <button type="button" tabIndex={-1} className="danger" disabled={!!busy} onClick={() => void close()}>
+                PR 닫기
+              </button>
+              <button type="button" tabIndex={-1} onClick={() => setClosing(false)}>
+                그만
               </button>
             </div>
           )}

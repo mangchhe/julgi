@@ -74,13 +74,15 @@ pub struct PrStatus {
     decision: String,
     /// 나 말고 다른 사람이 쓴 코멘트·리뷰·줄 코멘트 수. 늘면 새 코멘트가 온 것이다
     others: u32,
+    /// 마지막으로 닫거나 다시 연 사람이 내가 아니면 그 사람(봇 포함). 나거나 없으면 빈 글
+    actor: String,
 }
 
 #[tauri::command(async)]
 pub fn pr_status(repo: String, number: u64) -> Result<PrStatus, String> {
     check_repo(&repo)?;
     let (owner, name) = repo.split_once('/').unwrap_or_default();
-    let query = "query($owner:String!,$name:String!,$number:Int!){viewer{login} repository(owner:$owner,name:$name){pullRequest(number:$number){state reviewDecision commits(last:1){nodes{commit{statusCheckRollup{state}}}} comments(last:100){nodes{author{login}}} reviews(last:100){nodes{author{login}}} reviewThreads(last:100){nodes{comments(last:100){nodes{author{login}}}}}}}}";
+    let query = "query($owner:String!,$name:String!,$number:Int!){viewer{login} repository(owner:$owner,name:$name){pullRequest(number:$number){state reviewDecision commits(last:1){nodes{commit{statusCheckRollup{state}}}} comments(last:100){nodes{author{login}}} reviews(last:100){nodes{author{login}}} reviewThreads(last:100){nodes{comments(last:100){nodes{author{login}}}}} timelineItems(last:1,itemTypes:[CLOSED_EVENT,REOPENED_EVENT]){nodes{... on ClosedEvent{actor{login}} ... on ReopenedEvent{actor{login}}}}}}}";
     let out = run(&["api", "graphql", "-f", &format!("query={query}"), "-f", &format!("owner={owner}"), "-f", &format!("name={name}"), "-F", &format!("number={number}")])?;
     let v: serde_json::Value = serde_json::from_str(&out).map_err(|e| e.to_string())?;
     status_of(&v).ok_or_else(|| "PR을 찾지 못했다".into())
@@ -93,12 +95,14 @@ fn status_of(v: &serde_json::Value) -> Option<PrStatus> {
     let not_me = |list: Option<&serde_json::Value>| {
         list.and_then(|l| l.as_array()).map_or(0, |l| l.iter().filter(|n| n.pointer("/author/login").and_then(|x| x.as_str()).is_some_and(|who| who != me)).count() as u32)
     };
+    let actor = pr.pointer("/timelineItems/nodes/0/actor/login").and_then(|x| x.as_str()).filter(|who| *who != me).unwrap_or("").to_owned();
     let threads = pr.pointer("/reviewThreads/nodes").and_then(|t| t.as_array()).map_or(0, |t| t.iter().map(|th| not_me(th.pointer("/comments/nodes"))).sum());
     Some(PrStatus {
         state: text("/state"),
         ci: text("/commits/nodes/0/commit/statusCheckRollup/state"),
         decision: text("/reviewDecision"),
         others: not_me(pr.pointer("/comments/nodes")) + not_me(pr.pointer("/reviews/nodes")) + threads,
+        actor,
     })
 }
 
@@ -180,6 +184,33 @@ pub fn pr_review(repo: String, number: u64, kind: String, body: String) -> Resul
     run(&args).map(|_| ())
 }
 
+/// 닫는다. 코멘트를 같이 남기고 브랜치를 지울 수 있다
+#[tauri::command(async)]
+pub fn pr_close(repo: String, number: u64, comment: String, delete_branch: bool) -> Result<(), String> {
+    check_repo(&repo)?;
+    let n = number.to_string();
+    let mut args = vec!["pr", "close", &n, "-R", &repo];
+    if !comment.trim().is_empty() {
+        args.extend(["--comment", &comment]);
+    }
+    if delete_branch {
+        args.push("--delete-branch");
+    }
+    run(&args).map(|_| ())
+}
+
+/// 닫힌 PR을 다시 연다
+#[tauri::command(async)]
+pub fn pr_reopen(repo: String, number: u64, comment: String) -> Result<(), String> {
+    check_repo(&repo)?;
+    let n = number.to_string();
+    let mut args = vec!["pr", "reopen", &n, "-R", &repo];
+    if !comment.trim().is_empty() {
+        args.extend(["--comment", &comment]);
+    }
+    run(&args).map(|_| ())
+}
+
 /// 머지한다. method: squash, merge, rebase
 #[tauri::command(async)]
 pub fn pr_merge(repo: String, number: u64, method: String, delete_branch: bool) -> Result<(), String> {
@@ -235,5 +266,10 @@ mod tests {
             "reviewThreads":{"nodes":[{"comments":{"nodes":[{"author":{"login":"you"}},{"author":{"login":"me"}}]}}]}}}}}"#).unwrap();
         let s = status_of(&v).unwrap();
         assert_eq!((s.state.as_str(), s.ci.as_str(), s.decision.as_str(), s.others), ("OPEN", "FAILURE", "CHANGES_REQUESTED", 3));
+        assert_eq!(s.actor, "");
+        let closed: serde_json::Value = serde_json::from_str(r#"{"data":{"viewer":{"login":"me"},"repository":{"pullRequest":{"state":"CLOSED","timelineItems":{"nodes":[{"actor":{"login":"stale-bot"}}]}}}}}"#).unwrap();
+        assert_eq!(status_of(&closed).unwrap().actor, "stale-bot");
+        let mine: serde_json::Value = serde_json::from_str(r#"{"data":{"viewer":{"login":"me"},"repository":{"pullRequest":{"state":"CLOSED","timelineItems":{"nodes":[{"actor":{"login":"me"}}]}}}}}"#).unwrap();
+        assert_eq!(status_of(&mine).unwrap().actor, "");
     }
 }

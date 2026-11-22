@@ -10,6 +10,9 @@ assert.equal(newsOf(base, { ...base, ci: "PENDING" }), "");
 assert.equal(newsOf(base, { ...base, decision: "CHANGES_REQUESTED" }), "수정 요청");
 assert.equal(newsOf(base, { ...base, others: 3 }), "새 코멘트 2");
 assert.equal(newsOf(base, { ...base, state: "MERGED" }), "머지됨");
+assert.equal(newsOf(base, { ...base, state: "CLOSED", actor: "stale-bot" }), "닫힘 · stale-bot");
+assert.equal(newsOf(base, { ...base, state: "CLOSED", actor: "" }), ""); // 내가 닫았다
+assert.equal(newsOf({ ...base, state: "CLOSED" }, { ...base, actor: "lead" }), "다시 열림 · lead");
 assert.deepEqual(prOf("https://github.com/a/b-c/pull/12/files"), { repo: "a/b-c", number: 12 });
 assert.equal(prOf("https://github.com/a/b/issues/12"), null);
 console.log("pr ok");

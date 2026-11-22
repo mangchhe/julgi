@@ -14,7 +14,8 @@ export const openPr = (target: PrTarget) => window.dispatchEvent(new CustomEvent
 export type ReviewAsk = { number: number; title: string; repository: { nameWithOwner: string }; author: { login: string }; updatedAt: string; url: string; isDraft: boolean };
 
 /** 세션 줄에 달 PR의 형편 (Rust pr_status) */
-export type PrStatus = { state: string; ci: string; decision: string; others: number };
+/** actor: 마지막으로 닫거나 다시 연 사람이 내가 아니면 그 사람(봇 포함), 아니면 빈 글 */
+export type PrStatus = { state: string; ci: string; decision: string; others: number; actor?: string };
 
 const failed = (ci: string) => ci === "FAILURE" || ci === "ERROR";
 
@@ -24,6 +25,9 @@ const failed = (ci: string) => ci === "FAILURE" || ci === "ERROR";
  */
 export function newsOf(before: PrStatus, now: PrStatus): string {
   if (now.state === "MERGED" && before.state !== "MERGED") return "머지됨";
+  // 닫기·다시 열기는 남(봇 포함)이 했을 때만 알린다. 내가 한 것은 내가 안다
+  if (now.state === "CLOSED" && before.state === "OPEN" && now.actor) return `닫힘 · ${now.actor}`;
+  if (now.state === "OPEN" && before.state === "CLOSED" && now.actor) return `다시 열림 · ${now.actor}`;
   if (failed(now.ci) && !failed(before.ci)) return "CI 실패";
   if (now.decision !== before.decision && now.decision === "CHANGES_REQUESTED") return "수정 요청";
   if (now.decision !== before.decision && now.decision === "APPROVED") return "승인됨";

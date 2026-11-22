@@ -1742,6 +1742,14 @@ export default function App() {
           if (!targets.has(id)) targets.set(id, { target: { repo: pr.repository.nameWithOwner, number: pr.number }, keys: [], pr });
         }
       }
+      // 지난번에 열려 있던 PR이 이번 목록에 없으면 닫히거나 머지된 것이다. 한 번 더 봐서 알릴 일인지 가린다
+      let gone = 0;
+      for (const [id, seen] of Object.entries(prSeen.current)) {
+        if (gone >= 10 || seen.state !== "OPEN" || targets.has(id)) continue;
+        const [repo, number] = [id.slice(0, id.lastIndexOf("#")), Number(id.slice(id.lastIndexOf("#") + 1))];
+        targets.set(id, { target: { repo, number }, keys: [], pr: { number, title: `${repo.split("/")[1]} #${number}`, repository: { nameWithOwner: repo }, author: { login: "" }, updatedAt: "", url: `https://github.com/${repo}/pull/${number}`, isDraft: false } });
+        gone += 1;
+      }
       const next: Record<string, PrStatus> = {};
       for (const [id, { target, keys, sleeper, pr }] of targets) {
         const now = await invoke<PrStatus>("pr_status", { repo: target.repo, number: target.number }).catch(() => null);
