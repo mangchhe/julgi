@@ -1,4 +1,6 @@
 export default {
+  "흑연": "Graphite",
+  "회색조. 바탕은 더 검고 고른 줄은 파랑 대신 회색으로 뜬다": "Neutral grays. A blacker background, and selected rows lift in gray rather than blue",
   "남색": "Navy",
   "푸른 기가 도는 어두운 바탕": "Dark background with a blue tint",
   "먹": "Ink",

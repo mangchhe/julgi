@@ -37,7 +37,7 @@ Change them in `⌘,`; they apply at once and are saved to `~/.julgi/config.json
 | Key | Default | Meaning |
 |---|---|---|
 | `lang` | `auto` | Interface language. `auto` follows the system (Korean if the system is Korean, otherwise English), or `en`, `ko`. Applies after restart |
-| `theme` | `ink` | Colors. `navy`, `forest`, `plum`, `sand`, `paper` |
+| `theme` | `ink` | Colors. `navy`, `graphite`, `forest`, `plum`, `sand`, `paper` |
 | `thinking` | `balanced` | Level of the judgment models. `light` (all Haiku), `balanced`, `deep` |
 | `hotTokens` | 150000 | Sessions larger than this are handed off to a fresh session before sending |
 | `sleepHours` | 3 | Put sessions idle this long to sleep. 0 disables |
