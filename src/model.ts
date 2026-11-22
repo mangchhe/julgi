@@ -292,6 +292,14 @@ export const config = {
   prWatch: "mine",
   /** 나한테 온 리뷰 요청을 ⌘J에 넣고 알린다 */
   reviewAsks: true,
+  /** PR을 몇 분마다 볼까 (세션 줄의 PR, 내 PR) */
+  prEveryMin: 2,
+  /** 리뷰 요청을 몇 분마다 볼까 */
+  askEveryMin: 5,
+  /** 다른 앱에 있다 Julgi 창으로 돌아오면 PR과 리뷰 요청을 바로 다시 본다 */
+  refreshOnFocus: true,
+  /** PR 화면을 열어 둔 동안 몇 초마다 새로 읽을까. 0이면 r을 누를 때만 */
+  prViewRefreshSec: 30,
   /** 아래 상태 줄에 Claude 구독 사용량(5시간 창, 주간)을 보여 준다. Claude Code의 로그인 토큰을 읽어 Anthropic의 사용량 주소를 부른다 */
   usage: false,
   /** 세션들이 쓰는 메모리 합계가 이만큼(GB)을 넘으면, 답까지 보고 쉬는 세션을 오래 쉰 것부터 시간을 기다리지 않고 재운다. 0이면 안 한다 */

@@ -3,7 +3,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import { langOf, paint, parse, Line } from "./CodeReview";
 import { md } from "./md";
-import { ago } from "./model";
+import { ago, config } from "./model";
 import { openPr, prOf, PrTarget } from "./pr";
 
 type Who = { login: string };
@@ -92,6 +92,8 @@ export default function PrView({ target, onClose }: Props) {
   const [text, setText] = useState(""); // 줄 코멘트·답글에 쓰는 글
   const [say, setSay] = useState(""); // 대화 칸 아래에 쓰는 글 (코멘트·리뷰)
   const [busy, setBusy] = useState(""); // 보내는 중인 것
+  const busyRef = useRef("");
+  busyRef.current = busy;
   const [merging, setMerging] = useState(false);
   const [method, setMethod] = useState("squash");
   const [dropBranch, setDropBranch] = useState(true);
@@ -106,6 +108,16 @@ export default function PrView({ target, onClose }: Props) {
     void invoke<string>("pr_diff", args).then(setDiff, (e) => setError(String(e)));
     void invoke<string>("pr_comments", args).then((t) => setNotes(JSON.parse(t)), () => setNotes([]));
   }, [target.repo, target.number, loads]);
+
+  // 열어 둔 동안 설정한 주기로 새로 읽어 남이 단 코멘트와 CI를 들인다. 창을 안 보고 있거나 보내는 중이면 건너뛴다
+  useEffect(() => {
+    const every = config.prViewRefreshSec;
+    if (!every) return;
+    const timer = setInterval(() => {
+      if (document.hasFocus() && !busyRef.current) setLoads((n) => n + 1);
+    }, every * 1000);
+    return () => clearInterval(timer);
+  }, []);
 
   const files = useMemo(() => (diff ? parse(diff) : []), [diff]);
   const file = files[Math.min(fileAt, files.length - 1)];

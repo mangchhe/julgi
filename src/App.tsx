@@ -1699,15 +1699,26 @@ export default function App() {
       known = new Set(list.map((a) => a.url));
       setAsks(list);
     };
-    const first = setTimeout(() => void poll(), 8000);
-    const timer = setInterval(() => void poll(), 120_000);
-    const firstAsks = setTimeout(() => void pollAsks(), 12_000);
-    const askTimer = setInterval(() => void pollAsks(), 300_000);
+    // 주기는 설정에서 바꿀 수 있어서 매번 다시 읽는다
+    let timer = 0;
+    let askTimer = 0;
+    const loop = () => void poll().finally(() => (timer = window.setTimeout(loop, config.prEveryMin * 60_000)));
+    const askLoop = () => void pollAsks().finally(() => (askTimer = window.setTimeout(askLoop, config.askEveryMin * 60_000)));
+    timer = window.setTimeout(loop, 8000);
+    askTimer = window.setTimeout(askLoop, 12_000);
+    // 다른 앱에 있다 돌아오면 기다리지 않고 바로 본다. 창을 오가며 너무 자주 묻지 않게 20초에 한 번까지
+    let lastFocus = 0;
+    const onFocus = () => {
+      if (!config.refreshOnFocus || Date.now() - lastFocus < 20_000) return;
+      lastFocus = Date.now();
+      void poll();
+      void pollAsks();
+    };
+    window.addEventListener("focus", onFocus);
     return () => {
-      clearTimeout(first);
-      clearInterval(timer);
-      clearTimeout(firstAsks);
-      clearInterval(askTimer);
+      clearTimeout(timer);
+      clearTimeout(askTimer);
+      window.removeEventListener("focus", onFocus);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);

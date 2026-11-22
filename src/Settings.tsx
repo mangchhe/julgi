@@ -92,8 +92,12 @@ const SECTIONS: { title: string; hint: string; rows: Row[] }[] = [
     hint: "GitHub",
     rows: [
       { kind: "github", label: "GitHub", note: "연결하면 PR을 Julgi 안에서 본다. 터미널의 PR 링크를 ⌘ 클릭하거나 ⌘K에서 #번호를 친다. 로그인은 gh(GitHub CLI)가 하고 토큰도 gh가 키체인에 둔다. Julgi는 토큰을 보지 않는다" },
-      { kind: "pick", key: "prWatch", label: "챙길 PR", note: "2분마다 PR을 보고 CI가 깨지거나 남이 코멘트를 달거나 리뷰를 받거나 머지되면 알린다. 세션이 올린 PR은 그 세션을 내 차례로 올리고, 나머지 내 PR은 ⌘J의 \"내 PR\"에 넣는다", options: [["mine", "내 PR 전부"], ["session", "세션이 올린 PR만"], ["off", "끔"]] },
-      { kind: "toggle", key: "reviewAsks", label: "리뷰 요청", note: "5분마다 나한테 리뷰를 부탁한 PR을 보고 ⌘J의 \"리뷰 요청\"에 넣는다. 새로 오면 알린다" },
+      { kind: "pick", key: "prWatch", label: "챙길 PR", note: "정한 주기마다 PR을 보고 CI가 깨지거나 남이 코멘트를 달거나 리뷰를 받거나 머지되면 알린다. 세션이 올린 PR은 그 세션을 내 차례로 올리고, 나머지 내 PR은 ⌘J의 \"내 PR\"에 넣는다", options: [["mine", "내 PR 전부"], ["session", "세션이 올린 PR만"], ["off", "끔"]] },
+      { kind: "number", key: "prEveryMin", label: "PR 확인 주기", note: "세션 줄의 PR과 내 PR을 이만큼마다 본다. 짧을수록 알림이 빨리 온다", step: 1, min: 1, max: 30, show: (n) => `${n}분` },
+      { kind: "number", key: "askEveryMin", label: "리뷰 요청 확인 주기", note: "나한테 온 리뷰 요청을 이만큼마다 본다", step: 1, min: 1, max: 60, show: (n) => `${n}분` },
+      { kind: "toggle", key: "refreshOnFocus", label: "돌아오면 바로 보기", note: "다른 앱에 있다 Julgi 창으로 돌아오면 PR과 리뷰 요청을 기다리지 않고 바로 다시 본다" },
+      { kind: "number", key: "prViewRefreshSec", label: "PR 화면 새로 읽기", note: "PR 화면을 열어 둔 동안 이만큼마다 새로 읽어 남이 단 코멘트와 CI를 들인다. 끄면 r을 누를 때만 읽는다", step: 10, min: 0, max: 300, show: (n) => (n ? `${n}초` : "끔") },
+      { kind: "toggle", key: "reviewAsks", label: "리뷰 요청", note: "정한 주기마다 나한테 리뷰를 부탁한 PR을 보고 ⌘J의 \"리뷰 요청\"에 넣는다. 새로 오면 알린다" },
     ],
   },
   {
