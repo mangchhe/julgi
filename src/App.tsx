@@ -1765,6 +1765,17 @@ export default function App() {
       const key = panes[focus];
       const cwd = open.find((o) => o.key === key)?.cwd ?? (live.current.base || home);
       const cmd = e.metaKey && !e.altKey && !e.ctrlKey;
+      // PR 화면이 떠 있으면 그 화면만 상대한다. ⌘W는 뒤의 세션이 아니라 PR 화면을 닫는다.
+      // 포커스가 PR 화면 밖으로 빠졌어도 Esc로 닫히게 여기서도 받는다
+      if (live.current.prShown) {
+        const inside = e.target instanceof Element && !!e.target.closest(".pr-wrap");
+        if ((cmd && e.code === "KeyW") || (e.key === "Escape" && !inside)) {
+          e.preventDefault();
+          e.stopPropagation();
+          setPrShown(null);
+        }
+        return;
+      }
       // 번호와 넘겨 보기는 내가 상대하는 세션만 센다. 일감을 맡은 세션은 조율 세션에 딸린 것이라 뺀다
       const tops = open.filter((o) => !tasksRef.current.some((t) => t.session === o.sessionId && open.some((l) => l.sessionId === t.lead)));
       let handled = true;

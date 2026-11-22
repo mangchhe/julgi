@@ -138,7 +138,10 @@ export function parse(diff: string): FileDiff[] {
   let hunk: Hunk | undefined;
   let oldNo = 0;
   let newNo = 0;
-  for (const raw of diff.split("\n")) {
+  // diff 글은 줄바꿈으로 끝난다. 마지막 빈 조각을 줄로 세면 파일 끝에 번호만 있는 빈 줄이 붙는다
+  const rows = diff.split("\n");
+  if (rows[rows.length - 1] === "") rows.pop();
+  for (const raw of rows) {
     if (raw.startsWith("diff --git ")) {
       const m = raw.match(/ b\/(.+)$/);
       file = { path: m?.[1] ?? raw.slice(11), adds: 0, dels: 0, hunks: [], note: "" };
