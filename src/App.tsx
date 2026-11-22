@@ -1452,6 +1452,29 @@ export default function App() {
     // 일감을 맡은 세션이 처음 쓰는 레포에서 "이 폴더를 믿느냐"에 멈춰 서면 조율이 거기서 끊긴다
     const designated = config.mapRoot.trim() || config.repos.length ? mapState.current.repos.map((r) => r.cwd) : [];
     const dirs = [live.current.base, live.current.home + "/.julgi/worktrees", live.current.home + "/.julgi/grown", ...config.autoTrust.map((p) => p.replace(/^~(?=\/|$)/, live.current.home)), ...designated].filter(Boolean);
+    const within = (path: string) => dirs.some((dir) => path === dir || path.startsWith(dir + "/"));
+    // --add-dir로 붙인 폴더마다 Claude Code가 "Adding a new directory"를 하나씩 묻는다. 믿기로 한 폴더면 대신 "Yes, add it"을 누른다.
+    // 버퍼에는 지나간 물음도 남아 있으니 맨 마지막 물음만 보고, 같은 폴더에는 두 번 답하지 않는다(화면이 아직 안 바뀐 때 다음 물음에 Enter가 들어가지 않게)
+    for (const o of open) {
+      if (!o.sessionId || states[o.key] || !terms.opened(o.key) || terms.age(o.key) > 180_000) continue;
+      const lines = terms.text(o.key).split("\n");
+      let head = -1;
+      for (let i = lines.length - 1; i >= 0 && head < 0; i--) if (/Adding a new directory/.test(lines[i])) head = i;
+      if (head < 0) continue;
+      const path = lines.slice(head + 1).find((line) => line.trim())?.trim() ?? "";
+      const done = `${o.key}\n${path}`;
+      if (!path || trustedOnce.current.has(done) || !within(path)) continue;
+      const yes = lines.findIndex((line, i) => i > head && /Yes, add it/.test(line));
+      const at = lines.findIndex((line, i) => i > head && /❯/.test(line) && /(Yes, add it|No, exit)/.test(line));
+      if (yes < 0 || at < 0) continue;
+      if (yes !== at) {
+        terms.send(o.key, (yes > at ? "\x1b[B" : "\x1b[A").repeat(Math.abs(yes - at)));
+        continue;
+      }
+      trustedOnce.current.add(done);
+      terms.send(o.key, "\r");
+      record("허용", `${path.replace(live.current.home, "~")} 폴더를 세션에 붙이는 것을 대신 허락함`, o.sessionId);
+    }
     for (const o of open) {
       if (!o.sessionId || states[o.key] || trustedOnce.current.has(o.key) || !terms.opened(o.key) || terms.age(o.key) > 40_000) continue;
       if (!dirs.some((dir) => o.cwd === dir || o.cwd.startsWith(dir + "/"))) continue;

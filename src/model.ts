@@ -205,7 +205,9 @@ export const STATE_LABEL: Record<string, string> = { run: "일하는 중", wait:
 const hook = (state: string) => ({
   hooks: [{ type: "command", command: `printf ${state} > ~/.julgi/state/$JULGI_TERM` }],
 });
-const SETTINGS = JSON.stringify({
+// 지도의 레포는 --add-dir로 붙이지 않고 읽기만 허락한다. --add-dir는 폴더마다 "Adding a new directory"를 묻는다.
+// 규칙의 //는 절대 경로라는 뜻이다. 셸의 작은따옴표 안에 들어가니 '가 든 경로는 뺀다
+const settings = () => JSON.stringify({
   hooks: {
     UserPromptSubmit: [hook("run")],
     PostToolUse: [hook("run")],
@@ -214,12 +216,12 @@ const SETTINGS = JSON.stringify({
   },
   // Julgi의 스킬은 전부 이 명령 하나를 부른다. 부를 때마다 허락을 물으면 알아서 하는 것이 없어진다
   // 스킬을 만들고 다듬는 세션은 Julgi의 폴더 안에만 쓰고, 근거로 대화 기록을 읽는다. 그것도 묻지 않게 한다
-  permissions: { allow: ["Bash(~/.julgi/bin/julgi:*)", "Edit(~/.julgi/grown/**)", "Read(~/.julgi/**)", "Read(~/.claude/projects/**)", "Read(~/.claude/skills/**)"] },
+  permissions: { allow: ["Bash(~/.julgi/bin/julgi:*)", "Edit(~/.julgi/grown/**)", "Read(~/.julgi/**)", "Read(~/.claude/projects/**)", "Read(~/.claude/skills/**)", ...mapDirs.filter((dir) => !dir.includes("'")).map((dir) => `Read(/${dir}/**)`)] },
 });
 /** 선호 노트가 있어 ~/.julgi/prefs.md 를 써 두었는가. 있으면 세션의 시스템 프롬프트에 덧붙인다 */
 let prefs = false;
 export const setPrefs = (on: boolean) => void (prefs = on);
-/** 지도에 있는 레포 폴더들. 세션을 띄울 때 읽을 수 있게 열어 준다 */
+/** 지도에 있는 레포 폴더들. 세션을 띄울 때 읽기를 허락한다 */
 let mapDirs: string[] = [];
 export const setMapDirs = (dirs: string[]) => void (mapDirs = dirs);
 /** ~/.julgi/config.json으로 바꿀 수 있는 값 */
@@ -320,7 +322,7 @@ const skip = (id: string) => (config.skipPermissions === "all" || (config.skipPe
 
 // JULGI_SESSION: 세션 안에서 julgi 명령이 자기가 누구인지 아는 데 쓴다. --plugin-dir: Julgi의 스킬을 이 세션에만 얹는다
 const launch = (id: string, how: string) =>
-  `JULGI_SESSION=${id} claude ${how} ${id}${skip(id)} --settings '${SETTINGS}'${mapDirs.map((dir) => ` --add-dir "${dir.replace(/["`\\$]/g, "")}"`).join("")} --add-dir ~/.julgi/worktrees${prefs ? " --append-system-prompt-file ~/.julgi/prefs.md" : ""} --plugin-dir ~/.julgi/plugin --plugin-dir ~/.julgi/grown${config.pluginDirs.map((dir) => ` --plugin-dir "${dir.replace(/^~(?=\/|$)/, "$HOME").replace(/["`\\]/g, "")}"`).join("")}`;
+  `JULGI_SESSION=${id} claude ${how} ${id}${skip(id)} --settings '${settings()}' --add-dir ~/.julgi/worktrees${prefs ? " --append-system-prompt-file ~/.julgi/prefs.md" : ""} --plugin-dir ~/.julgi/plugin --plugin-dir ~/.julgi/grown${config.pluginDirs.map((dir) => ` --plugin-dir "${dir.replace(/^~(?=\/|$)/, "$HOME").replace(/["`\\]/g, "")}"`).join("")}`;
 export const resumeCommand = (id: string) => launch(id, "--resume");
 /** 파일에 적어 둔 글을 첫 입력으로 넣는다 */
 export const withPrompt = (command: string, path: string) => `${command} "$(cat '${path}')"`;
