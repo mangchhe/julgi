@@ -697,8 +697,9 @@ body.dragging .pane-body { pointer-events: none; }
 .set-card .set-row:first-child { border-top: 0; }
 .set-card .set-row.on { background: var(--accent-soft); box-shadow: inset 2px 0 0 var(--accent); }
 .set-card .set-label { font-size: 13.5px; }
-.set-card .set-note { font-size: 11.5px; line-height: 1.5; margin-top: 3px; max-width: 62ch; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
-.set-card .set-row.on .set-note { display: block; color: var(--ink); opacity: 0.8; }
+/* 설명은 늘 다 보인다. 고른 줄만 펼치면 누를 때마다 줄 높이가 바뀌어 화면이 출렁인다 */
+.set-card .set-note { font-size: 11.5px; line-height: 1.5; margin-top: 3px; max-width: 62ch; }
+.set-card .set-row.on .set-note { color: var(--ink); opacity: 0.8; }
 .set-card .set-value { max-width: 330px; flex-wrap: wrap; }
 .set-card .set-value input { width: 260px; padding: 6px 10px; background: var(--surface); }
 /* 켜고 끄기 */
