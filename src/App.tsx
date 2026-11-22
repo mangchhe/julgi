@@ -18,6 +18,7 @@ import { applyTheme } from "./themes";
 import { CHECK_SYSTEM, CORRECT_SYSTEM, prefsText, CAND_SYSTEM, Candidate as SkillCandidate, formatNote, indexLine, indexText, LEARN_SYSTEM, Note, parseNote, BRIEF_SYSTEM, MAP_SYSTEM, mapDomains, mapItems, recallText, stale, Stats, statOf, SWEEP_SYSTEM, TIDY_SYSTEM } from "./brain";
 import Sidebar from "./Sidebar";
 import PrView from "./PrView";
+import Work, { WorkGroup, WorkRow } from "./Work";
 import { newsOf, openPr, prOf, PrStatus, PrTarget, ReviewAsk } from "./pr";
 import * as terms from "./terms";
 import { rank } from "./route";
@@ -64,7 +65,7 @@ export default function App() {
   const [focus, setFocus] = useState(0);
   const [states, setStates] = useState<Record<string, TermState>>({});
   const [dead, setDead] = useState<string[]>([]);
-  const [overlay, setOverlay] = useState<"palette" | "send" | "help" | "history" | "settings" | "threads" | "queue" | "quit" | "close" | null>(null);
+  const [overlay, setOverlay] = useState<"palette" | "send" | "help" | "history" | "settings" | "threads" | "queue" | "quit" | "close" | "work" | null>(null);
   const [threads, setThreads] = useState<Thread[]>([]);
   const [tasks, setTasks] = useState<Job[]>([]); // 조율 세션이 맡긴 일감들
   const [memories, setMemories] = useState<Record<string, string>>({});
@@ -115,6 +116,8 @@ export default function App() {
   const [prNews, setPrNews] = useState<Record<string, string>>({});
   // 지난번에 본 PR 형편. 견줘서 새로 생긴 일만 알린다. Julgi를 다시 켜도 이어지게 파일에 둔다
   const prSeen = useRef<Record<string, PrStatus>>({});
+  // 작업 페이지의 "새로 읽기": 주기를 기다리지 않고 PR과 리뷰 요청을 바로 다시 읽는다
+  const refreshPrs = useRef(() => {});
   // 나한테 온 리뷰 요청. ⌘J 대기열의 아래 묶음이 된다
   const [asks, setAsks] = useState<ReviewAsk[]>([]);
   // 세션과 이어지지 않은 내 PR 가운데 봐야 할 일이 생긴 것: "소유자/레포#번호" → { PR, 까닭 }. ⌘J의 "내 PR"이 된다
@@ -1642,6 +1645,36 @@ export default function App() {
     if (!config.notify || document.hasFocus()) return;
     void invoke("notify", { title: `리뷰 요청 · ${repo} #${a.number}`, body: `${a.author.login}: ${a.title.slice(0, 80)}` });
   };
+  /** 작업 페이지의 묶음: 세션 PR(열린 세션과 최근 잠든 세션), 내 PR, 리뷰 요청 */
+  const workGroups = (): WorkGroup[] => {
+    const { open, sessions, names } = live.current;
+    const status = (t: PrTarget) => prs[`${t.repo}#${t.number}`];
+    const seen = new Set<string>();
+    const sessionRows: WorkRow[] = [];
+    const cutoff = Date.now() / 1000 - config.recentDays * 86400;
+    const openIds = new Set(open.map((o) => o.sessionId));
+    // 열린 세션 먼저, 그다음 최근 잠든 세션. 한 PR은 가장 최근 세션 하나에만 붙인다
+    const candidates = [...open.map((o) => o.sessionId).filter((id): id is string => !!id), ...sessions.filter((s) => s.mtime >= cutoff && !openIds.has(s.id)).map((s) => s.id)];
+    for (const id of candidates) {
+      const target = prOfSession(id);
+      if (!target || seen.has(`${target.repo}#${target.number}`)) continue;
+      seen.add(`${target.repo}#${target.number}`);
+      const s = byId.get(id);
+      sessionRows.push({ target, title: names[id] || s?.title || "세션", by: "세션", status: status(target), news: prNews["c:" + id] ?? sleepNews[id]?.news, sessionId: id, sleeping: !openIds.has(id) });
+    }
+    const mineRows: WorkRow[] = minePrs.map((p) => {
+      const target = { repo: p.repository.nameWithOwner, number: p.number };
+      const id = `${target.repo}#${target.number}`;
+      const sessionRow = sessionRows.find((r) => `${r.target.repo}#${r.target.number}` === id);
+      return { target, title: p.title, by: sessionRow ? `세션 "${sessionRow.title.slice(0, 20)}"` : "", at: p.updatedAt, status: status(target), news: mineNews[id]?.news ?? sessionRow?.news, sessionId: sessionRow?.sessionId, sleeping: sessionRow?.sleeping };
+    });
+    const askRows: WorkRow[] = asks.map((a) => ({ target: { repo: a.repository.nameWithOwner, number: a.number }, title: a.title, by: a.author.login, at: a.updatedAt, ask: a }));
+    return [
+      { id: "mine", title: "내 PR", hint: "내가 연 열린 PR 전부", rows: mineRows },
+      { id: "review", title: "리뷰 요청", hint: "나를 리뷰어로 지정한 PR", rows: askRows },
+      { id: "session", title: "세션 PR", hint: "열린 세션과 최근 세션이 올린 PR (머지·닫힌 것 포함)", rows: sessionRows },
+    ];
+  };
   /** 리뷰 요청을 새 세션에 맡긴다. 로컬에 그 레포가 있으면 거기서 띄워 코드도 같이 읽게 한다 */
   const handReview = (a: ReviewAsk, extra: string) => {
     const name = a.repository.nameWithOwner.split("/")[1];
@@ -1750,6 +1783,10 @@ export default function App() {
     const askLoop = () => void pollAsks().finally(() => (askTimer = window.setTimeout(askLoop, config.askEveryMin * 60_000)));
     timer = window.setTimeout(loop, 8000);
     askTimer = window.setTimeout(askLoop, 12_000);
+    refreshPrs.current = () => {
+      void poll();
+      void pollAsks();
+    };
     // 다른 앱에 있다 돌아오면 기다리지 않고 바로 본다. 창을 오가며 너무 자주 묻지 않게 20초에 한 번까지
     let lastFocus = 0;
     const onFocus = () => {
@@ -1853,7 +1890,10 @@ export default function App() {
       else if (cmd && e.code === "KeyY") setOverlay(overlay === "history" ? null : "history");
       else if (cmd && e.code === "Comma") setOverlay(overlay === "settings" ? null : "settings");
       else if (cmd && e.code === "KeyG") setOverlay(overlay === "threads" ? null : "threads");
+      else if (cmd && e.code === "KeyU") setOverlay(overlay === "work" ? null : "work");
       else if (overlay) {
+        // 작업 페이지는 Esc를 스스로 다룬다(PR 화면 안이면 목록으로, 목록이면 닫기)
+        if (overlay === "work" && e.target instanceof Element && e.target.closest(".wk")) return;
         if (e.key === "Escape") setOverlay(null);
         else if (overlay === "quit" && e.key === "Enter") void invoke("app_exit");
         else if (overlay === "close" && e.key === "Enter") a.confirmClose(e.altKey);
@@ -2215,6 +2255,8 @@ export default function App() {
           }}
           prNews={prNews}
           sleepNews={sleepNews}
+          work={{ prs: minePrs.length, asks: asks.length, news: Object.keys(mineNews).length + Object.keys(prNews).length + Object.keys(sleepNews).length }}
+          onWork={() => setOverlay("work")}
         />
       )}
       <div
@@ -2412,6 +2454,26 @@ export default function App() {
           }}
           onClose={() => setOverlay(null)}
           onChange={setConfig}
+        />
+      )}
+      {overlay === "work" && (
+        <Work
+          groups={workGroups()}
+          onClose={() => setOverlay(null)}
+          onRefresh={() => {
+            refreshPrs.current();
+            say("PR과 리뷰 요청을 다시 읽는 중");
+          }}
+          onOpenSession={(id) => {
+            setOverlay(null);
+            if (open.some((o) => o.sessionId === id)) show("c:" + id);
+            else wake(id);
+          }}
+          onHand={(a) => {
+            setOverlay(null);
+            handReview(a, "");
+            record("리뷰 맡김", `${a.repository.nameWithOwner} #${a.number}을 작업 페이지에서 새 세션에 맡김`);
+          }}
         />
       )}
       {prShown && <PrView key={`${prShown.repo}#${prShown.number}`} target={prShown} onClose={() => setPrShown(null)} />}

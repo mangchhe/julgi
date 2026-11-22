@@ -34,9 +34,12 @@ type Props = {
   prNews: Record<string, string>;
   /** 잠든 세션 가운데 PR에 일이 생긴 것: 세션 ID → 까닭과 PR */
   sleepNews: Record<string, { news: string; pr: PrTarget }>;
+  /** 작업 페이지 줄에 보일 숫자: 내 PR, 리뷰 요청, 새 소식 */
+  work: { prs: number; asks: number; news: number };
+  onWork: () => void;
 };
 
-export default function Sidebar({ open, items, threads, byId, states, tasks, changes, pinned, dead, loading, current, shown, onShow, onClose, onOpenSession, onSearch, prOf, prNews, sleepNews }: Props) {
+export default function Sidebar({ open, items, threads, byId, states, tasks, changes, pinned, dead, loading, current, shown, onShow, onClose, onOpenSession, onSearch, prOf, prNews, sleepNews, work, onWork }: Props) {
   const openIds = new Set(open.map((o) => o.sessionId));
   const cutoff = Date.now() / 1000 - config.recentDays * 86400;
 
@@ -84,6 +87,12 @@ export default function Sidebar({ open, items, threads, byId, states, tasks, cha
           <kbd>⌘K</kbd>
         </button>
       </div>
+      {/* 작업 페이지(⌘U): PR을 묶음별로 둘러본다 */}
+      <button type="button" className={"side-work" + (work.news ? " hot" : "")} onClick={onWork} title="작업: PR을 묶음별로 둘러본다 (⌘U)">
+        <svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="4" cy="4" r="2" /><circle cx="4" cy="12" r="2" /><circle cx="12" cy="12" r="2" /><path d="M4 6v4M12 10V7a3 3 0 0 0-3-3H7" /></svg>
+        <span>작업</span>
+        <small>{[work.prs ? `PR ${work.prs}` : "", work.asks ? `리뷰 ${work.asks}` : "", work.news ? `새 소식 ${work.news}` : ""].filter(Boolean).join(" · ") || "⌘U"}</small>
+      </button>
       <div className="side-list">
         {open.length === 0 && (
           <>

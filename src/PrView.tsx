@@ -77,10 +77,11 @@ function Md({ text }: { text: string }) {
   );
 }
 
-type Props = { target: PrTarget; onClose: () => void };
+/** inline: 작업 페이지의 오른쪽 칸에 끼워 넣는다(창 전체를 덮지 않는다). autoFocus: 열리자마자 키를 받을지 */
+type Props = { target: PrTarget; onClose: () => void; inline?: boolean; autoFocus?: boolean };
 
 /** PR 화면. 변경과 줄 코멘트, CI, 리뷰, 대화를 한 화면에 펴고, 코멘트·답글·리뷰·머지를 여기서 한다 */
-export default function PrView({ target, onClose }: Props) {
+export default function PrView({ target, onClose, inline = false, autoFocus = true }: Props) {
   const [view, setView] = useState<View | null>(null);
   const [diff, setDiff] = useState<string | null>(null);
   const [notes, setNotes] = useState<LineComment[]>([]);
@@ -99,7 +100,10 @@ export default function PrView({ target, onClose }: Props) {
   const [dropBranch, setDropBranch] = useState(true);
   const box = useRef<HTMLDivElement>(null);
   const body = useRef<HTMLDivElement>(null);
-  useEffect(() => box.current?.focus(), []);
+  // 작업 페이지에서 목록을 ↑↓로 넘길 때는 포커스를 뺏지 않는다
+  useEffect(() => {
+    if (autoFocus) box.current?.focus();
+  }, [autoFocus]);
 
   useEffect(() => {
     const args = { repo: target.repo, number: target.number };
@@ -235,7 +239,7 @@ export default function PrView({ target, onClose }: Props) {
   );
 
   return (
-    <div className="pr-wrap">
+    <div className={inline ? "pr-inline" : "pr-wrap"}>
       <div className="rv pr" ref={box} tabIndex={-1} onKeyDown={onKey}>
         <div className="rv-top pr-top">
           <div className="pr-title">
