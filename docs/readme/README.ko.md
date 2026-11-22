@@ -74,7 +74,7 @@ GitHub PR과 GitLab MR을 Julgi 안에서 연다. diff, 줄 코멘트와 답글,
 전부 한곳에서 둘러본다. 내 PR, 리뷰 요청, 세션이 올린 PR, 묶음별 Jira 티켓. 고르면 오른쪽에 PR이나 티켓이 열린다.
 
 </td>
-<td><img src="../images/work.png" alt="왼쪽에 PR 묶음과 티켓 묶음, 가운데 티켓 목록, 오른쪽에 티켓이 열린 작업 페이지" /></td>
+<td><img src="../images/work.png" alt="왼쪽에 PR 묶음과 티켓 묶음, 가운데 내 PR 목록, 오른쪽에 고른 PR이 열린 작업 페이지" /></td>
 </tr>
 <tr>
 <td>

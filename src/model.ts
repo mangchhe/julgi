@@ -313,7 +313,7 @@ export const config = {
   jiraStartTransition: "In Progress",
   jiraPrTransition: "In Review",
   jiraMergeTransition: "Done",
-  /** 프로젝트 키 → 레포 (이 티켓으로 시작에서 고르면 저절로 채운다). "ABC=api-server, OPS=infra" */
+  /** 프로젝트 키 → 레포 (이 티켓으로 시작에서 고르면 저절로 채운다). "ABC=acme-api, OPS=acme-infra" */
   jiraRepos: "",
   /** 아래 상태 줄에 Claude 구독 사용량(5시간 창, 주간)을 보여 준다. Claude Code의 로그인 토큰을 읽어 Anthropic의 사용량 주소를 부른다 */
   usage: false,

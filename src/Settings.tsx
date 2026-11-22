@@ -108,7 +108,7 @@ const SECTIONS: { title: string; hint: string; rows: Row[] }[] = [
       { kind: "text", key: "jiraStartTransition", label: "시작할 때 옮길 상태", note: "이 티켓으로 시작할 때 이 상태로 옮길지 묻는다. 비우면 묻지 않는다", hint: "In Progress" },
       { kind: "text", key: "jiraPrTransition", label: "PR 올리면 옮길 상태", note: "티켓과 이어진 세션이 PR을 올리면 이 상태로 옮길지 묻는다", hint: "In Review" },
       { kind: "text", key: "jiraMergeTransition", label: "머지되면 옮길 상태", note: "그 PR이 머지되면 이 상태로 옮길지 묻는다", hint: "Done" },
-      { kind: "text", key: "jiraRepos", label: "프로젝트 키 → 레포", note: "이 티켓으로 시작할 때 고를 레포. 시작 창에서 고르면 저절로 채운다", hint: "ABC=api-server, OPS=infra" },
+      { kind: "text", key: "jiraRepos", label: "프로젝트 키 → 레포", note: "이 티켓으로 시작할 때 고를 레포. 시작 창에서 고르면 저절로 채운다", hint: "ABC=acme-api, OPS=acme-infra" },
       { kind: "pick", key: "prWatch", label: "챙길 PR", note: "정한 주기마다 PR을 보고 CI가 깨지거나 남이 코멘트를 달거나 리뷰를 받거나 머지되면 알린다. 세션이 올린 PR은 그 세션을 내 차례로 올리고, 나머지 내 PR은 ⌘J의 \"내 PR\"에 넣는다", options: [["mine", "내 PR 전부"], ["session", "세션이 올린 PR만"], ["off", "끔"]] },
       { kind: "number", key: "prEveryMin", label: "PR 확인 주기", note: "세션 줄의 PR과 내 PR을 이만큼마다 본다. 짧을수록 알림이 빨리 온다", step: 1, min: 1, max: 30, show: (n) => `${n}분` },
       { kind: "number", key: "askEveryMin", label: "리뷰 요청 확인 주기", note: "나한테 온 리뷰 요청을 이만큼마다 본다", step: 1, min: 1, max: 60, show: (n) => `${n}분` },

@@ -74,7 +74,7 @@ GitHub PRs and GitLab MRs open inside Julgi: diff, line comments and replies, CI
 Everything in one place: my PRs, review requests, PRs my sessions opened, and Jira tickets by group. The PR or ticket opens in the right pane.
 
 </td>
-<td><img src="docs/images/work.png" alt="The Work page with pull request groups and ticket groups on the left, a ticket list in the middle and the ticket on the right" /></td>
+<td><img src="docs/images/work.png" alt="The Work page with pull request and ticket groups on the left, my pull requests in the middle and the selected one open on the right" /></td>
 </tr>
 <tr>
 <td>

@@ -74,7 +74,7 @@ GitHub の PR と GitLab の MR を Julgi の中で開きます。diff、行コ�
 すべてを 1 か所で見渡せます。自分の PR、レビュー依頼、セッションが出した PR、グループ別の Jira チケット。選ぶと右側に PR やチケットが開きます。
 
 </td>
-<td><img src="../images/work.png" alt="左に PR グループとチケットグループ、中央にチケット一覧、右にチケットが開いている作業ページ" /></td>
+<td><img src="../images/work.png" alt="左に PR グループとチケットグループ、中央に自分の PR 一覧、右に選んだ PR が開いている作業ページ" /></td>
 </tr>
 <tr>
 <td>

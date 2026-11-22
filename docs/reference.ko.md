@@ -74,7 +74,7 @@
 | `jiraSite`, `jiraEmail`, `jiraKind` | 없음 | Jira 사이트 주소, 이메일, `cloud`/`server`. 토큰은 여기 없고 macOS 키체인에만 있다 |
 | `jiraWatch`, `jiraEveryMin` | `mine`, 5 | 내게 배정된 티켓을 보는지와 주기(분) |
 | `jiraStartTransition`, `jiraPrTransition`, `jiraMergeTransition` | `In Progress`, `In Review`, `Done` | 시작할 때, PR을 올리면, 머지되면 제안할 상태. 비우면 묻지 않는다 |
-| `jiraRepos` | 없음 | 프로젝트 키 → 레포 (`ABC=api-server, OPS=infra`). 티켓으로 시작할 때 저절로 채운다 |
+| `jiraRepos` | 없음 | 프로젝트 키 → 레포 (`ABC=acme-api, OPS=acme-infra`). 티켓으로 시작할 때 저절로 채운다 |
 
 연결이 쓰는 것:
 

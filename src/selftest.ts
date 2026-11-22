@@ -100,7 +100,7 @@ async function sendTest(actions: Actions, live: Live) {
   // 모델에게 묻기
   const asked = await invoke<string>("route_ask", {
     system: '너는 분류기다. JSON 한 줄만 답한다: {"pick": 번호 또는 "new", "why": "짧은 한 문장"}',
-    prompt: "후보:\n0. 환불 금액 계산 (api-server)\n1. 주문 목록 지연 (admin-web)\n\n글: 쿠폰 겹치면 음수 나오는 거 봐줘\n",
+    prompt: "후보:\n0. 환불 금액 계산 (acme-api)\n1. 주문 목록 지연 (acme-admin)\n\n글: 쿠폰 겹치면 음수 나오는 거 봐줘\n",
   }).catch((e) => "실패: " + String(e));
   await log("route ask", asked.trim().slice(0, 200));
 

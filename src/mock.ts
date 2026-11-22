@@ -14,7 +14,7 @@ const SCREEN = [
   "⏺ RefundCalculator.kt:88 에서 쿠폰별로 따로 반올림합니다.",
   "  \x1b[2m테스트 추가: RefundCalculatorTest.kt\x1b[0m",
   "",
-  "⏺ PR을 올렸습니다. https://github.com/example/api-server/pull/1852 · ABC-123",
+  "⏺ PR을 올렸습니다. https://github.com/example/acme-api/pull/1852 · ABC-123",
   "",
   "\x1b[1m>\x1b[0m ",
 ].join("\r\n");
@@ -115,8 +115,8 @@ async function invoke(cmd: string, args: Record<string, unknown> = {}): Promise<
       // PR 형편을 지난번과 견주는 기록: 첫 PR은 그새 코멘트가 둘 늘고 CI가 깨진 것으로 보이게
       // Jira 감시 기록: ABC-123은 그새 코멘트가 하나 늘어난 것으로
       if (args.name === "jira-seen.json" && flags.has("jira")) return JSON.stringify({ "ABC-123": { status: "In Progress", others: 1, assigned: true }, "ABC-130": { status: "To Do", others: 0, assigned: true }, "ABC-131": { status: "To Do", others: 0, assigned: true } });
-      if (args.name === "pr-seen.json") return JSON.stringify({ "example/api-server#1852": { state: "OPEN", ci: "SUCCESS", decision: "REVIEW_REQUIRED", others: 1 }, "example/api-server#1700": { state: "OPEN", ci: "SUCCESS", decision: "APPROVED", others: -1 }, "example/api-server#1830": { state: "OPEN", ci: "SUCCESS", decision: "REVIEW_REQUIRED", others: 0 } });
-      if (args.name === "activity.jsonl" && flags.has("hist")) return `{"at": 1795184436364, "kind": "보냄", "text": "쿠폰 중복 환불 ← \\"환불 테스트도 돌려줘\\" (모델이 고름)", "sessionId": "x"}\n{"at": 1795184441364, "kind": "갈아탐", "text": "알림 스펙 정리 · 인계 글만 들고 새 세션으로, 이어서 보냄. 이전 세션은 재움", "sessionId": "x"}\n{"at": 1795261841364, "kind": "배움", "text": "\\"알림 스펙 정리\\"에서 브레인에 3개: 푸시는 10초 배치로 판정된다 / 하루 1회 제한은 상태 알림에만 적용된다 / 품절 임박 푸시는 찜한 고객만 받는다", "sessionId": "x"}\n{"at": 1795263641364, "kind": "지도", "text": "레포 5개의 지도를 그림 · 최신으로 당긴 것 2개(web-admin, shop-app) · 작업 중이라 그대로 둔 것: api-server(4커밋)"}\n{"at": 1795263741364, "kind": "지도", "text": "레포 5개의 지도를 그림 · 작업 중이라 그대로 둔 것: api-server(4커밋)"}\n{"at": 1795267241364, "kind": "점검", "text": "2판(매주): 손댄 것 13개, 눈에 띈 것 2개. ⌘G의 통계에서 본다"}\n{"at": 1795269041364, "kind": "확인 필요", "text": "\\"배포 상태 확인\\" 세션이 시작하지 못하고 있다", "sessionId": "x"}\n{"at": 1795270241364, "kind": "칸", "text": "칸을 하나 늘려 기다리던 \\"JDK 교체\\"을 올림", "sessionId": "x"}\n{"at": 1795270781364, "kind": "보냄", "text": "새 줄기 · api-server ← \\"쿠폰 기능 넣으려면 어디부터 봐야 해?\\" (이어 갈 줄기가 없어서)", "sessionId": "x"}`;
+      if (args.name === "pr-seen.json") return JSON.stringify({ "example/acme-api#1852": { state: "OPEN", ci: "SUCCESS", decision: "REVIEW_REQUIRED", others: 1 }, "example/acme-api#1700": { state: "OPEN", ci: "SUCCESS", decision: "APPROVED", others: -1 }, "example/acme-api#1830": { state: "OPEN", ci: "SUCCESS", decision: "REVIEW_REQUIRED", others: 0 } });
+      if (args.name === "activity.jsonl" && flags.has("hist")) return `{"at": 1795184436364, "kind": "보냄", "text": "쿠폰 중복 환불 ← \\"환불 테스트도 돌려줘\\" (모델이 고름)", "sessionId": "x"}\n{"at": 1795184441364, "kind": "갈아탐", "text": "알림 스펙 정리 · 인계 글만 들고 새 세션으로, 이어서 보냄. 이전 세션은 재움", "sessionId": "x"}\n{"at": 1795261841364, "kind": "배움", "text": "\\"알림 스펙 정리\\"에서 브레인에 3개: 푸시는 10초 배치로 판정된다 / 하루 1회 제한은 상태 알림에만 적용된다 / 품절 임박 푸시는 찜한 고객만 받는다", "sessionId": "x"}\n{"at": 1795263641364, "kind": "지도", "text": "레포 5개의 지도를 그림 · 최신으로 당긴 것 2개(acme-admin, acme-shop) · 작업 중이라 그대로 둔 것: acme-api(4커밋)"}\n{"at": 1795263741364, "kind": "지도", "text": "레포 5개의 지도를 그림 · 작업 중이라 그대로 둔 것: acme-api(4커밋)"}\n{"at": 1795267241364, "kind": "점검", "text": "2판(매주): 손댄 것 13개, 눈에 띈 것 2개. ⌘G의 통계에서 본다"}\n{"at": 1795269041364, "kind": "확인 필요", "text": "\\"배포 상태 확인\\" 세션이 시작하지 못하고 있다", "sessionId": "x"}\n{"at": 1795270241364, "kind": "칸", "text": "칸을 하나 늘려 기다리던 \\"JDK 교체\\"을 올림", "sessionId": "x"}\n{"at": 1795270781364, "kind": "보냄", "text": "새 줄기 · acme-api ← \\"쿠폰 기능 넣으려면 어디부터 봐야 해?\\" (이어 갈 줄기가 없어서)", "sessionId": "x"}`;
       if (args.name !== "threads.json" || !flags.has("threads")) return null;
       const sessions = await fetch("/mock-ledger.json").then((r) => r.json());
       const ids = sessions.slice(8, 12).map((x: { id: string }) => x.id);
@@ -131,11 +131,11 @@ async function invoke(cmd: string, args: Record<string, unknown> = {}): Promise<
     case "glab_status":
       return [true, ""];
     case "repo_slug":
-      return "example/api-server";
+      return "example/acme-api";
     case "pr_view":
       return JSON.stringify({
         number: 1852, title: "쿠폰 여러 장일 때 환불액 1원 어긋남 수정", body: "## 무엇을\n쿠폰마다 따로 반올림한 뒤 더한다.\n\n## 확인\n- RefundCalculatorTest 추가", author: { login: "me" },
-        state: "OPEN", isDraft: false, baseRefName: "develop", headRefName: "fix/refund-rounding", headRefOid: "5d6e7f8", mergeable: "MERGEABLE", url: "https://github.com/example/api-server/pull/1852",
+        state: "OPEN", isDraft: false, baseRefName: "develop", headRefName: "fix/refund-rounding", headRefOid: "5d6e7f8", mergeable: "MERGEABLE", url: "https://github.com/example/acme-api/pull/1852",
         reviewDecision: "CHANGES_REQUESTED", additions: 14, deletions: 2, changedFiles: 2, createdAt: new Date(Date.now() - 7200_000).toISOString(),
         statusCheckRollup: [{ __typename: "CheckRun", name: "build", status: "COMPLETED", conclusion: "SUCCESS" }, { __typename: "CheckRun", name: "test", status: "COMPLETED", conclusion: "FAILURE" }],
         comments: [{ author: { login: "teammate" }, body: "배포 전에 스테이지에서 한 번 돌려 볼게요.", createdAt: new Date(Date.now() - 3600_000).toISOString() }],
@@ -148,7 +148,7 @@ async function invoke(cmd: string, args: Record<string, unknown> = {}): Promise<
         { number: 1840, title: "정산 배치 재시도 간격을 설정으로", author: { login: "teammate" }, headRefName: "fix/settle-retry", isDraft: false, updatedAt: new Date().toISOString() },
       ]);
     case "pr_mine":
-      return JSON.stringify([{ number: 1852, title: "쿠폰 여러 장일 때 환불액 1원 어긋남 수정", repository: { nameWithOwner: "example/api-server" }, author: { login: "me" }, updatedAt: new Date().toISOString(), url: "https://github.com/example/api-server/pull/1852", isDraft: false }, { number: 1700, title: "주문 내보내기 CSV 열 순서 고정", repository: { nameWithOwner: "example/api-server" }, author: { login: "me" }, updatedAt: new Date().toISOString(), url: "https://github.com/example/api-server/pull/1700", isDraft: false }, { number: 31, title: "배송지 검증 규칙 정리", repository: { nameWithOwner: "gitlab:gitlab.example.com/shop/backend" }, author: { login: "me" }, updatedAt: new Date().toISOString(), url: "https://gitlab.example.com/shop/backend/-/merge_requests/31", isDraft: false }]);
+      return JSON.stringify([{ number: 1852, title: "쿠폰 여러 장일 때 환불액 1원 어긋남 수정", repository: { nameWithOwner: "example/acme-api" }, author: { login: "me" }, updatedAt: new Date().toISOString(), url: "https://github.com/example/acme-api/pull/1852", isDraft: false }, { number: 1700, title: "주문 내보내기 CSV 열 순서 고정", repository: { nameWithOwner: "example/acme-api" }, author: { login: "me" }, updatedAt: new Date().toISOString(), url: "https://github.com/example/acme-api/pull/1700", isDraft: false }, { number: 31, title: "배송지 검증 규칙 정리", repository: { nameWithOwner: "gitlab:gitlab.example.com/shop/backend" }, author: { login: "me" }, updatedAt: new Date().toISOString(), url: "https://gitlab.example.com/shop/backend/-/merge_requests/31", isDraft: false }]);
     case "token_usage": {
       // 사용량 화면 확인용: 가짜 세션들에 날짜·모델별 토큰을 흩어 둔다
       const sessions = (await fetch("/mock-ledger.json").then((r) => r.json())) as { id: string; cwd: string }[];
@@ -185,8 +185,8 @@ async function invoke(cmd: string, args: Record<string, unknown> = {}): Promise<
       return [{ id: "31", name: "Review", to: "In Review", category: "indeterminate" }, { id: "41", name: "Done", to: "Done", category: "done" }];
     case "pr_review_requests":
       return JSON.stringify([
-        { number: 215, title: "결제 취소 API에 부분 취소 추가", repository: { nameWithOwner: "example/api-server" }, author: { login: "teammate" }, updatedAt: new Date(Date.now() - 7200_000).toISOString(), url: "https://github.com/example/api-server/pull/215", isDraft: false },
-        { number: 88, title: "검색 필터에 기간 추가", repository: { nameWithOwner: "example/web-admin" }, author: { login: "designer" }, updatedAt: new Date(Date.now() - 86400_000).toISOString(), url: "https://github.com/example/web-admin/pull/88", isDraft: false },
+        { number: 215, title: "결제 취소 API에 부분 취소 추가", repository: { nameWithOwner: "example/acme-api" }, author: { login: "teammate" }, updatedAt: new Date(Date.now() - 7200_000).toISOString(), url: "https://github.com/example/acme-api/pull/215", isDraft: false },
+        { number: 88, title: "검색 필터에 기간 추가", repository: { nameWithOwner: "example/acme-admin" }, author: { login: "designer" }, updatedAt: new Date(Date.now() - 86400_000).toISOString(), url: "https://github.com/example/acme-admin/pull/88", isDraft: false },
       ]);
     case "pr_status":
       return args.number === 1852 ? { state: "OPEN", ci: "FAILURE", decision: "CHANGES_REQUESTED", others: 3 } : { state: "OPEN", ci: "SUCCESS", decision: "APPROVED", others: 0 };
@@ -237,7 +237,7 @@ setTimeout(() => {
   if (flags.has("stems")) press("KeyG");
   if (flags.has("review")) press("KeyE");
   if (flags.has("hist")) press("KeyY");
-  if (flags.has("pr")) window.dispatchEvent(new CustomEvent("julgi:pr", { detail: { repo: "example/api-server", number: 1852 } }));
+  if (flags.has("pr")) window.dispatchEvent(new CustomEvent("julgi:pr", { detail: { repo: "example/acme-api", number: 1852 } }));
   // 세션 상태가 한 번 읽힌 뒤에 눌러야 내 차례인 세션이 잡힌다
   // 설정의 묶음을 넘긴다: ?settings&sec=6
   for (let i = 0; i < Number(flags.get("sec") ?? 0); i++) setTimeout(() => document.querySelector(".settings")?.dispatchEvent(new KeyboardEvent("keydown", { key: "Tab", bubbles: true })), 400 + i * 150);

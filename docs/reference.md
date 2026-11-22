@@ -72,7 +72,7 @@ Change them in `⌘,`; they apply at once and are saved to `~/.julgi/config.json
 | `jiraSite`, `jiraEmail`, `jiraKind` | none | Jira site URL, email, `cloud` or `server`. The token is not here; it lives only in the macOS keychain |
 | `jiraWatch`, `jiraEveryMin` | `mine`, 5 | Whether to watch tickets assigned to me, and how often |
 | `jiraStartTransition`, `jiraPrTransition`, `jiraMergeTransition` | `In Progress`, `In Review`, `Done` | Status to offer on start, on PR, on merge. Empty means do not ask |
-| `jiraRepos` | none | Project key to repo (`ABC=api-server, OPS=infra`). Filled in as you start from tickets |
+| `jiraRepos` | none | Project key to repo (`ABC=acme-api, OPS=acme-infra`). Filled in as you start from tickets |
 
 What the connections use:
 

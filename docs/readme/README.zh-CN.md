@@ -74,7 +74,7 @@ GitHub PR 和 GitLab MR 都在 Julgi 里打开：diff、行内评论与回复、
 在一个地方看全所有东西：我的 PR、评审请求、会话提交的 PR，以及按分组的 Jira 工单。选中后，右侧打开对应的 PR 或工单。
 
 </td>
-<td><img src="../images/work.png" alt="工作页：左侧是 PR 分组和工单分组，中间是工单列表，右侧是打开的工单" /></td>
+<td><img src="../images/work.png" alt="工作页：左侧是 PR 分组和工单分组，中间是我的 PR 列表，右侧是选中的 PR" /></td>
 </tr>
 <tr>
 <td>
