@@ -202,6 +202,9 @@ async function invoke(cmd: string, args: Record<string, unknown> = {}): Promise<
       ]);
     case "pr_status":
       return args.number === 1852 ? { state: "OPEN", ci: "FAILURE", decision: "CHANGES_REQUESTED", others: 3 } : { state: "OPEN", ci: "SUCCESS", decision: "APPROVED", others: 0 };
+    case "route_ask":
+      // 보낼 곳을 묻는 글에만 답한다: 새 일이고 첫 레포의 일이라고 한다
+      return String(args.prompt ?? "").startsWith("후보:") ? '{"pick": "new", "repo": "acme-api", "why": "후보 가운데 이어지는 일이 없다"}' : null;
     case "pr_diff":
       return (await invoke("repo_diff", {})) ?? "";
     case "pr_comments":

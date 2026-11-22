@@ -21,6 +21,22 @@ node scripts/check-pr.mjs && node scripts/check-jira.mjs && node scripts/check-m
 (cd src-tauri && cargo test)
 ```
 
+## Measuring where messages go
+
+Sending a message to the right session (`⌘L`) is the part that has to be right. Two things measure it:
+
+```sh
+node scripts/eval-route.mjs --only fixtures   # made-up cases in scripts/route-cases.json
+node scripts/eval-route.mjs                   # plus your own history in ~/.julgi
+node scripts/eval-route.mjs --model haiku     # with another model
+```
+
+- Every send is logged to `~/.julgi/routes.jsonl` with who decided (you, the model, a text match) and, when the model was asked, the exact prompt and its answer. Moving a message to another stem afterwards (`⌘⇧L`) is logged to `misroutes.jsonl` as the correct answer.
+- The script asks the model the same questions again and compares with those answers. It prints accuracy, splits the mistakes into "joined a new job to old work", "opened a new stem for a follow-up" and "sent to another stem", and compares with the last run for the same model. Results are kept in `~/.julgi/eval/`.
+- It calls the model once per case, so it uses your Claude usage.
+
+Change the prompt in `src/routeAsk.ts`, run it before and after, and add a case to `route-cases.json` for every mistake you see in real use.
+
 ## Commit messages
 
 Write commit messages in English with a [Conventional Commits](https://www.conventionalcommits.org/) prefix.

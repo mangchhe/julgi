@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { aboutOf, ago, Folder, hot, Item, kilo, modelFor, repoOf } from "./model";
 import { Candidate, confident, rank, rankFolders } from "./route";
+import { ASK_SYSTEM, askPrompt, candidateLine, parseAnswer, RouteCase } from "./routeAsk.ts";
 import { indexLine, Note, shortlist, Stats } from "./brain";
 import { tr } from "./i18n";
 
@@ -11,7 +12,8 @@ export type Target = { kind: "item"; item: Item } | { kind: "new"; cwd: string; 
 /** by: 누가 골랐나. 한 일 목록에 남긴다 */
 /** brain: 새 세션에 붙여 줄 브레인 노트 */
 /** span: 이 일이 걸친 레포들. 둘이 넘으면 새 세션을 조율자로 세운다 */
-export type RouteNote = { top?: string; rank: number; asked?: string; by?: string; brain?: Note[]; span?: string[]; big?: boolean };
+/** ask: 모델에게 물었다면 그 물음과 답. 평가 때 다시 돌린다 */
+export type RouteNote = { top?: string; rank: number; asked?: string; by?: string; brain?: Note[]; span?: string[]; big?: boolean; ask?: RouteCase };
 
 type Props = {
   items: Item[];
@@ -40,8 +42,6 @@ type Props = {
 };
 
 const MAX = 6;
-const ASK_SYSTEM = // 모델에 보내는 글 i18n-ok
-  '너는 분류기다. 사용자가 쓴 글이 아래 후보 작업 가운데 하나를 이어서 하는 이야기인지 판정한다. 그 작업이 하던 일의 연속이거나 같은 대상을 다룰 때만 그 후보를 고른다. 같은 레포이거나 주제가 비슷하다는 것만으로는 고르지 않는다. 새로운 요청이면 pick을 "new"로 하고, 글이 어느 레포의 일인지 드러나면 repo에 아래 레포 목록 가운데 하나를 적는다(드러나지 않으면 빈 문자열). 브레인 노트 목록이 있으면, 이 글의 일을 할 때 알고 시작해야 할 노트의 번호(b 뒤의 숫자)를 notes에 최대 4개 적는다. 확실히 관련된 것만 고르고 없으면 빈 배열로 둔다. 새로운 요청이고, 그 일을 끝내려면 레포 두 곳 넘게를 고치거나 조사해야 하면 span에 그 레포 이름들을 레포 목록에 있는 이름 그대로 적는다(영역별 묶음이 있으면 그것을 보고 고른다). 한 레포 안에서 끝나는 일이거나 확실하지 않으면 span은 빈 배열로 둔다. span이 둘 넘으면 size에 일의 크기를 적는다. "작음"은 한 세션이 레포들을 오가며 금방 끝낼 일이다: 필드 하나 추가, 문구나 값 수정, 읽기만 하는 조사, 한쪽을 조금 고치고 다른 쪽에 반영하는 일. "큼"은 레포마다 따로 설계하고 구현하고 확인해야 하는 덩어리가 둘 넘게 있고, 그 덩어리들을 나란히 진행할 수 있는 일이다: 새 기능을 서버와 앱과 어드민에 걸쳐 만드는 일, 계약을 바꾸고 여러 쪽을 따라 고치는 일. 확실하지 않으면 "작음"으로 한다. JSON 한 줄만 답한다: {"pick": 번호 또는 "new", "repo": "레포 이름 또는 빈 문자열", "span": ["레포 이름들"], "size": "작음 또는 큼", "notes": [숫자들], "why": "짧은 한 문장"}';
 
 /** 보내기 상자. 할 말을 먼저 치면 어느 줄기 이야기인지 맞춰서 보여 주고, Enter로 거기에 보낸다. */
 export default function Send({ items, openIds, cwd, folders, base, notes, misses, stats, areas, initial, onSend, onLater, onClose }: Props) {
@@ -54,6 +54,7 @@ export default function Send({ items, openIds, cwd, folders, base, notes, misses
   const [touched, setTouched] = useState(false);
   const input = useRef<HTMLTextAreaElement>(null);
   const picked4 = useRef<Note[]>([]); // 모델이 고른 브레인 노트
+  const asked4 = useRef<RouteCase | undefined>(undefined); // 모델에게 물은 것과 답. 글을 고치면 버린다
   const span = useRef<string[]>([]); // 모델이 본, 이 일이 걸친 레포들
   const big = useRef(false); // 그리고 그 일이 나눠 맡길 만큼 큰가
   useEffect(() => input.current?.focus(), []);
@@ -108,7 +109,7 @@ export default function Send({ items, openIds, cwd, folders, base, notes, misses
   const send = (handoff: boolean) => {
     const text = message.trim();
     if (!text) return;
-    const note: RouteNote = { top: ranked[0]?.item.session.id, rank: picked ? ranked.indexOf(picked) : -1, asked: asked?.item?.session.id, by: tr`내가 고름` };
+    const note: RouteNote = { top: ranked[0]?.item.session.id, rank: picked ? ranked.indexOf(picked) : -1, asked: asked?.item?.session.id, by: tr`내가 고름`, ask: asked4.current };
     if (picked) onSend({ kind: "item", item: picked.item }, text, note, handoff);
     else onSend({ kind: "new", cwd: fresh[at - shown.length].cwd, join: fresh[at - shown.length].join }, text, note, false);
   };
@@ -119,20 +120,16 @@ export default function Send({ items, openIds, cwd, folders, base, notes, misses
     if (!text || asking) return null;
     setAsking(true);
     const pool = [...new Set([...ranked.slice(0, 12).map((c) => c.item), ...items.slice(0, 14)])];
-    const lines = pool.map((item, i) => {
-      const s = item.session;
-      const about = aboutOf(item).slice(0, 220);
-      return `${i}. ${item.name} (${[s.repo, s.branch].filter(Boolean).join(", ")})${about ? " — " + about : ""}`;
-    });
+    const lines = pool.map((item, i) => candidateLine(i, { name: item.name, repo: item.session.repo, branch: item.session.branch, about: aboutOf(item) }));
     try {
       const repos = folders.slice(0, 40).map((f) => f.repo).join(", ");
       // 노트가 많으면 글자가 겹치는 것과 많이 쓰인 것을 먼저 추려 보여 준다
       const shelf = shortlist(text, notes, stats);
-      // 모델에 보내는 글 i18n-off
-      const brainPart = shelf.length ? `\n\n브레인 노트:\n${shelf.map(indexLine).join("\n")}` : "";
-      const raw = await invoke<string>("route_ask", { model: modelFor("route"), system: ASK_SYSTEM, prompt: `후보:\n${lines.join("\n")}\n\n레포 목록: ${repos}${areas ? `\n\n영역별 묶음:\n${areas}` : ""}${brainPart}${misses ? `\n\n전에 틀렸던 판단(사용자가 직접 바로잡은 것. 비슷한 글이면 같은 실수를 하지 않는다):\n${misses}` : ""}\n\n글: ${text}\n` });
-      // i18n-on
-      const answer = JSON.parse(raw.slice(raw.indexOf("{"), raw.lastIndexOf("}") + 1)) as { pick: number | string; repo?: string; why?: string; notes?: number[]; span?: string[]; size?: string };
+      const prompt = askPrompt({ lines, repos, areas, brain: shelf.map(indexLine), misses, text });
+      const raw = await invoke<string>("route_ask", { model: modelFor("route"), system: ASK_SYSTEM, prompt });
+      const answer = parseAnswer(raw);
+      // 나중에 같은 물음을 다시 돌려 정확도를 재려고, 물은 것과 답을 그대로 남긴다
+      asked4.current = { prompt, pool: pool.map((item) => item.session.id), pick: typeof answer.pick === "number" ? (pool[answer.pick]?.session.id ?? "new") : "new", repo: answer.repo ?? "", model: modelFor("route") };
       const item = typeof answer.pick === "number" ? pool[answer.pick] : undefined;
       const cwd = item ? undefined : folders.find((f) => f.repo === answer.repo)?.cwd;
       setAsked({ item, why: answer.why ?? "", cwd });
@@ -172,7 +169,7 @@ export default function Send({ items, openIds, cwd, folders, base, notes, misses
       viaModel = !!answer?.item;
       cwd = answer?.cwd;
     }
-    const note: RouteNote = { top: ranked[0]?.item.session.id, rank: item ? ranked.findIndex((c) => c.item === item) : -1, asked: viaModel ? item?.session.id : undefined, by: viaModel ? tr`모델이 고름` : item ? tr`글자로 맞음` : tr`이어 갈 줄기가 없어서`, brain: picked4.current, span: span.current, big: big.current };
+    const note: RouteNote = { top: ranked[0]?.item.session.id, rank: item ? ranked.findIndex((c) => c.item === item) : -1, asked: viaModel ? item?.session.id : undefined, by: viaModel ? tr`모델이 고름` : item ? tr`글자로 맞음` : tr`이어 갈 줄기가 없어서`, brain: picked4.current, span: span.current, big: big.current, ask: asked4.current };
     if (item) return onSend({ kind: "item", item }, text, note, hot(item.session.tokens), late);
     // 새 줄기를 열 곳: 모델이 짚은 레포, 없으면 글자로 맞은 레포, 그것도 없으면 기본 폴더
     const place = fresh.find((row) => !row.join) ?? fresh[0];
@@ -225,6 +222,7 @@ export default function Send({ items, openIds, cwd, folders, base, notes, misses
             setSel(0);
             setAsked(null);
             picked4.current = [];
+            asked4.current = undefined;
             span.current = [];
             setTouched(false);
           }}

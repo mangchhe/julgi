@@ -1276,7 +1276,19 @@ export default function App() {
     // 내가 고른 곳과 Julgi가 1등으로 꼽은 곳을 남겨 두고 나중에 적중률을 본다
     void invoke("data_append", {
       name: "routes.jsonl",
-      line: JSON.stringify({ at: new Date().toISOString(), message: message.slice(0, 200), top: note.top ?? null, asked: note.asked ?? null, chosen: target.kind === "item" ? target.item.session.id : "new", rank: note.rank }),
+      // how: 누가 정했나(me 내가 골랐다, model 모델, text 글자, none 이어 갈 곳이 없었다, session 다른 세션이 넘겼다). ask: 모델에게 물은 글과 답.
+      // scripts/eval-route.mjs가 이 기록으로 같은 물음을 다시 돌려 정확도를 잰다
+      line: JSON.stringify({
+        at: new Date().toISOString(),
+        message: message.slice(0, 200),
+        top: note.top ?? null,
+        asked: note.asked ?? null,
+        chosen: target.kind === "item" ? target.item.session.id : "new",
+        repo: target.kind === "item" ? target.item.session.repo : repoOf(target.cwd),
+        rank: note.rank,
+        how: note.by?.includes("이 넘김") ? "session" : note.by === tr("내가 고름") ? "me" : note.ask ? "model" : target.kind === "item" ? "text" : "none", // i18n-ok
+        ask: note.ask,
+      }),
     });
     const outbox = (text = message) => invoke<string>("data_write", { name: `outbox/${crypto.randomUUID()}.md`, text });
     if (target.kind === "new") {
@@ -2602,7 +2614,8 @@ export default function App() {
               record("옮김", tr`다른 줄기로 옮김: "${args[1].split("\n").pop()?.slice(0, 50) ?? ""}"`); // i18n-ok
               // 무엇이 어디로 잘못 갔고 어디가 맞았는지 적어 둔다. 다음에 보낼 곳을 정할 때 모델에게 보여 준다
               const right = args[0].kind === "item" ? args[0].item.name : `새 줄기(${repoOf(args[0].cwd)})`; // i18n-ok
-              const miss = { at: Date.now(), said: movedFrom.current.said.slice(0, 160), wrong: movedFrom.current.name.slice(0, 50), right: right.slice(0, 50) };
+              // rightId, rightRepo: 평가가 정답으로 쓴다
+              const miss = { at: Date.now(), said: movedFrom.current.said.slice(0, 160), wrong: movedFrom.current.name.slice(0, 50), right: right.slice(0, 50), rightId: args[0].kind === "item" ? args[0].item.session.id : "new", rightRepo: args[0].kind === "item" ? args[0].item.session.repo : repoOf(args[0].cwd) };
               if (miss.said) {
                 setMisses((list) => [...list, miss].slice(-20));
                 void invoke("data_append", { name: "misroutes.jsonl", line: JSON.stringify(miss) });
