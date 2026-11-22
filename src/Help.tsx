@@ -1,5 +1,5 @@
 /** 이것만 알면 쓴다. 나머지는 Julgi가 알아서 한다 */
-const CORE: [string, string][] = [
+export const CORE: [string, string][] = [
   ["⌘L", "할 말을 치고 Enter. 어느 세션으로 보낼지, 새로 열지, 갈아탈지는 Julgi가 정한다"],
   ["⌘J", "내 차례: 답을 기다리는 세션들과 마지막에 물은 말. 거기서 바로 답한다"],
   ["⌘Y", "Julgi가 알아서 한 일 보기. 뭔가 사라졌거나 이상하면 여기부터"],
@@ -8,7 +8,7 @@ const CORE: [string, string][] = [
 ];
 
 /** 몰라도 된다. 직접 하고 싶을 때만 */
-const MORE: [string, string][] = [
+export const MORE: [string, string][] = [
   ["⌘K", "세션 찾기 · 새 세션 (Tab: 요약만 붙이기, ⌥⏎: 한 줄기로 묶기)"],
   ["⌘1 – ⌘9", "열린 세션 번호로 바로"],
   ["⌃Tab", "이 칸에서 직전에 보던 세션"],

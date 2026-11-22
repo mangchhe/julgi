@@ -920,3 +920,8 @@ body.dragging .pane-body { pointer-events: none; }
 .row-meta.pr-line:hover { color: var(--accent); }
 .row-meta.pr-line .loud { color: var(--wait); font-weight: 600; }
 .row-meta.pr-line.news { color: var(--ink); }
+/* 설정의 단축키 묶음: 키를 왼쪽에, 설명을 본문 글씨로 */
+.set-row.keys { grid-template-columns: 120px minmax(0, 1fr) 0; padding-top: 6px; padding-bottom: 6px; min-height: 0; }
+.set-row.keys .set-value { display: none; }
+.set-kbd { flex: none; min-width: 110px; font-family: ui-monospace, Menlo, monospace; font-size: 12px; color: var(--accent); background: none; border: 0; }
+.set-row.keys .set-note { color: var(--ink); font-size: 13px; margin: 0; }

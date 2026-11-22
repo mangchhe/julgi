@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { config, kilo } from "./model";
 import { THEMES } from "./themes";
+import { CORE, MORE } from "./Help";
 
 type Key = keyof typeof config;
 type Props = {
@@ -21,7 +22,8 @@ type Row =
   | { kind: "pick"; key: Key; label: string; note: string; options: [string, string][] }
   | { kind: "key"; key: Key; label: string; note: string }
   | { kind: "text"; key: Key; label: string; note: string; hint: string }
-  | { kind: "github"; label: string; note: string };
+  | { kind: "github"; label: string; note: string }
+  | { kind: "keys"; label: string; note: string };
 
 /** 묶음마다 줄 몇 개. 왼쪽에서 묶음을 고르면 오른쪽에 그 줄들만 나온다 */
 const SECTIONS: { title: string; hint: string; rows: Row[] }[] = [
@@ -108,6 +110,8 @@ const SECTIONS: { title: string; hint: string; rows: Row[] }[] = [
     ],
   },
 ];
+// 단축키는 고칠 값이 아니라 보는 것이다. 도움말(⌘/)과 같은 목록을 쓴다
+SECTIONS.push({ title: "단축키", hint: "⌘/로도 본다", rows: [...CORE, ...MORE].map(([label, note]) => ({ kind: "keys" as const, label, note })) });
 const ROWS: Row[] = SECTIONS.flatMap((sec) => sec.rows);
 /** 줄 번호 → 그 줄이 든 묶음 번호 */
 const SECTION_OF: number[] = SECTIONS.flatMap((sec, n) => sec.rows.map(() => n));
@@ -218,9 +222,10 @@ export default function Settings({ onChange, onClose, remoteUrl, onConnect }: Pr
             <div className="set-card">
               {ROWS.map((row, i) =>
                 SECTION_OF[i] !== SECTION_OF[at] ? null : (
-                <div key={row.label} className={"set-row" + (i === at ? " on" : "")} onClick={() => setAt(i)}>
+                <div key={`${row.label}-${i}`} className={"set-row" + (i === at ? " on" : "") + (row.kind === "keys" ? " keys" : "")} onClick={() => setAt(i)}>
+                  {row.kind === "keys" && <kbd className="set-kbd">{row.label}</kbd>}
                   <div className="set-label">
-                    {row.label}
+                    {row.kind !== "keys" && row.label}
                     <div className="set-note">{row.note}</div>
                     {row.kind === "toggle" && row.key === "remote" && config.remote && remoteUrl && (
                       <div className="set-remote">
