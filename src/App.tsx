@@ -118,6 +118,8 @@ export default function App() {
   // 나한테 온 리뷰 요청. ⌘J 대기열의 아래 묶음이 된다
   const [asks, setAsks] = useState<ReviewAsk[]>([]);
   // 세션과 이어지지 않은 내 PR 가운데 봐야 할 일이 생긴 것: "소유자/레포#번호" → { PR, 까닭 }. ⌘J의 "내 PR"이 된다
+  // 내가 연 열린 PR 전부 (챙길 PR이 "내 PR 전부"일 때). ⌘K에서 pr을 치면 고를 거리가 된다
+  const [minePrs, setMinePrs] = useState<ReviewAsk[]>([]);
   const [mineNews, setMineNews] = useState<Record<string, ReviewAsk & { news: string }>>({});
   const [reviews, setReviews] = useState<Review[]>([]); // 점검 기록. 판마다 값과 한 일이 남는다
   const [skillUses, setSkillUses] = useState<SkillUse[]>([]);
@@ -1572,7 +1574,9 @@ export default function App() {
       if (pr) openPr(pr);
       else void openUrl(p.url);
     } else if (p.kind === "pr") {
-      // "#번호": 지금 칸의 레포가 GitHub에 있을 때만 열 수 있다
+      if (!p.number) return;
+      if (p.repo) return openPr({ repo: p.repo, number: p.number });
+      // 번호만 쳤으면 지금 칸의 레포에서 연다. GitHub 레포일 때만 된다
       const cwd = cwdOf(current);
       void invoke<string | null>("repo_slug", { path: cwd }).then((repo) => (repo ? openPr({ repo, number: p.number }) : say(`${repoOf(cwd)}는 GitHub 레포가 아니다.`)));
     } else newSession(p.cwd);
@@ -1657,7 +1661,9 @@ export default function App() {
       // 내 PR 전부를 챙기면 세션과 이어지지 않은 내 PR도 같이 본다
       if (config.prWatch === "mine") {
         const text = await invoke<string>("pr_mine").catch(() => "");
-        for (const pr of text ? (JSON.parse(text) as ReviewAsk[]) : []) {
+        const list = text ? (JSON.parse(text) as ReviewAsk[]) : [];
+        setMinePrs(list);
+        for (const pr of list) {
           const id = `${pr.repository.nameWithOwner}#${pr.number}`;
           if (!targets.has(id)) targets.set(id, { target: { repo: pr.repository.nameWithOwner, number: pr.number }, keys: [], pr });
         }
@@ -2217,7 +2223,7 @@ export default function App() {
         })}
       </div>
       {overlay === "palette" && (
-        <Palette open={open} sessions={sessions} byId={byId} cwd={cwdOf(current)} onPick={pick} onAttach={attach} onJoin={join} onClose={() => setOverlay(null)} />
+        <Palette open={open} sessions={sessions} byId={byId} cwd={cwdOf(current)} onPick={pick} onAttach={attach} onJoin={join} onClose={() => setOverlay(null)} asks={asks} mine={minePrs} />
       )}
       {overlay === "send" && (
         <Send

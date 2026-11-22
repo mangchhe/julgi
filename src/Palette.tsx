@@ -1,14 +1,15 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { ago, linkLabel, Open, repoOf, Session } from "./model";
-import { prOf } from "./pr";
+import { invoke } from "@tauri-apps/api/core";
+import { prOf, ReviewAsk } from "./pr";
 
 export type Pick =
   | { kind: "open"; key: string }
   | { kind: "session"; session: Session }
   | { kind: "new"; cwd: string }
   | { kind: "link"; url: string }
-  /** 지금 칸의 레포에서 이 번호의 PR을 연다 */
-  | { kind: "pr"; number: number };
+  /** 이 번호의 PR을 연다. repo가 없으면 지금 칸의 레포에서 */
+  | { kind: "pr"; number: number; repo?: string };
 
 type Row = { pick: Pick; title: string; meta: string; isNew?: boolean; isLink?: boolean; session?: Session };
 
@@ -32,25 +33,67 @@ type Props = {
   /** 고른 세션을 지금 세션과 한 줄기로 묶는다 */
   onJoin: (sessionId: string) => void;
   onClose: () => void;
+  /** 나한테 온 리뷰 요청과 내 PR. "pr"을 치면 지금 칸 레포의 열린 PR과 함께 고를 거리로 낸다 */
+  asks: ReviewAsk[];
+  mine: ReviewAsk[];
 };
+
+/** ⌘K에서 고를 PR 하나 */
+type PrRow = { repo: string; number: number; title: string; author: string; branch: string; tag: string; draft: boolean; at: string };
 
 const MAX_SESSIONS = 40;
 
-export default function Palette({ open, sessions, byId, cwd, onPick, onAttach, onJoin, onClose }: Props) {
+export default function Palette({ open, sessions, byId, cwd, onPick, onAttach, onJoin, onClose, asks, mine }: Props) {
   const [query, setQuery] = useState("");
   const [sel, setSel] = useState(0);
   const input = useRef<HTMLInputElement>(null);
   const list = useRef<HTMLDivElement>(null);
 
   useEffect(() => input.current?.focus(), []);
+  // 지금 칸의 레포가 GitHub에 있으면 열린 PR을 미리 받아 둔다. pr을 쳤을 때 번호를 몰라도 고를 수 있게
+  const [repoPrs, setRepoPrs] = useState<PrRow[]>([]);
+  useEffect(() => {
+    void invoke<string | null>("repo_slug", { path: cwd }).then(async (repo) => {
+      if (!repo) return;
+      const text = await invoke<string>("pr_list", { repo }).catch(() => "");
+      const list = text ? (JSON.parse(text) as { number: number; title: string; author: { login: string }; headRefName: string; isDraft: boolean; updatedAt: string }[]) : [];
+      setRepoPrs(list.map((p) => ({ repo, number: p.number, title: p.title, author: p.author.login, branch: p.headRefName, tag: "", draft: p.isDraft, at: p.updatedAt })));
+    });
+  }, [cwd]);
+  // 리뷰 요청 → 내 PR → 이 레포의 나머지. 같은 PR은 한 번만
+  const prs = useMemo(() => {
+    const out: PrRow[] = [];
+    const add = (p: PrRow) => out.some((x) => x.repo === p.repo && x.number === p.number) || out.push(p);
+    for (const a of asks) add({ repo: a.repository.nameWithOwner, number: a.number, title: a.title, author: a.author.login, branch: "", tag: "리뷰 요청", draft: a.isDraft, at: a.updatedAt });
+    for (const m of mine) add({ repo: m.repository.nameWithOwner, number: m.number, title: m.title, author: m.author.login, branch: "", tag: "내 PR", draft: m.isDraft, at: m.updatedAt });
+    for (const p of repoPrs) add(p);
+    return out;
+  }, [asks, mine, repoPrs]);
 
   // 찾기와 새 세션은 같은 상자다. 하던 세션이 먼저 나오고, 새로 열기는 맨 아래다.
   const rows = useMemo<Row[]>(() => {
+    // "pr", "#", 숫자로 시작하면 열린 PR을 고를 거리로 맨 위에 낸다. 뒤에 붙인 글로 번호 앞자리나 제목·브랜치를 거른다
+    const prQuery = query.trim().match(/^(?:pr\b|#|(?=\d))\s*(.*)$/i);
+    const prRows: Row[] = [];
+    if (prQuery) {
+      const rest = prQuery[1].replace(/^#/, "").trim().toLowerCase();
+      const hits = prs.filter((p) => !rest || (/^\d+$/.test(rest) ? String(p.number).startsWith(rest) : `${p.title} ${p.branch} ${p.author}`.toLowerCase().includes(rest)));
+      for (const p of hits.slice(0, 30))
+        prRows.push({
+          pick: { kind: "pr", number: p.number, repo: p.repo },
+          title: `#${p.number} ${p.title}`,
+          meta: [p.tag, p.draft ? "초안" : "", p.repo.split("/")[1], p.author, p.branch].filter(Boolean).join(" · "),
+          isLink: true,
+        });
+      // 목록에 없는 번호(닫힌 옛 PR 등)를 정확히 쳤으면 그 번호로 바로 연다
+      if (/^\d+$/.test(rest) && !hits.some((p) => String(p.number) === rest)) prRows.push({ pick: { kind: "pr", number: Number(rest) }, title: `PR #${rest} 보기`, meta: `${repoOf(cwd)} · 열린 PR 목록에 없는 번호`, isLink: true });
+      if (!prRows.length) prRows.push({ pick: { kind: "pr", number: 0 }, title: prs.length ? "맞는 열린 PR이 없다" : "열린 PR이 없거나 아직 읽는 중", meta: "번호를 알면 숫자를 친다", isLink: true });
+    }
     // "아티팩트 환불"처럼 치면 산출물만 찾는다: 종류를 가리키는 낱말은 떼고 나머지로 세션을 찾아, 그 세션이 남긴 링크를 낸다
     const wanted = LINK_WORDS.filter(([word]) => word.test(query));
     const q = wanted.reduce((text, [word]) => text.replace(new RegExp(word.source, "gi"), " "), query).replace(/\s+/g, " ").trim().toLowerCase();
     if (wanted.length) {
-      const links: Row[] = [];
+      const links: Row[] = [...prRows];
       for (const s of sessions) {
         if (links.length >= 40) break;
         if (q && !`${s.title} ${s.said} ${s.group} ${s.repo} ${s.branch} ${s.recap}`.toLowerCase().includes(q)) continue;
@@ -59,10 +102,7 @@ export default function Palette({ open, sessions, byId, cwd, onPick, onAttach, o
       return links;
     }
     const has = (...parts: (string | undefined)[]) => parts.join(" ").toLowerCase().includes(q);
-    const out: Row[] = [];
-    // "#1465"나 "1465"를 치면 맨 위에 그 PR 보기를 낸다 (지금 칸의 레포에서)
-    const prNo = query.trim().match(/^#?(\d+)$/)?.[1];
-    if (prNo) out.push({ pick: { kind: "pr", number: Number(prNo) }, title: `PR #${prNo} 보기`, meta: `${repoOf(cwd)} · Julgi 안에서`, isLink: true });
+    const out: Row[] = [...prRows];
     const weak: Row[] = []; // 제목이 아니라 요약에서만 걸린 것은 뒤로 보낸다
     const openIds = new Set<string>();
     for (const o of open) {
@@ -101,7 +141,7 @@ export default function Palette({ open, sessions, byId, cwd, onPick, onAttach, o
     for (const folder of folders)
       out.push({ pick: { kind: "new", cwd: folder }, title: `+ 새 세션 · ${repoOf(folder)}`, meta: folder.replace(/^\/Users\/[^/]+/, "~"), isNew: true });
     return out;
-  }, [query, open, sessions, byId, cwd]);
+  }, [query, open, sessions, byId, cwd, prs]);
 
   const at = Math.min(sel, rows.length - 1);
   useEffect(() => {

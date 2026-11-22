@@ -137,6 +137,14 @@ async function invoke(cmd: string, args: Record<string, unknown> = {}): Promise<
         comments: [{ author: { login: "teammate" }, body: "배포 전에 스테이지에서 한 번 돌려 볼게요.", createdAt: new Date(Date.now() - 3600_000).toISOString() }],
         reviews: [{ author: { login: "reviewer" }, body: "음수 환불은 예외 말고 0으로 막는 게 맞지 않을까요?", submittedAt: new Date(Date.now() - 1800_000).toISOString(), state: "CHANGES_REQUESTED" }],
       });
+    case "pr_list":
+      return JSON.stringify([
+        { number: 1852, title: "쿠폰 여러 장일 때 환불액 1원 어긋남 수정", author: { login: "me" }, headRefName: "fix/refund-rounding", isDraft: false, updatedAt: new Date().toISOString() },
+        { number: 1849, title: "알림 묶음 발송 간격 설정", author: { login: "teammate" }, headRefName: "feat/noti-batch", isDraft: true, updatedAt: new Date().toISOString() },
+        { number: 1840, title: "정산 배치 재시도 간격을 설정으로", author: { login: "teammate" }, headRefName: "fix/settle-retry", isDraft: false, updatedAt: new Date().toISOString() },
+      ]);
+    case "pr_mine":
+      return JSON.stringify([{ number: 1852, title: "쿠폰 여러 장일 때 환불액 1원 어긋남 수정", repository: { nameWithOwner: "example/api-server" }, author: { login: "me" }, updatedAt: new Date().toISOString(), url: "https://github.com/example/api-server/pull/1852", isDraft: false }]);
     case "pr_review_requests":
       return JSON.stringify([
         { number: 215, title: "결제 취소 API에 부분 취소 추가", repository: { nameWithOwner: "example/api-server" }, author: { login: "teammate" }, updatedAt: new Date(Date.now() - 7200_000).toISOString(), url: "https://github.com/example/api-server/pull/215", isDraft: false },

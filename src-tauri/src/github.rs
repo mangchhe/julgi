@@ -102,6 +102,13 @@ fn status_of(v: &serde_json::Value) -> Option<PrStatus> {
     })
 }
 
+/// 한 레포의 열린 PR들. ⌘K에서 pr을 치면 고를 거리로 보여 준다. gh가 준 JSON 그대로
+#[tauri::command(async)]
+pub fn pr_list(repo: String) -> Result<String, String> {
+    check_repo(&repo)?;
+    run(&["pr", "list", "-R", &repo, "--state", "open", "--limit", "50", "--json", "number,title,author,headRefName,isDraft,updatedAt"])
+}
+
 /// 내가 연 열린 PR들. gh가 준 JSON 그대로
 #[tauri::command(async)]
 pub fn pr_mine() -> Result<String, String> {
