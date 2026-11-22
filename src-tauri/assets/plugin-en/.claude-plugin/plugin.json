@@ -1,0 +1,5 @@
+{
+  "name": "julgi",
+  "description": "Lets sessions running inside the Julgi workspace read and write stem memory and hand work to other sessions.",
+  "version": "0.1.0"
+}

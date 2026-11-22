@@ -112,5 +112,4 @@ Everything is a text file under `~/.julgi/`. Conversations are not here; Claude 
 - The phone view does not route for you, has no notifications, and cannot answer permission prompts.
 - GitLab and Jira were built against the documented API shapes and have not been checked against live accounts.
 - Few automated tests: three check scripts under `scripts/`, Rust unit tests, and an in-app self-check (`JULGI_SELFTEST=1 npm run tauri dev`).
-- The skills Julgi adds to sessions and the `julgi` command's output are still Korean.
 - No signed installer, macOS only.

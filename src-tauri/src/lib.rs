@@ -458,19 +458,24 @@ fn inbox_take() -> Vec<String> {
 }
 
 /// Julgi가 띄운 세션이 쓰는 julgi 명령과 스킬 묶음을 ~/.julgi에 깐다. 켤 때마다 덮어써서 앱과 같은 판을 유지한다.
+/// 스킬은 지금 언어의 것을 같은 자리에 쓰고, julgi 명령이 읽을 언어 표시(lang)도 함께 적는다. 언어를 바꾸고 다시 켜면 바뀐다.
 fn install_assets() {
-    let files: [(&str, &str); 9] = [
-        ("bin/julgi", include_str!("../assets/julgi")),
-        ("plugin/.claude-plugin/plugin.json", include_str!("../assets/plugin/.claude-plugin/plugin.json")),
-        ("plugin/skills/julgi-memory/SKILL.md", include_str!("../assets/plugin/skills/julgi-memory/SKILL.md")),
-        ("plugin/skills/julgi-send/SKILL.md", include_str!("../assets/plugin/skills/julgi-send/SKILL.md")),
-        ("plugin/skills/julgi-find/SKILL.md", include_str!("../assets/plugin/skills/julgi-find/SKILL.md")),
-        ("plugin/skills/julgi-wrap/SKILL.md", include_str!("../assets/plugin/skills/julgi-wrap/SKILL.md")),
-        ("plugin/skills/julgi-brain/SKILL.md", include_str!("../assets/plugin/skills/julgi-brain/SKILL.md")),
-        ("plugin/skills/julgi-map/SKILL.md", include_str!("../assets/plugin/skills/julgi-map/SKILL.md")),
-        ("plugin/skills/julgi-lead/SKILL.md", include_str!("../assets/plugin/skills/julgi-lead/SKILL.md")),
+    let ko = lang::is_ko();
+    // (자리, 한국어 글, 영어 글)
+    let files: [(&str, &str, &str); 10] = [
+        ("bin/julgi", include_str!("../assets/julgi"), include_str!("../assets/julgi")),
+        ("lang", "ko\n", "en\n"),
+        ("plugin/.claude-plugin/plugin.json", include_str!("../assets/plugin/.claude-plugin/plugin.json"), include_str!("../assets/plugin-en/.claude-plugin/plugin.json")),
+        ("plugin/skills/julgi-memory/SKILL.md", include_str!("../assets/plugin/skills/julgi-memory/SKILL.md"), include_str!("../assets/plugin-en/skills/julgi-memory/SKILL.md")),
+        ("plugin/skills/julgi-send/SKILL.md", include_str!("../assets/plugin/skills/julgi-send/SKILL.md"), include_str!("../assets/plugin-en/skills/julgi-send/SKILL.md")),
+        ("plugin/skills/julgi-find/SKILL.md", include_str!("../assets/plugin/skills/julgi-find/SKILL.md"), include_str!("../assets/plugin-en/skills/julgi-find/SKILL.md")),
+        ("plugin/skills/julgi-wrap/SKILL.md", include_str!("../assets/plugin/skills/julgi-wrap/SKILL.md"), include_str!("../assets/plugin-en/skills/julgi-wrap/SKILL.md")),
+        ("plugin/skills/julgi-brain/SKILL.md", include_str!("../assets/plugin/skills/julgi-brain/SKILL.md"), include_str!("../assets/plugin-en/skills/julgi-brain/SKILL.md")),
+        ("plugin/skills/julgi-map/SKILL.md", include_str!("../assets/plugin/skills/julgi-map/SKILL.md"), include_str!("../assets/plugin-en/skills/julgi-map/SKILL.md")),
+        ("plugin/skills/julgi-lead/SKILL.md", include_str!("../assets/plugin/skills/julgi-lead/SKILL.md"), include_str!("../assets/plugin-en/skills/julgi-lead/SKILL.md")),
     ];
-    for (name, text) in files {
+    for (name, text, en) in files {
+        let text = if ko { text } else { en };
         let path = data_dir().join(name);
         if let Some(dir) = path.parent() {
             let _ = std::fs::create_dir_all(dir);

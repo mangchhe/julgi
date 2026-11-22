@@ -4,9 +4,15 @@
 ROOT="$HOME/.julgi"
 INDEX="$ROOT/index.tsv" # 줄기id, 최근세션id, 세션id들, 레포, 상태, 이름, 요약 (탭으로 나눔)
 me="${JULGI_SESSION:-}"
+# 글의 언어: Julgi가 켤 때 ~/.julgi/lang 에 ko 또는 en 을 적어 둔다. 없으면 영어다
+[ "$(cat "$ROOT/lang" 2>/dev/null)" = ko ] && KO=1 || KO=0
+say() { if [ "$KO" = 1 ]; then printf '%s\n' "$1"; else printf '%s\n' "$2"; fi; }
+# 파일에 한국어로 적힌 상태·종류 낱말은 영어일 때 보여 주는 자리에서만 옮긴다 (파일의 값은 그대로다)
+# 낱말은 == 로 견주지 않고 표에서 찾는다: macOS awk의 == 는 서로 다른 한글 낱말을 같다고 본다
+WORD='BEGIN { split("열림 open 잠듦 asleep 끝남 ended 대기 waiting 실패 failed 멈춤 stopped 결정 decision 함정 pitfall 사실 fact 선호 preference", p, " "); for (i = 1; i < 21; i += 2) EN[p[i]] = p[i + 1]; EN["하는 중"] = "running" } function w(s) { return (!ko && (s in EN)) ? EN[s] : s }'
 
 need_me() {
-  [ -n "$me" ] || { echo "Julgi가 띄운 세션에서만 쓸 수 있다 (JULGI_SESSION이 없다)" >&2; exit 1; }
+  [ -n "$me" ] || { say "Julgi가 띄운 세션에서만 쓸 수 있다 (JULGI_SESSION이 없다)" "Only works in a session started by Julgi (JULGI_SESSION is not set)" >&2; exit 1; }
 }
 # ask <명령> <대상> : 본문은 표준 입력에서 읽는다
 ask() {
@@ -29,38 +35,38 @@ show_memory() {
   for id in "$thread" "$session"; do
     if [ -s "$ROOT/threads/$id.md" ]; then cat "$ROOT/threads/$id.md"; echo; found=1; fi
   done
-  [ "$found" = 1 ] || echo "(이 줄기에는 아직 적힌 기억이 없다)"
+  [ "$found" = 1 ] || say "(이 줄기에는 아직 적힌 기억이 없다)" "(no memory written for this stem yet)"
 }
 
 case "${1:-}" in
   threads)
-    rows "${2:-}" | head -60 | awk -F'\t' '{ printf "%s  [%s · %s]\n", $6, $4, $5; if ($7 != "") printf "    %s\n", $7 }'
+    rows "${2:-}" | head -60 | awk -F'\t' -v ko="$KO" "$WORD"'{ printf "%s  [%s · %s]\n", $6, $4, w($5); if ($7 != "") printf "    %s\n", $7 }'
     ;;
   memory)
     if [ -n "${2:-}" ]; then line=$(rows "$2" | head -1); else need_me; line=$(mine); fi
-    [ -n "$line" ] || { echo "(맞는 줄기가 없다)"; exit 0; }
+    [ -n "$line" ] || { say "(맞는 줄기가 없다)" "(no matching stem)"; exit 0; }
     printf '%s\n\n' "$(printf '%s' "$line" | cut -f6)"
     show_memory "$line"
     ;;
   note)
     shift
-    [ -n "$*" ] || { echo "쓸 내용을 준다: julgi note \"결정: ...\"" >&2; exit 1; }
+    [ -n "$*" ] || { say "쓸 내용을 준다: julgi note \"결정: ...\"" "Give the text to write: julgi note \"Decision: ...\"" >&2; exit 1; }
     printf '%s\n' "$*" | ask note ""
-    echo "줄기 기억에 적어 달라고 했다."
+    say "줄기 기억에 적어 달라고 했다." "Asked Julgi to write it to stem memory."
     ;;
   send)
-    [ -n "${2:-}" ] && [ -n "${3:-}" ] || { echo "쓰는 법: julgi send <줄기 이름 일부 | new> \"시킬 말\"" >&2; exit 1; }
+    [ -n "${2:-}" ] && [ -n "${3:-}" ] || { say "쓰는 법: julgi send <줄기 이름 일부 | new> \"시킬 말\"" "Usage: julgi send <part of a stem name | new> \"what to ask\"" >&2; exit 1; }
     target="$2"; shift 2
     printf '%s\n' "$*" | ask send "$target"
-    echo "보내 달라고 했다. 답은 그 세션에 쌓이고, 나는 기다리지 않는다."
+    say "보내 달라고 했다. 답은 그 세션에 쌓이고, 나는 기다리지 않는다." "Asked Julgi to send it. The reply stays in that session; do not wait for it."
     ;;
   handoff)
     printf '' | ask handoff ""
-    echo "이 답이 끝나면 인계 글을 받아 새 세션으로 넘어가 달라고 했다."
+    say "이 답이 끝나면 인계 글을 받아 새 세션으로 넘어가 달라고 했다." "Asked Julgi to take a handoff note when this reply ends and move to a new session."
     ;;
   done)
     printf '' | ask done ""
-    echo "이 일을 끝난 것으로 해 달라고 했다."
+    say "이 일을 끝난 것으로 해 달라고 했다." "Asked Julgi to mark this work as done."
     ;;
   brain)
     shift
@@ -71,38 +77,40 @@ case "${1:-}" in
       if [ -z "$*" ]; then ok=1; else for w in $*; do grep -qiF -- "$w" "$f" && ok=1; done; fi
       [ "$ok" = 1 ] || continue
       id=$(basename "$f" .md)
-      title=$(sed -n 's/^title: //p' "$f" | head -1); kind=$(sed -n 's/^type: //p' "$f" | head -1)
+      title=$(sed -n 's/^title: //p' "$f" | head -1); kind=$(sed -n 's/^type: //p' "$f" | head -1 | awk -v ko="$KO" "$WORD"'{ print w($0) }')
       if [ -z "$*" ]; then printf '[%s] (%s) %s\n' "$id" "$kind" "$title"
       else printf '[%s] (%s) %s\n' "$id" "$kind" "$title"; awk 'n >= 2 && NF { print "    " $0 } /^---$/ { n++ }' "$f"; hits="$hits $id"; fi
     done
     # 찾아본 노트를 Julgi가 세어 둔다
     [ -n "$hits" ] && [ -n "$me" ] && printf '%s\n' "$hits" | ask used ""
-    [ -n "$hits" ] || [ -z "$*" ] || echo "(맞는 노트가 없다)"
+    [ -n "$hits" ] || [ -z "$*" ] || say "(맞는 노트가 없다)" "(no matching note)"
     ;;
   learn)
-    [ -n "${2:-}" ] && [ -n "${3:-}" ] && [ -n "${4:-}" ] || { echo "쓰는 법: julgi learn <결정|함정|사실> \"제목\" \"본문\"" >&2; exit 1; }
-    printf '%s\n%s\n' "$3" "$4" | ask learn "$2"
-    echo "브레인에 담아 달라고 했다."
+    [ -n "${2:-}" ] && [ -n "${3:-}" ] && [ -n "${4:-}" ] || { say "쓰는 법: julgi learn <결정|함정|사실> \"제목\" \"본문\"" "Usage: julgi learn <decision|pitfall|fact> \"title\" \"body\"" >&2; exit 1; }
+    # 영어 이름으로 받아도 부탁에는 앱이 읽는 한국어 값으로 적는다
+    case "$2" in decision) kind="결정" ;; pitfall) kind="함정" ;; fact) kind="사실" ;; *) kind="$2" ;; esac
+    printf '%s\n%s\n' "$3" "$4" | ask learn "$kind"
+    say "브레인에 담아 달라고 했다." "Asked Julgi to add it to the brain."
     ;;
   fix)
-    [ -n "${2:-}" ] && [ -n "${3:-}" ] || { echo "쓰는 법: julgi fix <노트 id> \"고친 본문\"" >&2; exit 1; }
+    [ -n "${2:-}" ] && [ -n "${3:-}" ] || { say "쓰는 법: julgi fix <노트 id> \"고친 본문\"" "Usage: julgi fix <note id> \"corrected body\"" >&2; exit 1; }
     printf '%s\n' "$3" | ask fix "$2"
-    echo "노트를 고쳐 달라고 했다."
+    say "노트를 고쳐 달라고 했다." "Asked Julgi to fix the note."
     ;;
   forget)
-    [ -n "${2:-}" ] || { echo "쓰는 법: julgi forget <노트 id> \"틀린 이유\"" >&2; exit 1; }
+    [ -n "${2:-}" ] || { say "쓰는 법: julgi forget <노트 id> \"틀린 이유\"" "Usage: julgi forget <note id> \"why it is wrong\"" >&2; exit 1; }
     printf '%s\n' "${3:-}" | ask forget "$2"
-    echo "노트를 지워 달라고 했다."
+    say "노트를 지워 달라고 했다." "Asked Julgi to delete the note."
     ;;
   skill)
     # 다듬기 세션이 쓴다: ~/.julgi/grown/revised/<이름>/SKILL.md 를 진짜 스킬 자리에 넣어 달라고 한다
-    [ "${2:-}" = "apply" ] && [ -n "${3:-}" ] || { echo "쓰는 법: julgi skill apply <스킬 이름> \"무엇을 왜 바꿨는지\"" >&2; exit 1; }
-    [ -s "$ROOT/grown/revised/$3/SKILL.md" ] || { echo "고친 글이 없다: $ROOT/grown/revised/$3/SKILL.md" >&2; exit 1; }
+    [ "${2:-}" = "apply" ] && [ -n "${3:-}" ] || { say "쓰는 법: julgi skill apply <스킬 이름> \"무엇을 왜 바꿨는지\"" "Usage: julgi skill apply <skill name> \"what changed and why\"" >&2; exit 1; }
+    [ -s "$ROOT/grown/revised/$3/SKILL.md" ] || { say "고친 글이 없다: $ROOT/grown/revised/$3/SKILL.md" "No revised text: $ROOT/grown/revised/$3/SKILL.md" >&2; exit 1; }
     printf '%s\n' "${4:-}" | ask skill "$3"
-    echo "스킬을 바꿔 넣어 달라고 했다. 옛 글은 ~/.julgi/skill-history/$3 에 남는다."
+    say "스킬을 바꿔 넣어 달라고 했다. 옛 글은 ~/.julgi/skill-history/$3 에 남는다." "Asked Julgi to swap the skill in. The old text is kept in ~/.julgi/skill-history/$3."
     ;;
   map)
-    [ -s "$ROOT/MAP.md" ] || { echo "(지도가 아직 없다. Julgi가 레포를 훑어 만든다)"; exit 0; }
+    [ -s "$ROOT/MAP.md" ] || { say "(지도가 아직 없다. Julgi가 레포를 훑어 만든다)" "(no map yet. Julgi builds it by scanning the repos)"; exit 0; }
     if [ -z "${2:-}" ]; then cat "$ROOT/MAP.md"
     else awk -v q="$2" 'BEGIN { RS = "\n## "; IGNORECASE = 1 } NR == 1 { next } index(tolower($0), tolower(q)) { print "## " $0 }' "$ROOT/MAP.md"; fi
     ;;
@@ -114,40 +122,41 @@ case "${1:-}" in
     own() { awk -F'\t' -v ids=",$mine_ids," 'index(ids, "," $4 ",")' "$TASKS" 2>/dev/null; }
     case "${2:-list}" in
       add)
-        [ -n "${3:-}" ] && [ -n "${4:-}" ] || { echo "쓰는 법: julgi task add <레포이름> \"시킬 일\"" >&2; exit 1; }
+        [ -n "${3:-}" ] && [ -n "${4:-}" ] || { say "쓰는 법: julgi task add <레포이름> \"시킬 일\"" "Usage: julgi task add <repo name> \"work to do\"" >&2; exit 1; }
         id="t$(LC_ALL=C tr -dc 'a-z0-9' < /dev/urandom | head -c 4)"
         printf '%s\n' "$4" | ask task "$id|$3"
-        echo "일감 $id 을 $3 에 맡겼다. 끝나면 Julgi가 결과를 이 세션에 넣어 준다. 기다리며 되풀이해 확인하지 않는다."
+        say "일감 $id 을 $3 에 맡겼다. 끝나면 Julgi가 결과를 이 세션에 넣어 준다. 기다리며 되풀이해 확인하지 않는다." "Handed task $id to $3. When it finishes, Julgi puts the result into this session. Do not poll while waiting."
         ;;
       list)
         rows=$(own)
-        [ -n "$rows" ] || { echo "(맡긴 일감이 없다)"; exit 0; }
-        printf '%s\n' "$rows" | awk -F'\t' '{ printf "%s  [%s · %s]  %s\n", $1, $2, $3, $5; if ($6 != "") printf "      → %s\n", $6 }'
+        [ -n "$rows" ] || { say "(맡긴 일감이 없다)" "(no tasks handed out)"; exit 0; }
+        printf '%s\n' "$rows" | awk -F'\t' -v ko="$KO" "$WORD"'{ printf "%s  [%s · %s]  %s\n", $1, w($2), $3, $5; if ($6 != "") printf "      → %s\n", $6 }'
         ;;
       result)
-        [ -n "${3:-}" ] || { echo "쓰는 법: julgi task result <일감 id>" >&2; exit 1; }
-        own | cut -f1 | grep -qx "$3" || { echo "(내가 맡긴 일감이 아니다: $3)"; exit 0; }
-        [ -s "$ROOT/tasks/$3.md" ] && cat "$ROOT/tasks/$3.md" || echo "(아직 결과가 없다)"
+        [ -n "${3:-}" ] || { say "쓰는 법: julgi task result <일감 id>" "Usage: julgi task result <task id>" >&2; exit 1; }
+        own | cut -f1 | grep -qx "$3" || { say "(내가 맡긴 일감이 아니다: $3)" "(not a task I handed out: $3)"; exit 0; }
+        [ -s "$ROOT/tasks/$3.md" ] && cat "$ROOT/tasks/$3.md" || say "(아직 결과가 없다)" "(no result yet)"
         ;;
       redo)
-        [ -n "${3:-}" ] && [ -n "${4:-}" ] || { echo "쓰는 법: julgi task redo <일감 id> \"더 시킬 말\"" >&2; exit 1; }
+        [ -n "${3:-}" ] && [ -n "${4:-}" ] || { say "쓰는 법: julgi task redo <일감 id> \"더 시킬 말\"" "Usage: julgi task redo <task id> \"what more to do\"" >&2; exit 1; }
         printf '%s\n' "$4" | ask taskredo "$3"
-        echo "일감 $3 을 맡았던 세션에 이어서 시켰다. 끝나면 결과가 다시 온다."
+        say "일감 $3 을 맡았던 세션에 이어서 시켰다. 끝나면 결과가 다시 온다." "Sent follow-up work to the session that had task $3. The result comes again when it finishes."
         ;;
       cancel)
-        [ -n "${3:-}" ] || { echo "쓰는 법: julgi task cancel <일감 id>" >&2; exit 1; }
+        [ -n "${3:-}" ] || { say "쓰는 법: julgi task cancel <일감 id>" "Usage: julgi task cancel <task id>" >&2; exit 1; }
         printf '' | ask taskcancel "$3"
-        echo "일감 $3 을 더 기다리지 않는다."
+        say "일감 $3 을 더 기다리지 않는다." "No longer waiting for task $3."
         ;;
-      *) echo "쓰는 법: julgi task add|list|result|redo|cancel" >&2; exit 1 ;;
+      *) say "쓰는 법: julgi task add|list|result|redo|cancel" "Usage: julgi task add|list|result|redo|cancel" >&2; exit 1 ;;
     esac
     ;;
   whoami)
     need_me
     line=$(mine)
-    [ -n "$line" ] && printf '%s\n' "$line" | awk -F'\t' '{ printf "%s  [%s · %s]\n", $6, $4, $5 }' || echo "(아직 목록에 없는 새 세션: $me)"
+    [ -n "$line" ] && printf '%s\n' "$line" | awk -F'\t' -v ko="$KO" "$WORD"'{ printf "%s  [%s · %s]\n", $6, $4, w($5) }' || say "(아직 목록에 없는 새 세션: $me)" "(a new session not in the list yet: $me)"
     ;;
   *)
+    if [ "$KO" = 1 ]; then
     cat <<'USAGE'
 julgi threads [글]          줄기 목록 (글이 있으면 이름·레포·요약에서 찾는다)
 julgi memory [글]           내 줄기의 기억, 또는 글에 맞는 줄기의 기억
@@ -167,5 +176,26 @@ julgi task redo <id> "말"   같은 세션에 이어서 시키기
 julgi task cancel <id>      일감을 더 기다리지 않기
 julgi whoami                내가 어느 줄기인지
 USAGE
+    else
+    cat <<'USAGE'
+julgi threads [text]         list stems (with text, search names, repos, summaries)
+julgi memory [text]          my stem's memory, or the memory of the stem matching text
+julgi note "text"            write one line to my stem's memory
+julgi send <stem|new> "ask"  hand work to another stem (or a new one)
+julgi handoff                hand off to a new session when this one has grown too big
+julgi done                   mark this work as done
+julgi brain [text]           search the brain (decisions, pitfalls, facts learned before)
+julgi learn <kind> "title" "body"   save to the brain (kind: decision, pitfall, fact)
+julgi fix <id> "body"        correct a wrong brain note
+julgi forget <id> "why"      delete a brain note that no longer holds
+julgi map [text]             repo map: where the other repos are and what they do
+julgi task add <repo> "work" hand a task to another session (the result comes back here)
+julgi task list              tasks I handed out
+julgi task result <id>       full result of a finished task
+julgi task redo <id> "ask"   send follow-up work to the same session
+julgi task cancel <id>       stop waiting for a task
+julgi whoami                 which stem I am
+USAGE
+    fi
     ;;
 esac
