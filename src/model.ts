@@ -202,15 +202,17 @@ export const aliveElsewhere = (s: Session) => alive.has(s.id);
 export const STATE_LABEL: Record<string, string> = { run: "일하는 중", wait: "답함 · 내 차례", hold: "일감 기다리는 중", idle: "일감 끝냄", ask: "확인이 필요함", dead: "끝남" };
 
 // Julgi가 띄운 Claude 세션만 상태를 적게 한다. 전역 설정은 건드리지 않고 실행할 때만 훅을 얹는다.
-const hook = (state: string) => ({
-  hooks: [{ type: "command", command: `printf ${state} > ~/.julgi/state/$JULGI_TERM` }],
+// 서브에이전트의 도구 호출도 부모 세션의 훅으로 온다(입력에 agent_id가 붙는다). 메인 답이 끝난 뒤 백그라운드 서브에이전트가
+// "일하는 중"으로 덮어쓰면 끝날 때마다 "내 차례" 알림이 또 오고, 들어가 보면 일하는 중이라 나온다. 그래서 그건 세지 않는다
+const hook = (state: string, mainOnly = false) => ({
+  hooks: [{ type: "command", command: `${mainOnly ? `grep -q agent_id || ` : ""}printf ${state} > ~/.julgi/state/$JULGI_TERM` }],
 });
 // 지도의 레포는 --add-dir로 붙이지 않고 읽기만 허락한다. --add-dir는 폴더마다 "Adding a new directory"를 묻는다.
 // 규칙의 //는 절대 경로라는 뜻이다. 셸의 작은따옴표 안에 들어가니 '가 든 경로는 뺀다
 const settings = () => JSON.stringify({
   hooks: {
     UserPromptSubmit: [hook("run")],
-    PostToolUse: [hook("run")],
+    PostToolUse: [hook("run", true)],
     Stop: [hook("wait")],
     Notification: [hook("ask")],
   },
