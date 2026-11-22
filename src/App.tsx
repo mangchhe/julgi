@@ -137,7 +137,6 @@ export default function App() {
   const [zoom, setZoom] = useState(false);
   const [sidebar, setSidebar] = useState(true);
   const [fontSize, setFontSize] = useState(13);
-  const [filter, setFilter] = useState<string | null>(null);
   const [home, setHome] = useState("/");
   const [restored, setRestored] = useState(false);
   const [pinned, setPinned] = useState<string[]>([]); // 알아서 바꿔 끼우지 않을 세션
@@ -204,8 +203,8 @@ export default function App() {
   const waitCount = open.filter((o) => waiting(states[o.key])).length;
 
   // 키 처리와 이벤트 콜백은 한 번만 걸고, 최신 상태는 여기서 읽는다
-  const live = useRef({ open, panes, widths, focus, states, overlay, filter, sessions, home, base, fontSize, handing, byId, threads, memories, pinned, items, folders, names, zoom, notes, skills, reviews, acts, skillUses, closing, dead, mapText, skillCands, reviewing, prNews, asks, mineNews, prShown, sleepNews });
-  live.current = { open, panes, widths, focus, states, overlay, filter, sessions, home, base, fontSize, handing, byId, threads, memories, pinned, items, folders, names, zoom, notes, skills, reviews, acts, skillUses, closing, dead, mapText, skillCands, reviewing, prNews, asks, mineNews, prShown, sleepNews };
+  const live = useRef({ open, panes, widths, focus, states, overlay, sessions, home, base, fontSize, handing, byId, threads, memories, pinned, items, folders, names, zoom, notes, skills, reviews, acts, skillUses, closing, dead, mapText, skillCands, reviewing, prNews, asks, mineNews, prShown, sleepNews });
+  live.current = { open, panes, widths, focus, states, overlay, sessions, home, base, fontSize, handing, byId, threads, memories, pinned, items, folders, names, zoom, notes, skills, reviews, acts, skillUses, closing, dead, mapText, skillCands, reviewing, prNews, asks, mineNews, prShown, sleepNews };
 
   const say = (message: string, ms = 3500) => {
     setToast(message);
@@ -1557,11 +1556,6 @@ export default function App() {
       .sort((a, b) => (states[a.key]?.since ?? Infinity) - (states[b.key]?.since ?? Infinity));
     if (queue.length) show(queue[0].key);
   };
-  const cycleFilter = () => {
-    const repos = [...new Set(live.current.sessions.map((s) => s.repo))];
-    const next = repos.indexOf(live.current.filter ?? "") + 1;
-    setFilter(next < repos.length ? repos[next] : null);
-  };
   const resize = (size: number) => {
     const next = Math.max(9, Math.min(22, size));
     terms.setFontSize(next);
@@ -1660,8 +1654,8 @@ export default function App() {
       (extra ? `\n\n덧붙여: ${extra}` : "");
     void dispatch({ kind: "new", cwd }, ask, { rank: 0, by: "리뷰 요청" });
   };
-  const actions = useRef({ readUsage, publishRemote, say, dispatch, show, close, sleep, requestQuit, handoff, exited, newSession, newShell, nextWaiting, cycleFilter, openTerm, resize, split, unsplit, finishThread, move, togglePin, tend, serve, confirmClose, toggleReview, prNotice, askNotice, mineNotice, sleepNotice, wake });
-  actions.current = { readUsage, publishRemote, say, dispatch, show, close, sleep, requestQuit, handoff, exited, newSession, newShell, nextWaiting, cycleFilter, openTerm, resize, split, unsplit, finishThread, move, togglePin, tend, serve, confirmClose, toggleReview, prNotice, askNotice, mineNotice, sleepNotice, wake };
+  const actions = useRef({ readUsage, publishRemote, say, dispatch, show, close, sleep, requestQuit, handoff, exited, newSession, newShell, nextWaiting, openTerm, resize, split, unsplit, finishThread, move, togglePin, tend, serve, confirmClose, toggleReview, prNotice, askNotice, mineNotice, sleepNotice, wake });
+  actions.current = { readUsage, publishRemote, say, dispatch, show, close, sleep, requestQuit, handoff, exited, newSession, newShell, nextWaiting, openTerm, resize, split, unsplit, finishThread, move, togglePin, tend, serve, confirmClose, toggleReview, prNotice, askNotice, mineNotice, sleepNotice, wake };
 
   /** 세션이 남긴 링크 가운데 마지막 PR */
   const prOfSession = (id?: string) => {
@@ -1915,7 +1909,6 @@ export default function App() {
       }
       else if (cmd && !e.shiftKey && e.code === "KeyN") a.newSession(cwd);
       else if (cmd && !e.shiftKey && e.code === "KeyT") a.newShell(cwd);
-      else if (cmd && !e.shiftKey && e.code === "KeyP") a.cycleFilter();
       else if (cmd && !e.shiftKey && e.code === "KeyI") setInfo((v) => !v);
       else if (cmd && !e.shiftKey && e.code === "KeyB") setSidebar((v) => !v);
       else if (cmd && !e.shiftKey && e.code === "KeyS") {
@@ -2210,7 +2203,6 @@ export default function App() {
           dead={dead}
           current={current}
           shown={panes}
-          filter={filter}
           loading={!ledger}
           onShow={show}
           onClose={sleep}

@@ -22,7 +22,6 @@ type Props = {
   loading: boolean;
   current: string | null;
   shown: (string | null)[];
-  filter: string | null;
   /** 목록을 접는다 (⌘B) */
   onShow: (key: string) => void;
   onClose: (key: string) => void;
@@ -37,7 +36,7 @@ type Props = {
   sleepNews: Record<string, { news: string; pr: PrTarget }>;
 };
 
-export default function Sidebar({ open, items, threads, byId, states, tasks, changes, pinned, dead, loading, current, shown, filter, onShow, onClose, onOpenSession, onSearch, prOf, prNews, sleepNews }: Props) {
+export default function Sidebar({ open, items, threads, byId, states, tasks, changes, pinned, dead, loading, current, shown, onShow, onClose, onOpenSession, onSearch, prOf, prNews, sleepNews }: Props) {
   const openIds = new Set(open.map((o) => o.sessionId));
   const cutoff = Date.now() / 1000 - config.recentDays * 86400;
 
@@ -49,7 +48,6 @@ export default function Sidebar({ open, items, threads, byId, states, tasks, cha
     // 줄기의 세션이 하나라도 열려 있으면 그 줄기는 위의 "열림"에 있다
     const ids = item.thread?.sessions ?? [s.id];
     if (item.thread?.done || s.mtime < cutoff || ids.some((id) => openIds.has(id))) continue;
-    if (filter && s.repo !== filter) continue;
     const group = item.thread ? THREADS : s.group;
     const list = groups.get(group) ?? [];
     list.push(item);
@@ -85,7 +83,6 @@ export default function Sidebar({ open, items, threads, byId, states, tasks, cha
           <span>찾기</span>
           <kbd>⌘K</kbd>
         </button>
-        {filter && <span className="side-filter" title="이 프로젝트만 보는 중 (⌘P)">{filter}</span>}
       </div>
       <div className="side-list">
         {open.length === 0 && (
@@ -179,7 +176,7 @@ export default function Sidebar({ open, items, threads, byId, states, tasks, cha
         })}
 
         {loading && <div className="side-none">대화 기록을 읽는 중</div>}
-        {!loading && groups.size === 0 && <div className="side-none">{filter ? "이 프로젝트의 최근 세션이 없다" : "최근 세션이 없다"}</div>}
+        {!loading && groups.size === 0 && <div className="side-none">최근 세션이 없다</div>}
         {[...groups].map(([group, list]) => (
           <div key={group}>
             <div className={"grp" + (group === THREADS ? "" : " repo")}>

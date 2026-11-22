@@ -732,7 +732,6 @@ body.dragging .pane-body { pointer-events: none; }
 .side-stat.run:not(.zero) { color: var(--accent); }
 .side-stat.zero { color: var(--muted); }
 .side-stat.zero .dot { background: var(--line); }
-.side-filter { margin-left: auto; font-size: 11px; color: var(--accent); border: 1px solid var(--accent); border-radius: 999px; padding: 0 8px; }
 /* 줄: 닫기 단추가 제목 자리를 차지하지 않게 겹쳐 띄우고, 열린 세션의 제목은 두 줄까지 보여 준다 */
 .row { position: relative; grid-template-columns: 14px 8px minmax(0, 1fr); padding: 6px 8px 6px 6px; }
 .row-x { position: absolute; right: 4px; top: 4px; padding: 0 5px; line-height: 18px; background: var(--surface); border: 1px solid var(--line); }
