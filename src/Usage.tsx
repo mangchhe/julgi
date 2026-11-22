@@ -34,6 +34,8 @@ export default function Usage({ sessionInfo, onOpenSession, onClose }: Props) {
   const [metric, setMetric] = useState("all");
   const [rows, setRows] = useState<Row[] | null>(null);
   const [hover, setHover] = useState<number | null>(null);
+  // 모델이나 프로젝트 줄을 누르면 그것만 본다. 같은 종류의 목록은 거르지 않아 바로 다른 것으로 바꿀 수 있다
+  const [only, setOnly] = useState<{ kind: "model" | "repo"; name: string } | null>(null);
   const box = useRef<HTMLDivElement>(null);
   useEffect(() => box.current?.focus(), []);
   useEffect(() => {
@@ -53,16 +55,23 @@ export default function Usage({ sessionInfo, onOpenSession, onClose }: Props) {
     const repos = new Map<string, Sum & { sessions: Set<string> }>();
     const sessions = new Map<string, Sum & { last: number; models: Map<string, number>; cwd: string }>();
     for (const r of list) {
+      const repo = sessionInfo(r.session, r.cwd).repo;
+      const modelOk = !only || only.kind !== "model" || r.model === only.name;
+      const repoOk = !only || only.kind !== "repo" || repo === only.name;
+      if (repoOk) {
+        const mm = models.get(r.model) ?? Object.assign(zero(), { sessions: new Set<string>() });
+        add(mm, r).sessions.add(r.session);
+        models.set(r.model, mm);
+      }
+      if (modelOk) {
+        const rr = repos.get(repo) ?? Object.assign(zero(), { sessions: new Set<string>() });
+        add(rr, r).sessions.add(r.session);
+        repos.set(repo, rr);
+      }
+      if (!modelOk || !repoOk) continue;
       add(all, r);
       const day = byDay.get(r.day);
       if (day) add(day, r);
-      const mm = models.get(r.model) ?? Object.assign(zero(), { sessions: new Set<string>() });
-      add(mm, r).sessions.add(r.session);
-      models.set(r.model, mm);
-      const repo = sessionInfo(r.session, r.cwd).repo;
-      const rr = repos.get(repo) ?? Object.assign(zero(), { sessions: new Set<string>() });
-      add(rr, r).sessions.add(r.session);
-      repos.set(repo, rr);
       const ss = sessions.get(r.session) ?? Object.assign(zero(), { last: 0, models: new Map<string, number>(), cwd: r.cwd });
       add(ss, r);
       ss.last = Math.max(ss.last, r.last);
@@ -78,7 +87,7 @@ export default function Usage({ sessionInfo, onOpenSession, onClose }: Props) {
       recent: [...sessions].sort((a, b) => b[1].last - a[1].last).slice(0, 20),
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [rows, days]);
+  }, [rows, days, only]);
 
   const reuse = view.all.cache_read / Math.max(1, view.all.input + view.all.cache_read + view.all.cache_write);
   const peak = Math.max(1, ...view.days.map((d) => m.of(d.s)));
@@ -91,7 +100,8 @@ export default function Usage({ sessionInfo, onOpenSession, onClose }: Props) {
   const shown = hover != null ? view.days[hover] : null;
 
   return (
-    <div className="us" ref={box} tabIndex={-1} onKeyDown={(e) => e.key === "Escape" && (e.stopPropagation(), onClose())}>
+    <div className="pal-back us-back" onMouseDown={onClose}>
+    <div className="us" ref={box} tabIndex={-1} onMouseDown={(e) => e.stopPropagation()} onKeyDown={(e) => e.key === "Escape" && (e.stopPropagation(), only ? setOnly(null) : onClose())}>
       <div className="us-top">
         <b className="us-title">사용량</b>
         <span className="set-seg us-seg">
@@ -101,7 +111,13 @@ export default function Usage({ sessionInfo, onOpenSession, onClose }: Props) {
             </button>
           ))}
         </span>
-        <small className="us-note">Claude Code 대화 기록에서 센다 · 토큰만(구독은 토큰당 과금이 아니다) · 서브에이전트 포함</small>
+        {only ? (
+          <button type="button" tabIndex={-1} className="us-only" onClick={() => setOnly(null)} title="거르기 풀기 (Esc)">
+            {only.kind === "model" ? "모델" : "프로젝트"}: {only.name.replace(/^claude-/, "")} ×
+          </button>
+        ) : (
+          <small className="us-note">대화 기록에서 센 토큰 · 서브에이전트 포함 · 모델이나 프로젝트를 누르면 그것만 본다</small>
+        )}
         <button type="button" tabIndex={-1} className="us-close" onClick={onClose} title="닫기 (Esc)">
           ×
         </button>
@@ -165,9 +181,9 @@ export default function Usage({ sessionInfo, onOpenSession, onClose }: Props) {
 
           <div className="us-two">
             {[
-              { title: "모델별", list: view.models },
-              { title: "프로젝트별", list: view.repos },
-            ].map(({ title, list }) => {
+              { title: "모델별", kind: "model" as const, list: view.models },
+              { title: "프로젝트별", kind: "repo" as const, list: view.repos },
+            ].map(({ title, kind, list }) => {
               const top = Math.max(1, ...list.map(([, s]) => total(s)));
               return (
                 <div key={title} className="us-card">
@@ -176,7 +192,14 @@ export default function Usage({ sessionInfo, onOpenSession, onClose }: Props) {
                     <small>{list[0] ? `가장 많이: ${list[0][0]}` : ""}</small>
                   </div>
                   {list.map(([name, s]) => (
-                    <div key={name} className="us-line" title={`입력 ${big(s.input)} · 출력 ${big(s.output)} · 캐시 읽기 ${big(s.cache_read)} · 캐시 쓰기 ${big(s.cache_write)}`}>
+                    <button
+                      key={name}
+                      type="button"
+                      tabIndex={-1}
+                      className={"us-line" + (only?.kind === kind && only.name === name ? " on" : "")}
+                      title={`입력 ${big(s.input)} · 출력 ${big(s.output)} · 캐시 읽기 ${big(s.cache_read)} · 캐시 쓰기 ${big(s.cache_write)} · 누르면 이것만 본다`}
+                      onClick={() => setOnly(only?.kind === kind && only.name === name ? null : { kind, name })}
+                    >
                       <div className="us-line-text">
                         <span>{name}</span>
                         <b>{big(total(s))}</b>
@@ -187,7 +210,7 @@ export default function Usage({ sessionInfo, onOpenSession, onClose }: Props) {
                       <small>
                         세션 {s.sessions.size} · 답 {s.turns.toLocaleString()}
                       </small>
-                    </div>
+                    </button>
                   ))}
                   {!list.length && <div className="side-none">기록이 없다</div>}
                 </div>
@@ -235,6 +258,7 @@ export default function Usage({ sessionInfo, onOpenSession, onClose }: Props) {
           </div>
         </div>
       )}
+    </div>
     </div>
   );
 }

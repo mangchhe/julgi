@@ -1896,6 +1896,8 @@ export default function App() {
       else if (overlay) {
         // 작업 페이지는 Esc를 스스로 다룬다(PR 화면 안이면 목록으로, 목록이면 닫기)
         if (overlay === "work" && e.target instanceof Element && e.target.closest(".wk")) return;
+        // 사용량도 Esc를 스스로 다룬다(거르기 중이면 거르기부터 푼다)
+        if (overlay === "usage" && e.target instanceof Element && e.target.closest(".us")) return;
         if (e.key === "Escape") setOverlay(null);
         else if (overlay === "quit" && e.key === "Enter") void invoke("app_exit");
         else if (overlay === "close" && e.key === "Enter") a.confirmClose(e.altKey);
