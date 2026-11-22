@@ -159,6 +159,10 @@ Julgi가 띄운 세션에는 `julgi` 명령(`~/.julgi/bin/julgi`)과 스킬이 �
 - 자동 테스트가 거의 없다. `JULGI_SELFTEST=1 npm run tauri dev`로 도는 앱 안 점검 몇 가지뿐이다.
 - 영어 UI, 서명된 설치 파일, macOS 밖의 지원이 없다.
 
+## 기여
+
+커밋 규칙과 띄워 보는 법은 [CONTRIBUTING.md](CONTRIBUTING.md)에 있다.
+
 ## 라이선스
 
 MIT
