@@ -124,6 +124,20 @@ Jira チケットを Julgi の中で開き、「このチケットで開始」�
 
 macOS、Node 20 以上、Rust（stable）、`git`、そしてログイン済みの `claude` コマンドが PATH にあることが必要です。
 
+<details>
+<summary>足りないものがある場合</summary>
+
+```sh
+xcode-select --install                                            # コンパイラと git
+brew install node                                                 # または https://nodejs.org
+curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh    # Rust, https://rustup.rs
+npm install -g @anthropic-ai/claude-code && claude                # Claude Code、その後ログイン
+```
+
+`scripts/install.sh --check` でまだ足りないものがわかります。
+
+</details>
+
 ```sh
 git clone https://github.com/mangchhe/julgi.git && cd julgi
 scripts/install.sh --open    # ツール確認 → ビルド → /Applications/Julgi.app → 起動

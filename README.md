@@ -124,6 +124,20 @@ Where judgment is needed (where to send, whether two sessions are the same work,
 
 You need macOS, Node 20+, Rust (stable), `git`, and the `claude` command logged in and on your PATH.
 
+<details>
+<summary>Missing some of these?</summary>
+
+```sh
+xcode-select --install                                            # compiler and git
+brew install node                                                 # or https://nodejs.org
+curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh    # Rust, https://rustup.rs
+npm install -g @anthropic-ai/claude-code && claude                # Claude Code, then log in
+```
+
+`scripts/install.sh --check` tells you which ones are still missing.
+
+</details>
+
 ```sh
 git clone https://github.com/mangchhe/julgi.git && cd julgi
 scripts/install.sh --open    # check tools → build → /Applications/Julgi.app → launch

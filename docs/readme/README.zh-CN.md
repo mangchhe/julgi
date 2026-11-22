@@ -124,6 +124,20 @@ GitHub PR 和 GitLab MR 都在 Julgi 里打开：diff、行内评论与回复、
 
 需要 macOS、Node 20+、Rust（stable）、`git`，以及已登录并在 PATH 中的 `claude` 命令。
 
+<details>
+<summary>缺少其中某些？</summary>
+
+```sh
+xcode-select --install                                            # 编译器和 git
+brew install node                                                 # 或 https://nodejs.org
+curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh    # Rust, https://rustup.rs
+npm install -g @anthropic-ai/claude-code && claude                # Claude Code，然后登录
+```
+
+`scripts/install.sh --check` 会告诉你还缺什么。
+
+</details>
+
 ```sh
 git clone https://github.com/mangchhe/julgi.git && cd julgi
 scripts/install.sh --open    # 检查工具 → 构建 → /Applications/Julgi.app → 启动

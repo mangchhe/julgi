@@ -124,6 +124,20 @@ Jira 티켓을 Julgi 안에서 열고 "이 티켓으로 시작"을 누른다. �
 
 macOS, Node 20+, Rust(stable), `git`, 그리고 로그인된 `claude` 명령이 PATH에 있어야 한다.
 
+<details>
+<summary>없는 것이 있다면</summary>
+
+```sh
+xcode-select --install                                            # 컴파일러와 git
+brew install node                                                 # 또는 https://nodejs.org
+curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh    # Rust, https://rustup.rs
+npm install -g @anthropic-ai/claude-code && claude                # Claude Code, 그다음 로그인
+```
+
+`scripts/install.sh --check`가 아직 없는 것을 알려 준다.
+
+</details>
+
 ```sh
 git clone https://github.com/mangchhe/julgi.git && cd julgi
 scripts/install.sh --open    # 도구 확인 → 빌드 → /Applications/Julgi.app → 실행
