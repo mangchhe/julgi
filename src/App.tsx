@@ -18,7 +18,7 @@ import { CHECK_SYSTEM, CORRECT_SYSTEM, prefsText, CAND_SYSTEM, Candidate as Skil
 import Sidebar from "./Sidebar";
 import * as terms from "./terms";
 import { rank } from "./route";
-import { Brief, Change, Job, MAX_PARALLEL, setMapDirs, setPrefs, STATE_LABEL, ago, Item, modelFor, SkillInfo, SkillUse, aboutOf, buildFolders, buildItems, aliveElsewhere, config, elsewhere, enrich, markSlept, setAlive, handoffCommand, Ledger, Merge, mergeCandidates, mergeKey, newCommand, Open, repoOf, resumeCommand, Session, TermState, Thread, waiting, withPrompt } from "./model";
+import { Brief, Change, Job, MAX_PARALLEL, setMapDirs, setPrefs, markAuto, isAuto, autoList, STATE_LABEL, ago, Item, modelFor, SkillInfo, SkillUse, aboutOf, buildFolders, buildItems, aliveElsewhere, config, elsewhere, enrich, markSlept, setAlive, handoffCommand, Ledger, Merge, mergeCandidates, mergeKey, newCommand, Open, repoOf, resumeCommand, Session, TermState, Thread, waiting, withPrompt } from "./model";
 import { selftest } from "./selftest";
 import "./App.css";
 
@@ -1110,6 +1110,11 @@ export default function App() {
           setMemories((old) => ({ ...old, [thread.id]: reply }));
           void invoke("data_write", { name: `threads/${thread.id}.md`, text: reply });
           const next: Open = { key: "c:" + id, label: title, cwd: o.cwd, sessionId: id };
+          // 알아서 띄운 세션에서 갈아탄 새 세션도 알아서 띄운 것이다
+          if (isAuto(oldId)) {
+            markAuto(id);
+            void invoke("data_write", { name: "auto-sessions.json", text: JSON.stringify(autoList()) });
+          }
           terms.create({ key: next.key, cwd: o.cwd, command: handoffCommand(id, path) });
           setOpen((list) => [...list, next]);
           // 이전 세션이 보이던 칸에 새 세션을 끼운다.
@@ -1167,6 +1172,11 @@ export default function App() {
       const text = recalled + (about ? `[이어지는 작업 "${target.join!.name}"의 지금까지 내용. 참고만 한다]\n${about.slice(0, 4000)}\n\n---\n\n${message}` : message);
       if (note.brain?.length) bump(note.brain.map((n) => n.id), "out");
       if (note.brain?.length) record("꺼냄", `브레인에서 ${note.brain.length}개를 새 세션에 붙임: ${note.brain.map((n) => n.title).join(" / ").slice(0, 120)}`, id);
+      // 내가 던진 것이 아니면(세션이나 폰이 넘긴 일, 일감, 스킬) 알아서 띄운 세션으로 적어 둔다. 권한을 따로 준다
+      if (quiet) {
+        markAuto(id);
+        void invoke("data_write", { name: "auto-sessions.json", text: JSON.stringify(autoList()) });
+      }
       terms.create({ key, cwd: target.cwd, command: withPrompt(newCommand(id), await outbox(text)) });
       setOpen((list) => [...list, { key, label: message.split("\n")[0].slice(0, 40), cwd: target.cwd, sessionId: id }]);
       terms.wake(key);
@@ -1822,7 +1832,17 @@ export default function App() {
   // 지난번에 열어 둔 세션과 칸 배치를 되살린다. 터미널은 칸에 보일 때 비로소 뜬다.
   useEffect(() => {
     if (!ledger || restored) return;
-    void invoke<string | null>("layout_load").then((json) => {
+    void invoke<string | null>("data_read", { name: "auto-sessions.json" })
+      .then((text) => {
+        // 다시 띄우기 전에 알아야 한다: 어느 세션이 알아서 띄운 것이었는지에 따라 권한이 달라진다
+        try {
+          for (const id of JSON.parse(text ?? "[]") as string[]) markAuto(id);
+        } catch {
+          // 없거나 깨졌으면 전부 내가 연 것으로 본다
+        }
+      }, () => {})
+      .then(() => invoke<string | null>("layout_load"))
+      .then((json) => {
       setRestored(true);
       if (!json) return;
       let saved: Layout;

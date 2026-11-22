@@ -282,6 +282,8 @@ export const config = {
   remote: false,
   /** 폰용 화면의 포트 */
   remotePort: 4747,
+  /** 세션이 파일을 고치거나 명령을 돌릴 때 허락을 묻지 않게 띄운다(--dangerously-skip-permissions). off: 묻는다, mine: 내가 연 세션만 안 묻는다, all: Julgi가 알아서 띄운 세션(일감, 스킬, 폰에서 던진 일)까지 전부 */
+  skipPermissions: "off",
   /** 세션을 닫기 전에 한 번 묻는다 */
   confirmClose: true,
   /** 화면 색. 설정(⌘,)에서 고른다 */
@@ -305,9 +307,16 @@ export function linkLabel(url: string): string {
   return url.replace(/^https:\/\//, "");
 }
 
+/** Julgi가 알아서 띄운 세션들(일감, 스킬 만들기, 다른 세션이나 폰이 던진 일). 내가 연 것과 구분해 권한을 다르게 준다 */
+const autoIds = new Set<string>();
+export const markAuto = (id: string) => void autoIds.add(id);
+export const isAuto = (id: string) => autoIds.has(id);
+export const autoList = () => [...autoIds].slice(-600);
+const skip = (id: string) => (config.skipPermissions === "all" || (config.skipPermissions === "mine" && !autoIds.has(id)) ? " --dangerously-skip-permissions" : "");
+
 // JULGI_SESSION: 세션 안에서 julgi 명령이 자기가 누구인지 아는 데 쓴다. --plugin-dir: Julgi의 스킬을 이 세션에만 얹는다
 const launch = (id: string, how: string) =>
-  `JULGI_SESSION=${id} claude ${how} ${id} --settings '${SETTINGS}'${mapDirs.map((dir) => ` --add-dir "${dir.replace(/["`\\$]/g, "")}"`).join("")} --add-dir ~/.julgi/worktrees${prefs ? " --append-system-prompt-file ~/.julgi/prefs.md" : ""} --plugin-dir ~/.julgi/plugin --plugin-dir ~/.julgi/grown${config.pluginDirs.map((dir) => ` --plugin-dir "${dir.replace(/^~(?=\/|$)/, "$HOME").replace(/["`\\]/g, "")}"`).join("")}`;
+  `JULGI_SESSION=${id} claude ${how} ${id}${skip(id)} --settings '${SETTINGS}'${mapDirs.map((dir) => ` --add-dir "${dir.replace(/["`\\$]/g, "")}"`).join("")} --add-dir ~/.julgi/worktrees${prefs ? " --append-system-prompt-file ~/.julgi/prefs.md" : ""} --plugin-dir ~/.julgi/plugin --plugin-dir ~/.julgi/grown${config.pluginDirs.map((dir) => ` --plugin-dir "${dir.replace(/^~(?=\/|$)/, "$HOME").replace(/["`\\]/g, "")}"`).join("")}`;
 export const resumeCommand = (id: string) => launch(id, "--resume");
 /** 파일에 적어 둔 글을 첫 입력으로 넣는다 */
 export const withPrompt = (command: string, path: string) => `${command} "$(cat '${path}')"`;
