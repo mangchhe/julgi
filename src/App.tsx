@@ -19,6 +19,7 @@ import { CHECK_SYSTEM, CORRECT_SYSTEM, prefsText, CAND_SYSTEM, Candidate as Skil
 import Sidebar from "./Sidebar";
 import PrView from "./PrView";
 import Work, { WorkGroup, WorkRow } from "./Work";
+import Usage from "./Usage";
 import { newsOf, openPr, prOf, PrStatus, PrTarget, ReviewAsk } from "./pr";
 import * as terms from "./terms";
 import { rank } from "./route";
@@ -65,7 +66,7 @@ export default function App() {
   const [focus, setFocus] = useState(0);
   const [states, setStates] = useState<Record<string, TermState>>({});
   const [dead, setDead] = useState<string[]>([]);
-  const [overlay, setOverlay] = useState<"palette" | "send" | "help" | "history" | "settings" | "threads" | "queue" | "quit" | "close" | "work" | null>(null);
+  const [overlay, setOverlay] = useState<"palette" | "send" | "help" | "history" | "settings" | "threads" | "queue" | "quit" | "close" | "work" | "usage" | null>(null);
   const [threads, setThreads] = useState<Thread[]>([]);
   const [tasks, setTasks] = useState<Job[]>([]); // 조율 세션이 맡긴 일감들
   const [memories, setMemories] = useState<Record<string, string>>({});
@@ -1890,6 +1891,7 @@ export default function App() {
       else if (cmd && e.code === "KeyY") setOverlay(overlay === "history" ? null : "history");
       else if (cmd && e.code === "Comma") setOverlay(overlay === "settings" ? null : "settings");
       else if (cmd && e.code === "KeyG") setOverlay(overlay === "threads" ? null : "threads");
+      else if (cmd && e.shiftKey && e.code === "KeyU") setOverlay(overlay === "usage" ? null : "usage");
       else if (cmd && e.code === "KeyU") setOverlay(overlay === "work" ? null : "work");
       else if (overlay) {
         // 작업 페이지는 Esc를 스스로 다룬다(PR 화면 안이면 목록으로, 목록이면 닫기)
@@ -2456,6 +2458,22 @@ export default function App() {
           onChange={setConfig}
         />
       )}
+      {overlay === "usage" && (
+        <Usage
+          sessionInfo={(id, cwd) => {
+            const s = byId.get(id);
+            return { repo: s?.repo || cwd.split("/").pop() || "?", name: names[id] || s?.title || "기록에서 빠진 세션" };
+          }}
+          onOpenSession={(id) => {
+            const s = byId.get(id);
+            if (!s) return say("이 세션은 목록에 없다. 너무 오래됐거나 다른 도구가 만든 세션이다.");
+            setOverlay(null);
+            if (open.some((o) => o.sessionId === id)) show("c:" + id);
+            else openSession(s);
+          }}
+          onClose={() => setOverlay(null)}
+        />
+      )}
       {overlay === "work" && (
         <Work
           groups={workGroups()}
@@ -2530,6 +2548,7 @@ export default function App() {
         onShow={(key) => (setLoadOpen(false), show(key))}
         onRefresh={readUsage}
         onHelp={() => setOverlay("help")}
+        onUsage={() => setOverlay("usage")}
       />
       {toast && <div className="toast">{toast}</div>}
     </div>

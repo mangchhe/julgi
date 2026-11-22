@@ -967,3 +967,49 @@ body.dragging .pane-body { pointer-events: none; }
 .side-work span { font-weight: 600; }
 .side-work small { margin-left: auto; color: var(--muted); font-size: 11px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .side-work.hot small { color: var(--wait); font-weight: 600; }
+
+/* 사용량 화면(⌘⇧U) */
+.us { position: fixed; inset: 30px 0 24px; z-index: 24; display: flex; flex-direction: column; background: var(--bg); outline: none; }
+.us-top { display: flex; align-items: center; gap: 14px; padding: 10px 16px; border-bottom: 1px solid var(--line); background: var(--surface); }
+.us-title { font-size: 15px; }
+.us-note { color: var(--muted); font-size: 11.5px; }
+.us-close { margin-left: auto; font: inherit; font-size: 16px; color: var(--muted); background: none; border: 1px solid transparent; border-radius: 6px; padding: 0 8px; cursor: pointer; }
+.us-close:hover { color: var(--ink); border-color: var(--line); }
+.us-seg button { border: 0; border-left: 1px solid var(--line); background: none; padding: 3px 10px; font: inherit; font-size: 12px; color: var(--muted); cursor: pointer; }
+.us-seg button:first-child { border-left: 0; }
+.us-seg button.yes { background: var(--accent); color: var(--bg); font-weight: 600; }
+.us-wait { padding: 30px; }
+.us-body { flex: 1; overflow-y: auto; padding: 14px 16px 24px; display: flex; flex-direction: column; gap: 14px; }
+.us-tiles { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 10px; }
+.us-tile { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; display: flex; flex-direction: column; gap: 2px; }
+.us-tile b { font-size: 18px; font-variant-numeric: tabular-nums; }
+.us-tile small { color: var(--muted); font-size: 11.5px; }
+.us-card { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px; }
+.us-card-head { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; margin-bottom: 10px; }
+.us-card-head small { color: var(--muted); font-size: 11.5px; }
+.us-chart { position: relative; }
+.us-bars { display: flex; align-items: stretch; gap: 2px; height: 200px; }
+.us-col { flex: 1; display: flex; flex-direction: column; align-items: center; min-width: 0; cursor: default; }
+.us-track { flex: 1; width: 100%; display: flex; align-items: flex-end; justify-content: center; border-bottom: 1px solid var(--line); }
+.us-bar { width: min(28px, 70%); background: var(--accent); opacity: 0.85; border-radius: 4px 4px 0 0; }
+.us-col.on .us-bar { opacity: 1; }
+.us-col.on .us-track { background: color-mix(in srgb, var(--accent) 6%, transparent); }
+.us-axis { color: var(--muted); font-size: 10.5px; height: 18px; line-height: 18px; white-space: nowrap; }
+.us-tip { position: absolute; top: 0; transform: translateX(-50%); background: var(--bg); border: 1px solid var(--line); border-radius: 8px; padding: 6px 10px; font-size: 11.5px; display: flex; flex-direction: column; gap: 1px; pointer-events: none; white-space: nowrap; box-shadow: 0 6px 18px rgba(0, 0, 0, 0.3); }
+.us-tip span { color: var(--muted); }
+.us-two { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+.us-line { padding: 5px 0; }
+.us-line-text { display: flex; justify-content: space-between; font-size: 13px; }
+.us-line-text b { font-variant-numeric: tabular-nums; font-weight: 600; }
+.us-line i { display: block; height: 4px; background: var(--bg); border-radius: 4px; margin: 4px 0 2px; overflow: hidden; }
+.us-line u { display: block; height: 100%; background: var(--accent); border-radius: 4px; }
+.us-line small { color: var(--muted); font-size: 11px; }
+.us-table { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+.us-table th { text-align: left; font-size: 11px; font-weight: 600; color: var(--muted); padding: 6px 8px; border-bottom: 1px solid var(--line); }
+.us-table td { padding: 7px 8px; border-bottom: 1px solid var(--line); }
+.us-table .n { text-align: right; font-variant-numeric: tabular-nums; }
+.us-table tbody tr { cursor: pointer; }
+.us-table tbody tr:hover { background: var(--bg); }
+.us-name { max-width: 280px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.us-mono { font-family: ui-monospace, Menlo, monospace; font-size: 11.5px; }
+.status-use { cursor: pointer; }

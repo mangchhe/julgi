@@ -15,6 +15,8 @@ type Props = {
   onRefresh: () => void;
   /** 단축키 안내를 연다 */
   onHelp: () => void;
+  /** 사용량 화면(모델·프로젝트·세션별 토큰)을 연다 */
+  onUsage: () => void;
 };
 
 const size = (kb: number) => (kb >= 1_048_576 ? `${(kb / 1_048_576).toFixed(1)}GB` : `${Math.round(kb / 1024)}MB`);
@@ -30,7 +32,7 @@ const left = (at: number) => {
  * 창 맨 아랫줄. 왼쪽은 Claude 구독 사용량, 오른쪽은 Julgi가 띄운 세션들이 쓰는 자원(누르면 세션별로 펴진다).
  * 메모리는 보고 직접 닫으라는 것이 아니다. 한도를 넘으면 Julgi가 쉬는 세션부터 재우고, 여기는 그 형편을 보여 줄 뿐이다
  */
-export default function Status({ rows, limit, usage, usageWhy, open, onToggle, onShow, onRefresh, onHelp }: Props) {
+export default function Status({ rows, limit, usage, usageWhy, open, onToggle, onShow, onRefresh, onHelp, onUsage }: Props) {
   const box = useRef<HTMLDivElement>(null);
   // 펴 둔 동안: Esc나 바깥을 누르면 닫는다. Esc가 터미널로 넘어가 세션을 끊지 않게 여기서 먼저 잡는다
   useEffect(() => {
@@ -76,7 +78,7 @@ export default function Status({ rows, limit, usage, usageWhy, open, onToggle, o
         </div>
       )}
       {usage?.map((l) => (
-        <span key={l.name} className={"status-use" + (l.used >= 90 ? " high" : l.used >= 70 ? " mid" : "")} title={`${l.name} 한도의 ${l.used.toFixed(0)}%를 썼다${left(l.resets) ? ` · ${left(l.resets)} 뒤에 다시 찬다` : ""}`}>
+        <span key={l.name} className={"status-use" + (l.used >= 90 ? " high" : l.used >= 70 ? " mid" : "")} title={`${l.name} 한도의 ${l.used.toFixed(0)}%를 썼다${left(l.resets) ? ` · ${left(l.resets)} 뒤에 다시 찬다` : ""} · 누르면 사용량 자세히`} onClick={onUsage}>
           <small>{l.name}</small>
           <i>
             <u style={{ width: `${Math.min(100, l.used)}%` }} />
@@ -96,6 +98,9 @@ export default function Status({ rows, limit, usage, usageWhy, open, onToggle, o
         세션 {live.length} · <b>{size(total)}</b>
         {limit > 0 && <small> / {limit}GB</small>}
         {cpu >= 1 && <span> · CPU {cpu.toFixed(0)}%</span>}
+      </button>
+      <button type="button" tabIndex={-1} className="status-keys" title="모델·프로젝트·세션별 토큰 사용량 (⌘⇧U)" onClick={onUsage}>
+        토큰
       </button>
       <button type="button" tabIndex={-1} className="status-keys" title="단축키 보기" onClick={onHelp}>
         <kbd>⌘/</kbd> 키
