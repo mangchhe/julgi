@@ -77,8 +77,11 @@ export default function Status({ rows, limit, usage, usageWhy, open, onToggle, o
           {live.length === 0 && <div className="side-none">떠 있는 세션이 없다</div>}
         </div>
       )}
-      {usage?.map((l) => (
-        <span key={l.name} className={"status-use" + (l.used >= 90 ? " high" : l.used >= 70 ? " mid" : "")} title={`${l.name} 한도의 ${l.used.toFixed(0)}%를 썼다${left(l.resets) ? ` · ${left(l.resets)} 뒤에 다시 찬다` : ""} · 누르면 사용량 자세히`} onClick={onUsage}>
+      {/* 한도 막대들은 한 묶음이다. 어디를 눌러도 사용량 화면이 열린다 */}
+      {usage && usage.length > 0 && (
+      <span className="status-usegrp" title="누르면 모델·프로젝트·세션별 사용량 (⌘⇧U)" onClick={onUsage}>
+      {usage.map((l) => (
+        <span key={l.name} className={"status-use" + (l.used >= 90 ? " high" : l.used >= 70 ? " mid" : "")} title={`${l.name} 한도의 ${l.used.toFixed(0)}%를 썼다${left(l.resets) ? ` · ${left(l.resets)} 뒤에 다시 찬다` : ""}`}>
           <small>{l.name}</small>
           <i>
             <u style={{ width: `${Math.min(100, l.used)}%` }} />
@@ -87,6 +90,8 @@ export default function Status({ rows, limit, usage, usageWhy, open, onToggle, o
           {left(l.resets) && <small>{left(l.resets)}</small>}
         </span>
       ))}
+      </span>
+      )}
       {usageWhy && !usage && <span className="status-why" title={usageWhy}>사용량을 못 받았다</span>}
       {(usage || usageWhy) && (
         <button type="button" tabIndex={-1} className="status-refresh" title="사용량 다시 받기" onClick={onRefresh}>

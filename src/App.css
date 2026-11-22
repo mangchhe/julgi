@@ -1016,7 +1016,7 @@ body.dragging .pane-body { pointer-events: none; }
 .us-table tbody tr:hover { background: var(--bg); }
 .us-name { max-width: 280px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .us-mono { font-family: ui-monospace, Menlo, monospace; font-size: 11.5px; }
-/* 상태 줄의 한도 막대: 누르면 사용량 화면. 올리면 누를 수 있다는 게 보이게 */
-.status-use { cursor: pointer; border-radius: 6px; padding: 1px 6px; margin: 0 -2px; }
-.status-use:hover { background: var(--bg); box-shadow: inset 0 0 0 1px var(--line); }
-.status-use:hover::after { content: "자세히 ›"; color: var(--accent); font-size: 10.5px; }
+/* 상태 줄의 한도 막대 묶음: 누르면 사용량 화면. 올리면 묶음 전체가 밝아지고 끝에 "자세히"가 하나 붙는다 */
+.status-usegrp { display: inline-flex; align-items: center; gap: 14px; cursor: pointer; border-radius: 6px; padding: 1px 8px; margin: 0 -4px; }
+.status-usegrp:hover { background: var(--bg); box-shadow: inset 0 0 0 1px var(--line); }
+.status-usegrp:hover::after { content: "자세히 ›"; color: var(--accent); font-size: 10.5px; }

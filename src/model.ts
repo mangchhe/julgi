@@ -309,7 +309,7 @@ export const config = {
   /** 세션을 닫기 전에 한 번 묻는다 */
   confirmClose: true,
   /** 화면 색. 설정(⌘,)에서 고른다 */
-  theme: "navy",
+  theme: "ink",
   /** ⌘S를 누르면 지금 세션에 보내는 말. 비우면 아무 일도 없다 */
   saveCommand: "",
   /** 갈아탈 때 이전 세션에 보내는 부탁 */

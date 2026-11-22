@@ -120,7 +120,7 @@ Julgi가 띄운 세션에는 `julgi` 명령(`~/.julgi/bin/julgi`)과 스킬이 �
 
 | 값 | 기본 | 뜻 |
 |---|---|---|
-| `theme` | `navy` | 화면 색. `ink`, `forest`, `plum`, `sand`, `paper` |
+| `theme` | `ink` | 화면 색. `navy`, `forest`, `plum`, `sand`, `paper` |
 | `thinking` | `balanced` | 판단 모델의 수준. `light`(전부 Haiku), `balanced`, `deep` |
 | `hotTokens` | 150000 | 이보다 큰 세션에 보낼 때는 갈아탄 뒤 보낸다 |
 | `sleepHours` | 3 | 이 시간 넘게 쉰 세션을 재운다. 0이면 안 재운다 |
