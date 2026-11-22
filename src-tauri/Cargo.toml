@@ -1,7 +1,7 @@
 [package]
 name = "julgi"
 version = "0.1.0"
-description = "Claude Code 세션 여러 개를 한 창에서 굴리는 작업실"
+description = "A macOS app that runs many Claude Code sessions side by side"
 authors = ["Joohyun Ha"]
 license = "MIT"
 edition = "2024"

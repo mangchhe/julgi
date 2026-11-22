@@ -167,7 +167,7 @@ GitHub은 `gh`, GitLab은 `glab`, Jira는 REST API를 쓰고 Jira 토큰은 macO
 
 ## 기여
 
-커밋 규칙과 가짜 데이터로 화면을 띄워 보는 법은 [CONTRIBUTING.md](../../CONTRIBUTING.md)에 있다.
+커밋 규칙과 가짜 데이터로 화면을 띄워 보는 법은 [CONTRIBUTING.ko.md](../CONTRIBUTING.ko.md)에 있다.
 
 ## 라이선스
 

@@ -159,7 +159,7 @@ GitHub は `gh`、GitLab は `glab`、Jira は REST API を使い、Jira のト�
 
 ## コントリビュート
 
-コミット規約とモックデータで画面を表示する方法は [CONTRIBUTING.md](../../CONTRIBUTING.md)（韓国語）にあります。
+コミット規約とモックデータで画面を表示する方法は [CONTRIBUTING.md](../../CONTRIBUTING.md)（英語）にあります。
 
 ## ライセンス
 

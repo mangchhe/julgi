@@ -159,7 +159,7 @@ Julgi 授予会话的权限、扩展点、全部设置、写入的文件和已�
 
 ## 参与贡献
 
-提交规范以及如何用模拟数据打开界面，见 [CONTRIBUTING.md](../../CONTRIBUTING.md)（韩文）。
+提交规范以及如何用模拟数据打开界面，见 [CONTRIBUTING.md](../../CONTRIBUTING.md)（英文）。
 
 ## 许可证
 
