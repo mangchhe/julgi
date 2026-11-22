@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import PrView from "./PrView";
 import { ago } from "./model";
-import { prParts, PrStatus, PrTarget, ReviewAsk } from "./pr";
+import { prNo, prParts, PrStatus, PrTarget, repoName, ReviewAsk } from "./pr";
 
 /** 작업 페이지의 한 줄. PR 하나다 */
 export type WorkRow = {
@@ -102,7 +102,7 @@ export default function Work({ groups, onClose, onRefresh, onOpenSession, onHand
         {rows.map((r, i) => (
           <button key={idOf(r.target)} type="button" tabIndex={-1} className={"wk-row" + (i === at ? " on" : "")} onClick={() => pick(i)} onDoubleClick={enterPr}>
             <span className="wk-row-title">
-              <em>#{r.target.number}</em> {r.title}
+              <em>{prNo(r.target)}</em> {r.title}
             </span>
             <span className="wk-row-meta">
               {r.news && <b className="loud">{r.news} · </b>}
@@ -112,7 +112,7 @@ export default function Work({ groups, onClose, onRefresh, onOpenSession, onHand
                     {text} ·{" "}
                   </span>
                 ))}
-              {r.target.repo.split("/")[1]}
+              {repoName(r.target.repo)}
               {r.by && ` · ${r.by}`}
               {r.sleeping && " · 잠듦"}
               {r.at && ` · ${ago(Date.parse(r.at) / 1000)}`}

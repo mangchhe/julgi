@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { ago, linkLabel, Open, repoOf, Session } from "./model";
 import { invoke } from "@tauri-apps/api/core";
-import { prOf, ReviewAsk } from "./pr";
+import { prNo, prOf, repoName, ReviewAsk } from "./pr";
 
 export type Pick =
   | { kind: "open"; key: string }
@@ -85,8 +85,8 @@ export default function Palette({ open, sessions, byId, cwd, onPick, onAttach, o
       for (const p of hits.slice(0, 30))
         prRows.push({
           pick: { kind: "pr", number: p.number, repo: p.repo },
-          title: `#${p.number} ${p.title}`,
-          meta: [p.tag, p.draft ? "초안" : "", p.repo.split("/")[1], p.author, p.branch].filter(Boolean).join(" · "),
+          title: `${prNo({ repo: p.repo, number: p.number })} ${p.title}`,
+          meta: [p.tag, p.draft ? "초안" : "", repoName(p.repo), p.author, p.branch].filter(Boolean).join(" · "),
           isLink: true,
         });
       // 목록에 없는 번호(닫힌 옛 PR 등)를 정확히 쳤으면 그 번호로 바로 연다
@@ -103,7 +103,7 @@ export default function Palette({ open, sessions, byId, cwd, onPick, onAttach, o
           left.push({ url, ...pr, s });
         }
       left.sort((a, b) => b.number - a.number);
-      for (const l of left.slice(0, 30)) prRows.push({ pick: { kind: "pr", number: l.number, repo: l.repo }, title: `${l.repo.split("/")[1]} PR #${l.number}`, meta: `세션이 남긴 PR · ${l.s.title.slice(0, 40)} · ${ago(l.s.mtime)}`, isLink: true, session: l.s });
+      for (const l of left.slice(0, 30)) prRows.push({ pick: { kind: "pr", number: l.number, repo: l.repo }, title: `${repoName(l.repo)} PR ${prNo(l)}`, meta: `세션이 남긴 PR · ${l.s.title.slice(0, 40)} · ${ago(l.s.mtime)}`, isLink: true, session: l.s });
       if (!prRows.length) prRows.push({ pick: { kind: "pr", number: 0 }, title: prs.length ? "맞는 PR이 없다" : "열린 PR이 없거나 아직 읽는 중", meta: "pr 뒤에 번호나 제목을 친다", isLink: true });
       return prRows;
     }

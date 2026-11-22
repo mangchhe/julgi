@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { ago } from "./model";
-import { PrTarget, ReviewAsk } from "./pr";
+import { PrTarget, ReviewAsk, prNo, repoName } from "./pr";
 
 /** news: PR에 생긴 일(CI 실패, 새 코멘트 등). 있으면 답을 기다리는 게 아니라 PR 때문에 올라온 것이다 */
 /** pr: 이 세션이 올린 PR. ⌥Enter로 PR 화면을 연다. state가 sleep이면 잠든 세션이다(고르면 깨운다) */
@@ -128,7 +128,7 @@ export default function Queue({ rows, asks, mine, onView, onHand, onAnswer, onOp
             <button key={a.url} type="button" tabIndex={-1} className={"qu-row" + (a.url === ask?.url ? " on" : "")} onClick={() => (setAt(list.length + i), setText(""))}>
               <b>{a.title}</b>
               <small>
-                {a.repository.nameWithOwner.split("/")[1]} #{a.number} · {a.kind === "mine" ? <em className="qu-news">{a.news}</em> : a.author.login} · {ago(Date.parse(a.updatedAt) / 1000)}
+                {repoName(a.repository.nameWithOwner)} {prNo({ repo: a.repository.nameWithOwner, number: a.number })} · {a.kind === "mine" ? <em className="qu-news">{a.news}</em> : a.author.login} · {ago(Date.parse(a.updatedAt) / 1000)}
               </small>
             </button>
             </>

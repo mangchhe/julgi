@@ -4,7 +4,7 @@ import { openUrl } from "@tauri-apps/plugin-opener";
 import { langOf, paint, parse, Line } from "./CodeReview";
 import { md } from "./md";
 import { ago, config } from "./model";
-import { openPr, prOf, PrTarget } from "./pr";
+import { openPr, prNo, prOf, PrTarget, repoName } from "./pr";
 
 type Who = { login: string };
 type Check = { __typename?: string; name?: string; context?: string; status?: string; conclusion?: string; state?: string };
@@ -30,9 +30,10 @@ type View = {
   createdAt: string;
 };
 /** 코드 줄에 단 코멘트 (GitHub REST). line이 없으면 그 뒤로 코드가 바뀌어 지금 diff에 자리가 없는 것이다 */
-type LineComment = { id: number; path: string; line: number | null; side: "LEFT" | "RIGHT"; in_reply_to_id?: number; user: Who; body: string; created_at: string };
+/** id: GitHub은 숫자, GitLab은 토론 id(글자)다 */
+type LineComment = { id: number | string; path: string; line: number | null; side: "LEFT" | "RIGHT"; in_reply_to_id?: number | string | null; user: Who; body: string; created_at: string };
 /** 쓰는 중인 것: 코드 줄에 새 코멘트, 또는 스레드에 답글 */
-type Draft = { kind: "line"; path: string; line: number; side: "LEFT" | "RIGHT" } | { kind: "reply"; id: number };
+type Draft = { kind: "line"; path: string; line: number; side: "LEFT" | "RIGHT" } | { kind: "reply"; id: number | string };
 
 const STATE: Record<string, string> = { OPEN: "열림", CLOSED: "닫힘", MERGED: "머지됨" };
 const DECISION: Record<string, string> = { APPROVED: "승인됨", CHANGES_REQUESTED: "수정 요청", REVIEW_REQUIRED: "리뷰 필요" };
@@ -130,7 +131,7 @@ export default function PrView({ target, onClose, inline = false, autoFocus = tr
   const lang = file ? langOf(file.path) : undefined;
   // 답글은 첫 코멘트 아래에 모은다
   const roots = notes.filter((c) => !c.in_reply_to_id);
-  const replies = (id: number) => notes.filter((c) => c.in_reply_to_id === id);
+  const replies = (id: number | string) => notes.filter((c) => c.in_reply_to_id === id);
   const count = (path: string) => notes.filter((c) => c.path === path).length;
   useEffect(() => {
     body.current?.scrollTo({ top: 0 });
@@ -156,7 +157,7 @@ export default function PrView({ target, onClose, inline = false, autoFocus = tr
     const ok =
       draft.kind === "line"
         ? await send("줄 코멘트", "pr_line_comment", { commit: view?.headRefOid ?? "", path: draft.path, line: draft.line, side: draft.side, body: text })
-        : await send("답글", "pr_reply", { id: draft.id, body: text });
+        : await send("답글", "pr_reply", { id: String(draft.id), body: text });
     if (ok) (setDraft(null), setText(""), box.current?.focus());
   };
   const review = async (kind: "comment" | "approve" | "request-changes") => {
@@ -250,7 +251,7 @@ export default function PrView({ target, onClose, inline = false, autoFocus = tr
         <div className="rv-top pr-top">
           <div className="pr-title">
             <span className="pr-no">
-              {target.repo.split("/")[1]} #{target.number}
+              {repoName(target.repo)} {prNo(target)}
             </span>
             <b>{view?.title ?? (error ? "" : "읽는 중")}</b>
           </div>

@@ -13,6 +13,8 @@ type Props = {
   remoteUrl?: string;
   /** GitHub 연결: 셸 칸에서 gh auth login을 돌린다 */
   onConnect: () => void;
+  /** GitLab 연결: 셸 칸에서 glab auth login을 돌린다 */
+  onConnectLab: () => void;
 };
 
 type Row =
@@ -23,6 +25,7 @@ type Row =
   | { kind: "key"; key: Key; label: string; note: string }
   | { kind: "text"; key: Key; label: string; note: string; hint: string }
   | { kind: "github"; label: string; note: string }
+  | { kind: "gitlab"; label: string; note: string }
   | { kind: "keys"; label: string; note: string };
 
 /** 묶음마다 줄 몇 개. 왼쪽에서 묶음을 고르면 오른쪽에 그 줄들만 나온다 */
@@ -91,9 +94,10 @@ const SECTIONS: { title: string; hint: string; rows: Row[] }[] = [
   },
   {
     title: "연결",
-    hint: "GitHub",
+    hint: "GitHub · GitLab · 동기화",
     rows: [
       { kind: "github", label: "GitHub", note: "연결하면 PR을 Julgi 안에서 본다. 터미널의 PR 링크를 ⌘ 클릭하거나 ⌘K에서 #번호를 친다. 로그인은 gh(GitHub CLI)가 하고 토큰도 gh가 키체인에 둔다. Julgi는 토큰을 보지 않는다" },
+      { kind: "gitlab", label: "GitLab", note: "연결하면 MR도 PR과 똑같이 본다(PR 화면, 작업 페이지, 알림). 로그인은 glab(GitLab CLI)이 하고 토큰도 glab이 둔다. 회사 GitLab이면 glab auth login에서 그 호스트를 고른다" },
       { kind: "pick", key: "prWatch", label: "챙길 PR", note: "정한 주기마다 PR을 보고 CI가 깨지거나 남이 코멘트를 달거나 리뷰를 받거나 머지되면 알린다. 세션이 올린 PR은 그 세션을 내 차례로 올리고, 나머지 내 PR은 ⌘J의 \"내 PR\"에 넣는다", options: [["mine", "내 PR 전부"], ["session", "세션이 올린 PR만"], ["off", "끔"]] },
       { kind: "number", key: "prEveryMin", label: "PR 확인 주기", note: "세션 줄의 PR과 내 PR을 이만큼마다 본다. 짧을수록 알림이 빨리 온다", step: 1, min: 1, max: 30, show: (n) => `${n}분` },
       { kind: "number", key: "askEveryMin", label: "리뷰 요청 확인 주기", note: "나한테 온 리뷰 요청을 이만큼마다 본다", step: 1, min: 1, max: 60, show: (n) => `${n}분` },
@@ -135,11 +139,13 @@ const showKey = (combo: string) =>
     .join("");
 
 /** 설정 (⌘,). 바꾸는 즉시 적용되고 ~/.julgi/config.json에 남는다 */
-export default function Settings({ onChange, onClose, remoteUrl, onConnect }: Props) {
+export default function Settings({ onChange, onClose, remoteUrl, onConnect, onConnectLab }: Props) {
   const [at, setAt] = useState(0);
   // gh가 있는가, 누구로 로그인했는가. undefined면 아직 보는 중
   const [gh, setGh] = useState<[boolean, string] | undefined>(undefined);
   useEffect(() => void invoke<[boolean, string]>("gh_status").then(setGh, () => setGh([false, ""])), []);
+  const [lab, setLab] = useState<[boolean, string] | undefined>(undefined);
+  useEffect(() => void invoke<[boolean, string]>("glab_status").then(setLab, () => setLab([false, ""])), []);
   const [taking, setTaking] = useState(false); // 키 조합을 받는 중
   const [, redraw] = useState(0);
   const box = useRef<HTMLDivElement>(null);
@@ -197,6 +203,7 @@ export default function Settings({ onChange, onClose, remoteUrl, onConnect }: Pr
       else if (row.kind === "text") box.current?.querySelector<HTMLInputElement>(".set-row.on input")?.focus();
       else if (row.kind === "toggle") nudge(row, 1);
       else if (row.kind === "github") onConnect();
+      else if (row.kind === "gitlab") onConnectLab();
       else onClose();
     } else return;
     e.preventDefault();
@@ -290,6 +297,21 @@ export default function Settings({ onChange, onClose, remoteUrl, onConnect }: Pr
                           <span className="set-on">● {gh[1]}로 연결됨</span>
                         ) : (
                           <button type="button" tabIndex={-1} className="set-toggle" onClick={onConnect}>
+                            연결
+                          </button>
+                        )}
+                      </span>
+                    )}
+                    {row.kind === "gitlab" && (
+                      <span className="set-gh">
+                        {lab === undefined ? (
+                          <span className="set-note">보는 중</span>
+                        ) : !lab?.[0] ? (
+                          <span className="set-note">glab이 없다 · 터미널에서 brew install glab</span>
+                        ) : lab[1] ? (
+                          <span className="set-on">● {lab[1]}로 연결됨</span>
+                        ) : (
+                          <button type="button" tabIndex={-1} className="set-toggle" onClick={onConnectLab}>
                             연결
                           </button>
                         )}

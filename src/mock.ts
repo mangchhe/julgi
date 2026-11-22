@@ -126,6 +126,8 @@ async function invoke(cmd: string, args: Record<string, unknown> = {}): Promise<
     }
     case "gh_status":
       return [true, "me"];
+    case "glab_status":
+      return [true, ""];
     case "repo_slug":
       return "example/api-server";
     case "pr_view":
@@ -144,7 +146,7 @@ async function invoke(cmd: string, args: Record<string, unknown> = {}): Promise<
         { number: 1840, title: "정산 배치 재시도 간격을 설정으로", author: { login: "teammate" }, headRefName: "fix/settle-retry", isDraft: false, updatedAt: new Date().toISOString() },
       ]);
     case "pr_mine":
-      return JSON.stringify([{ number: 1852, title: "쿠폰 여러 장일 때 환불액 1원 어긋남 수정", repository: { nameWithOwner: "example/api-server" }, author: { login: "me" }, updatedAt: new Date().toISOString(), url: "https://github.com/example/api-server/pull/1852", isDraft: false }, { number: 1700, title: "주문 내보내기 CSV 열 순서 고정", repository: { nameWithOwner: "example/api-server" }, author: { login: "me" }, updatedAt: new Date().toISOString(), url: "https://github.com/example/api-server/pull/1700", isDraft: false }]);
+      return JSON.stringify([{ number: 1852, title: "쿠폰 여러 장일 때 환불액 1원 어긋남 수정", repository: { nameWithOwner: "example/api-server" }, author: { login: "me" }, updatedAt: new Date().toISOString(), url: "https://github.com/example/api-server/pull/1852", isDraft: false }, { number: 1700, title: "주문 내보내기 CSV 열 순서 고정", repository: { nameWithOwner: "example/api-server" }, author: { login: "me" }, updatedAt: new Date().toISOString(), url: "https://github.com/example/api-server/pull/1700", isDraft: false }, { number: 31, title: "배송지 검증 규칙 정리", repository: { nameWithOwner: "gitlab:gitlab.example.com/shop/backend" }, author: { login: "me" }, updatedAt: new Date().toISOString(), url: "https://gitlab.example.com/shop/backend/-/merge_requests/31", isDraft: false }]);
     case "token_usage": {
       // 사용량 화면 확인용: 가짜 세션들에 날짜·모델별 토큰을 흩어 둔다
       const sessions = (await fetch("/mock-ledger.json").then((r) => r.json())) as { id: string; cwd: string }[];

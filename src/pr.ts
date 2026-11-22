@@ -1,11 +1,24 @@
 /** GitHub PR 하나를 가리키는 것: "소유자/레포"와 번호 */
 export type PrTarget = { repo: string; number: number };
 
-/** https://github.com/소유자/레포/pull/123(/files 등) → { repo, number } */
+/**
+ * PR·MR 주소 → { repo, number }.
+ * GitHub: https://github.com/소유자/레포/pull/123 → repo "소유자/레포"
+ * GitLab: https://호스트/그룹/.../프로젝트/-/merge_requests/12 → repo "gitlab:호스트/그룹/.../프로젝트"
+ */
 export function prOf(url: string): PrTarget | null {
-  const m = url.match(/^https?:\/\/github\.com\/([\w.-]+\/[\w.-]+)\/pull\/(\d+)/);
-  return m ? { repo: m[1], number: Number(m[2]) } : null;
+  const gh = url.match(/^https?:\/\/github\.com\/([\w.-]+\/[\w.-]+)\/pull\/(\d+)/);
+  if (gh) return { repo: gh[1], number: Number(gh[2]) };
+  const lab = url.match(/^https?:\/\/([\w.-]+(?:\/[\w.-]+)+)\/-\/merge_requests\/(\d+)/);
+  return lab ? { repo: `gitlab:${lab[1]}`, number: Number(lab[2]) } : null;
 }
+
+export const isLab = (repo: string) => repo.startsWith("gitlab:");
+/** 화면에 보일 레포 이름: 마지막 칸 (GitLab은 그룹이 여럿일 수 있다) */
+export const repoName = (repo: string) => repo.split("/").pop() ?? repo;
+/** PR 번호 표시: GitHub은 #12, GitLab MR은 !12 */
+export const prNo = (t: PrTarget) => `${isLab(t.repo) ? "!" : "#"}${t.number}`;
+export const prUrl = (t: PrTarget) => (isLab(t.repo) ? `https://${t.repo.slice(7)}/-/merge_requests/${t.number}` : `https://github.com/${t.repo}/pull/${t.number}`);
 
 /** PR 링크를 Julgi 안의 PR 화면으로 연다. 터미널, 찾기, 코드 검토 어디서든 이것만 부른다. App이 받아서 연다 */
 export const openPr = (target: PrTarget) => window.dispatchEvent(new CustomEvent<PrTarget>("julgi:pr", { detail: target }));

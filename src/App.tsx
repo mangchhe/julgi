@@ -20,7 +20,7 @@ import Sidebar from "./Sidebar";
 import PrView from "./PrView";
 import Work, { WorkGroup, WorkRow } from "./Work";
 import Usage from "./Usage";
-import { newsOf, openPr, prOf, PrStatus, PrTarget, ReviewAsk } from "./pr";
+import { isLab, newsOf, openPr, prOf, PrStatus, PrTarget, prUrl, repoName, ReviewAsk } from "./pr";
 import * as terms from "./terms";
 import { rank } from "./route";
 import { Brief, Change, Job, MAX_PARALLEL, setMapDirs, setPrefs, markAuto, isAuto, autoList, STATE_LABEL, ago, Item, modelFor, SkillInfo, SkillUse, aboutOf, buildFolders, buildItems, aliveElsewhere, config, elsewhere, enrich, markSlept, setAlive, handoffCommand, Ledger, Merge, mergeCandidates, mergeKey, newCommand, Open, repoOf, resumeCommand, Session, TermState, Thread, waiting, withPrompt } from "./model";
@@ -1634,14 +1634,14 @@ export default function App() {
   };
   /** 세션과 이어지지 않은 내 PR에 일이 생겼다 */
   const mineNotice = (pr: ReviewAsk, news: string) => {
-    const repo = pr.repository.nameWithOwner.split("/")[1];
+    const repo = repoName(pr.repository.nameWithOwner);
     record("PR", `내 PR ${repo} #${pr.number} · ${news}: ${pr.title.slice(0, 60)}`);
     if (!config.notify || document.hasFocus()) return;
     void invoke("notify", { title: `${repo} #${pr.number} · ${news}`, body: pr.title.slice(0, 80) });
   };
   /** 새 리뷰 요청이 왔다 */
   const askNotice = (a: ReviewAsk) => {
-    const repo = a.repository.nameWithOwner.split("/")[1];
+    const repo = repoName(a.repository.nameWithOwner);
     record("리뷰 요청", `${a.author.login}: ${repo} #${a.number} ${a.title.slice(0, 60)}`);
     if (!config.notify || document.hasFocus()) return;
     void invoke("notify", { title: `리뷰 요청 · ${repo} #${a.number}`, body: `${a.author.login}: ${a.title.slice(0, 80)}` });
@@ -1678,11 +1678,13 @@ export default function App() {
   };
   /** 리뷰 요청을 새 세션에 맡긴다. 로컬에 그 레포가 있으면 거기서 띄워 코드도 같이 읽게 한다 */
   const handReview = (a: ReviewAsk, extra: string) => {
-    const name = a.repository.nameWithOwner.split("/")[1];
+    const name = repoName(a.repository.nameWithOwner);
     const cwd = mapState.current.repos.find((r) => r.repo === name)?.cwd ?? (live.current.base || live.current.home);
     const ask =
       `PR ${a.url} (${a.repository.nameWithOwner} #${a.number} "${a.title}", 작성 ${a.author.login})을 리뷰해 줘.\n\n` +
-      `- \`gh pr view ${a.number} -R ${a.repository.nameWithOwner} --comments\`와 \`gh pr diff ${a.number} -R ${a.repository.nameWithOwner}\`로 읽는다. 필요하면 이 폴더의 코드를 같이 본다.\n` +
+      (isLab(a.repository.nameWithOwner)
+        ? `- \`glab mr view ${a.number} -R ${a.repository.nameWithOwner.slice(7)} --comments\`와 \`glab mr diff ${a.number} -R ${a.repository.nameWithOwner.slice(7)}\`로 읽는다. 필요하면 이 폴더의 코드를 같이 본다.\n`
+        : `- \`gh pr view ${a.number} -R ${a.repository.nameWithOwner} --comments\`와 \`gh pr diff ${a.number} -R ${a.repository.nameWithOwner}\`로 읽는다. 필요하면 이 폴더의 코드를 같이 본다.\n`) +
       `- 버그, 위험, 빠진 처리, 확인할 것을 "파일:줄 — 무엇을 왜" 목록으로 정리한다. 중요한 것부터.\n` +
       `- GitHub에 코멘트를 달거나 승인하지 않는다. 올리는 것은 내가 Julgi의 PR 화면에서 한다.` +
       (extra ? `\n\n덧붙여: ${extra}` : "");
@@ -1747,7 +1749,7 @@ export default function App() {
       for (const [id, seen] of Object.entries(prSeen.current)) {
         if (gone >= 10 || seen.state !== "OPEN" || targets.has(id)) continue;
         const [repo, number] = [id.slice(0, id.lastIndexOf("#")), Number(id.slice(id.lastIndexOf("#") + 1))];
-        targets.set(id, { target: { repo, number }, keys: [], pr: { number, title: `${repo.split("/")[1]} #${number}`, repository: { nameWithOwner: repo }, author: { login: "" }, updatedAt: "", url: `https://github.com/${repo}/pull/${number}`, isDraft: false } });
+        targets.set(id, { target: { repo, number }, keys: [], pr: { number, title: `${repoName(repo)} #${number}`, repository: { nameWithOwner: repo }, author: { login: "" }, updatedAt: "", url: prUrl({ repo, number }), isDraft: false } });
         gone += 1;
       }
       const next: Record<string, PrStatus> = {};
@@ -2459,6 +2461,11 @@ export default function App() {
       {overlay === "settings" && (
         <Settings
           remoteUrl={remoteUrl}
+          onConnectLab={() => {
+            // glab이 호스트와 로그인 방식(웹 또는 토큰)을 묻는다. 끝나면 셸 칸을 닫으면 된다
+            setOverlay(null);
+            newShell(cwdOf(current), "glab auth login; echo; echo '끝났다. ⌘W로 이 칸을 닫는다.'; read -r _", "GitLab 연결");
+          }}
           onConnect={() => {
             // gh가 브라우저를 열고 일회용 코드를 보여 준다. 끝나면 셸 칸을 닫으면 된다
             setOverlay(null);
