@@ -387,7 +387,7 @@ function open(entry: Entry) {
     entry.outAt = Date.now();
     t.write(data instanceof ArrayBuffer ? new Uint8Array(data) : Uint8Array.from(data));
   };
-  void invoke("pty_spawn", { id, cols: t.cols, rows: t.rows, cwd: spec.cwd, command: spec.command, stripEnv: config.stripEnv, onData: channel }).catch(
+  void invoke("pty_spawn", { id, cols: t.cols, rows: t.rows, cwd: spec.cwd, command: spec.command, stripEnv: config.stripEnv, fallbackDir: config.defaultDir || null, onData: channel }).catch(
     (e) => t.write(`\r\n터미널을 띄우지 못했다: ${e}\r\n`),
   );
   t.onData((data) => {

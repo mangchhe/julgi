@@ -56,6 +56,7 @@ fn pty_spawn(
     cwd: Option<String>,
     command: Option<String>,
     strip_env: Option<Vec<String>>,
+    fallback_dir: Option<String>,
     on_data: Channel<Response>,
 ) -> Result<(), String> {
     let pair = native_pty_system()
@@ -80,9 +81,9 @@ fn pty_spawn(
     if let Some(command) = command {
         cmd.args(["-i", "-c", &command]);
     }
-    let home = std::env::var("HOME").unwrap_or_else(|_| "/".into());
-    // 사라진 폴더(지운 워크트리 등)의 세션은 홈에서 연다
-    cmd.cwd(cwd.filter(|dir| std::path::Path::new(dir).is_dir()).unwrap_or(home));
+    // 사라진 폴더(지운 워크트리 등)의 세션은 Julgi의 기본 폴더에서 연다. 홈에서 열면 Claude Code가 홈을 믿느냐고 묻는다.
+    // 대화는 폴더와 상관없이 ID로 이어진다
+    cmd.cwd(cwd.filter(|dir| std::path::Path::new(dir).is_dir()).unwrap_or_else(|| default_dir(fallback_dir)));
     cmd.env("TERM", "xterm-256color");
     cmd.env("COLORTERM", "truecolor");
     cmd.env("TERM_PROGRAM", "Julgi");

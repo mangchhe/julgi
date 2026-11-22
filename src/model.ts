@@ -207,7 +207,7 @@ export const STATE_LABEL: Record<string, string> = { run: "일하는 중", wait:
 const hook = (state: string, mainOnly = false) => ({
   hooks: [{ type: "command", command: `${mainOnly ? `grep -q agent_id || ` : ""}printf ${state} > ~/.julgi/state/$JULGI_TERM` }],
 });
-// 지도의 레포는 --add-dir로 붙이지 않고 읽기만 허락한다. --add-dir는 폴더마다 "Adding a new directory"를 묻는다.
+// 지도의 레포와 일감 워크트리(~/.julgi/** 안)는 --add-dir로 붙이지 않고 읽기만 허락한다. --add-dir는 폴더마다 "Adding a new directory"를 묻는다.
 // 규칙의 //는 절대 경로라는 뜻이다. 셸의 작은따옴표 안에 들어가니 '가 든 경로는 뺀다
 const settings = () => JSON.stringify({
   hooks: {
@@ -324,7 +324,7 @@ const skip = (id: string) => (config.skipPermissions === "all" || (config.skipPe
 
 // JULGI_SESSION: 세션 안에서 julgi 명령이 자기가 누구인지 아는 데 쓴다. --plugin-dir: Julgi의 스킬을 이 세션에만 얹는다
 const launch = (id: string, how: string) =>
-  `JULGI_SESSION=${id} claude ${how} ${id}${skip(id)} --settings '${settings()}' --add-dir ~/.julgi/worktrees${prefs ? " --append-system-prompt-file ~/.julgi/prefs.md" : ""} --plugin-dir ~/.julgi/plugin --plugin-dir ~/.julgi/grown${config.pluginDirs.map((dir) => ` --plugin-dir "${dir.replace(/^~(?=\/|$)/, "$HOME").replace(/["`\\]/g, "")}"`).join("")}`;
+  `JULGI_SESSION=${id} claude ${how} ${id}${skip(id)} --settings '${settings()}'${prefs ? " --append-system-prompt-file ~/.julgi/prefs.md" : ""} --plugin-dir ~/.julgi/plugin --plugin-dir ~/.julgi/grown${config.pluginDirs.map((dir) => ` --plugin-dir "${dir.replace(/^~(?=\/|$)/, "$HOME").replace(/["`\\]/g, "")}"`).join("")}`;
 export const resumeCommand = (id: string) => launch(id, "--resume");
 /** 파일에 적어 둔 글을 첫 입력으로 넣는다 */
 export const withPrompt = (command: string, path: string) => `${command} "$(cat '${path}')"`;
