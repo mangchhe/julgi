@@ -12,11 +12,6 @@ import { openUrl } from "@tauri-apps/plugin-opener";
 import "@xterm/xterm/css/xterm.css";
 import { config } from "./model";
 
-// ~/.julgi/keylog 파일이 있으면 키 입력이 어떻게 들어오고 무엇이 나갔는지 julgi.log에 남긴다 (입력기 문제를 볼 때만)
-let keylog = false;
-void invoke<string | null>("data_read", { name: "keylog" }).then((v) => (keylog = v != null), () => {});
-const klog = (line: string) => keylog && void invoke("log_line", { line: `key ${Date.now() % 100000} ${line}` });
-
 export type TermSpec = { key: string; cwd?: string; command?: string };
 
 type Entry = {
@@ -260,7 +255,6 @@ function open(entry: Entry) {
     else if (/[\r\x03\x15]/.test(data) && !data.startsWith("\x1b[200~")) entry.draft = 0;
     else if (!data.startsWith("\x1b") || data.startsWith("\x1b[200~"))
       entry.draft = Math.max(0, entry.draft + [...data].reduce((n, ch) => n + (ch === "\x7f" ? -1 : 1), 0));
-    klog(`send ${JSON.stringify(data)}`);
     void invoke("pty_write", { id, data });
   };
 
@@ -268,13 +262,14 @@ function open(entry: Entry) {
   // 그 뒤로는 마지막 글자를 통째로 바꾸는 insertReplacementText로 온다 (ㅇ → 아 → 안).
   // xterm은 뒤쪽을 무시하므로 여기서 직접 받아, 앞서 보낸 글자를 지우고 바뀐 글자를 다시 보낸다.
   let pending = ""; // 아직 바뀔 수 있는 마지막 글자
+  // xterm이 키 이벤트로 막 보낸 글자. 웹뷰는 Space 같은 키에 같은 글자를 input으로 한 번 더 준다(그대로 보내면 두 칸이 된다)
+  let keySent = { data: "", at: 0 };
   let lastKeyCode = 0;
   const MODIFIERS = new Set([16, 17, 18, 20, 91, 93]);
   el.addEventListener(
     "keydown",
     (e) => {
       lastKeyCode = e.keyCode;
-      klog(`down ${e.keyCode} ${JSON.stringify(e.key)} composing=${e.isComposing}`);
       if (e.keyCode !== 229 && !MODIFIERS.has(e.keyCode)) pending = "";
     },
     true,
@@ -283,10 +278,10 @@ function open(entry: Entry) {
     "input",
     (ev) => {
       const e = ev as InputEvent;
-      klog(`input ${e.inputType} ${JSON.stringify(e.data)} composing=${e.isComposing}`);
       if (e.isComposing) return; // 조합 이벤트를 제대로 보내는 입력기는 xterm에 맡긴다
       if (e.inputType === "insertText" && e.data) {
         e.stopPropagation();
+        if (e.data === keySent.data && performance.now() - keySent.at < 100) return;
         send(e.data);
         pending = [...e.data].pop()!;
       } else if (e.inputType === "insertReplacementText" && e.data != null) {
@@ -343,6 +338,7 @@ function open(entry: Entry) {
     // 창 포커스가 오갈 때 터미널이 알아서 보내는 것은 내가 친 게 아니다
     // 내가 친 것만 센다. 터미널이 프로그램의 물음에 알아서 답하는 것(커서 위치, 장치 정보)과 방향키는 \x1b로 시작한다
     if (!data.startsWith("\x1b")) entry.typedAt = Date.now();
+    keySent = { data, at: performance.now() };
     send(data);
   });
   t.onResize(({ cols, rows }) => void invoke("pty_resize", { id, cols, rows }));
