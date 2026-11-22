@@ -8,7 +8,7 @@ import { WebglAddon } from "@xterm/addon-webgl";
 import { Unicode11Addon } from "@xterm/addon-unicode11";
 import { WebLinksAddon } from "@xterm/addon-web-links";
 import { SearchAddon } from "@xterm/addon-search";
-import { openUrl } from "@tauri-apps/plugin-opener";
+import { openPath, openUrl } from "@tauri-apps/plugin-opener";
 import "@xterm/xterm/css/xterm.css";
 import { config } from "./model";
 
@@ -62,6 +62,33 @@ const visible = (entry: Entry) => entry.el.clientWidth > 50 && entry.el.clientHe
 export const has = (key: string) => pool.has(key);
 export const idOf = (key: string) => pool.get(key)?.id;
 
+/** ⌘를 누른 채 누른 링크를 연다. 파일 링크(file://)는 그 파일을 기본 앱으로 연다 */
+function openLink(e: MouseEvent, uri: string) {
+  if (!e.metaKey) return;
+  if (uri.startsWith("file://")) {
+    // file://host/path 형식이면 host를 버린다. 뒤에 붙은 :줄번호는 파일 이름이 아니다
+    const path = decodeURIComponent(new URL(uri).pathname).replace(/:\d+(:\d+)?$/, "");
+    void openPath(path).catch(() => {});
+  } else void openUrl(uri).catch(() => {});
+}
+
+/** 화면 글에서 파일 경로를 찾는다: /절대/경로, ./상대, 폴더/파일.확장자, 파일.확장자 (뒤에 :줄:칸이 붙을 수 있다) */
+const PATH = /(?:\.{0,2}\/)?(?:[\w.@+-]+\/)*[\w@+-][\w.@+-]*\.[A-Za-z0-9]{1,8}(?::\d+(?::\d+)?)?/g;
+export function findPaths(text: string): { start: number; end: number; path: string }[] {
+  const out: { start: number; end: number; path: string }[] = [];
+  for (const m of text.matchAll(PATH)) {
+    const start = m.index!;
+    // URL의 일부(example.com, //host/a.js)나 단어 중간이면 경로가 아니다
+    if (start > 0 && /[\w:/.~-]/.test(text[start - 1])) continue;
+    if (text[start + m[0].length] === "/") continue;
+    const path = m[0].replace(/:\d+(:\d+)?$/, "");
+    // 폴더 없이 이름만 있으면 이름과 확장자가 두 글자 넘을 때만 파일로 본다 (e.g, v1.2, 2.1.330 같은 것을 거른다)
+    if (!path.includes("/") && !/^[\w@+-][\w.@+-]+\.[A-Za-z][A-Za-z0-9]+$/.test(path)) continue;
+    out.push({ start, end: start + m[0].length, path });
+  }
+  return out;
+}
+
 export function create(spec: TermSpec) {
   if (pool.has(spec.key)) return;
   const term = new Terminal({
@@ -72,13 +99,42 @@ export function create(spec: TermSpec) {
     scrollback: 20000,
     allowProposedApi: true,
     theme,
+    // Claude Code는 PR·파일 경로를 터미널 하이퍼링크(OSC 8)로 보낸다. 기본 처리는 file://을 버리고 http도 웹뷰에서 못 연다
+    linkHandler: { activate: openLink, allowNonHttpProtocols: true },
   });
   const fit = new FitAddon();
   term.loadAddon(fit);
   term.loadAddon(new Unicode11Addon());
   term.unicode.activeVersion = "11";
   // 링크는 ⌘를 누른 채 눌러야 열린다. 그냥 누르면 글자 선택과 헷갈린다.
-  term.loadAddon(new WebLinksAddon((e, uri) => e.metaKey && void openUrl(uri)));
+  term.loadAddon(new WebLinksAddon(openLink));
+  // 파일 경로는 Claude Code가 링크로 보내지 않는다. 화면에서 찾아 ⌘를 누른 채 누르면 세션 폴더 기준으로 연다
+  term.registerLinkProvider({
+    provideLinks(y, callback) {
+      const line = term.buffer.active.getLine(y - 1);
+      if (!line) return callback(undefined);
+      // 한글은 두 칸을 차지해서 글자 위치와 화면 칸이 다르다. 글자마다 시작 칸을 적어 둔다
+      let text = "";
+      const col: number[] = [];
+      for (let x = 0; x < line.length; x++) {
+        const cell = line.getCell(x);
+        if (!cell || cell.getWidth() === 0) continue;
+        const chars = cell.getChars() || " ";
+        for (const _ of chars) col.push(x);
+        text += chars;
+      }
+      const links = findPaths(text.trimEnd()).map(({ start, end, path }) => ({
+        range: { start: { x: col[start] + 1, y }, end: { x: col[end - 1] + 1, y } },
+        text: path,
+        activate: (e: MouseEvent) => {
+          if (!e.metaKey) return;
+          const full = path.startsWith("/") ? path : `${(spec.cwd ?? "").replace(/\/$/, "")}/${path.replace(/^\.\//, "")}`;
+          void openPath(full).catch(() => {});
+        },
+      }));
+      callback(links.length ? links : undefined);
+    },
+  });
   const search = new SearchAddon();
   term.loadAddon(search);
   const el = document.createElement("div");
