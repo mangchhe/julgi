@@ -302,6 +302,19 @@ export const config = {
   prViewRefreshSec: 30,
   /** 잠든 세션의 PR에 일이 생기면 그 세션을 바로 깨운다. 끄면 알리고 ⌘J에 올려 두기만 한다(고르면 깨운다) */
   wakeOnPr: false,
+  /** Jira 사이트 주소(https://…), 이메일, cloud/server. 토큰은 키체인에만 있다. 사이트가 비면 Jira 기능이 꺼진다 */
+  jiraSite: "",
+  jiraEmail: "",
+  jiraKind: "cloud",
+  /** 챙길 티켓: mine 내게 배정된 것, off 안 챙김 */
+  jiraWatch: "mine",
+  jiraEveryMin: 5,
+  /** 시작할 때 / PR을 올리면 / 머지되면 제안할 전환 이름. 비우면 묻지 않는다 */
+  jiraStartTransition: "In Progress",
+  jiraPrTransition: "In Review",
+  jiraMergeTransition: "Done",
+  /** 프로젝트 키 → 레포 (이 티켓으로 시작에서 고르면 저절로 채운다). "ABC=api-server, OPS=infra" */
+  jiraRepos: "",
   /** 아래 상태 줄에 Claude 구독 사용량(5시간 창, 주간)을 보여 준다. Claude Code의 로그인 토큰을 읽어 Anthropic의 사용량 주소를 부른다 */
   usage: false,
   /** 세션들이 쓰는 메모리 합계가 이만큼(GB)을 넘으면, 답까지 보고 쉬는 세션을 오래 쉰 것부터 시간을 기다리지 않고 재운다. 0이면 안 한다 */

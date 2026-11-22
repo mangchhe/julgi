@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { ago, linkLabel, Open, repoOf, Session } from "./model";
 import { invoke } from "@tauri-apps/api/core";
 import { prNo, prOf, repoName, ReviewAsk } from "./pr";
+import { CATEGORY, JiraConn, Ticket } from "./jira";
 
 export type Pick =
   | { kind: "open"; key: string }
@@ -9,7 +10,9 @@ export type Pick =
   | { kind: "new"; cwd: string }
   | { kind: "link"; url: string }
   /** 이 번호의 PR을 연다. repo가 없으면 지금 칸의 레포에서 */
-  | { kind: "pr"; number: number; repo?: string };
+  | { kind: "pr"; number: number; repo?: string }
+  /** 티켓 화면을 연다 */
+  | { kind: "ticket"; key: string };
 
 type Row = { pick: Pick; title: string; meta: string; isNew?: boolean; isLink?: boolean; session?: Session };
 
@@ -36,6 +39,9 @@ type Props = {
   /** 나한테 온 리뷰 요청과 내 PR. "pr"을 치면 지금 칸 레포의 열린 PR과 함께 고를 거리로 낸다 */
   asks: ReviewAsk[];
   mine: ReviewAsk[];
+  /** Jira 연결 (없으면 null)과 내 티켓. "jira"를 치면 고를 거리가 된다 */
+  jira: JiraConn | null;
+  tickets: Ticket[];
 };
 
 /** ⌘K에서 고를 PR 하나 */
@@ -43,7 +49,7 @@ type PrRow = { repo: string; number: number; title: string; author: string; bran
 
 const MAX_SESSIONS = 40;
 
-export default function Palette({ open, sessions, byId, cwd, onPick, onAttach, onJoin, onClose, asks, mine }: Props) {
+export default function Palette({ open, sessions, byId, cwd, onPick, onAttach, onJoin, onClose, asks, mine, jira, tickets }: Props) {
   const [query, setQuery] = useState("");
   const [sel, setSel] = useState(0);
   const input = useRef<HTMLInputElement>(null);
@@ -60,6 +66,20 @@ export default function Palette({ open, sessions, byId, cwd, onPick, onAttach, o
       setRepoPrs(list.map((p) => ({ repo, number: p.number, title: p.title, author: p.author.login, branch: p.headRefName, tag: "", draft: p.isDraft, at: p.updatedAt })));
     });
   }, [cwd]);
+  // "jira 글"을 치면 Jira 전체에서도 찾는다 (치는 동안은 기다렸다가)
+  const jiraQuery = query.trim().match(/^(?:jira|티켓)\b\s*(.*)$/i);
+  const jiraText = jiraQuery?.[1].trim() ?? "";
+  const [hits, setHits] = useState<Ticket[]>([]);
+  useEffect(() => {
+    setHits([]);
+    if (!jira || jiraText.length < 2 || /^[A-Z][A-Z0-9_]+-\d+$/i.test(jiraText)) return;
+    const timer = setTimeout(() => {
+      const safe = jiraText.replace(/["\\]/g, " ");
+      void invoke<Ticket[]>("jira_search", { conn: jira, jql: `text ~ "${safe}" ORDER BY updated DESC`, limit: 20 }).then(setHits, () => setHits([]));
+    }, 350);
+    return () => clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [jiraText, !!jira]);
   // 리뷰 요청 → 내 PR → 이 레포의 나머지. 같은 PR은 한 번만
   const prs = useMemo(() => {
     const out: PrRow[] = [];
@@ -72,6 +92,24 @@ export default function Palette({ open, sessions, byId, cwd, onPick, onAttach, o
 
   // 찾기와 새 세션은 같은 상자다. 하던 세션이 먼저 나오고, 새로 열기는 맨 아래다.
   const rows = useMemo<Row[]>(() => {
+    // "jira" 또는 "티켓"으로 시작하면 티켓만 찾는다: 키를 쳤으면 그 티켓, 내 티켓(진행 중 → 할 일), Jira 전체 검색 결과
+    if (jiraQuery) {
+      if (!jira) return [{ pick: { kind: "ticket", key: "" }, title: "Jira에 연결돼 있지 않다", meta: "⌘,의 연결에서 연결한다", isLink: true }];
+      const out: Row[] = [];
+      const key = jiraText.toUpperCase();
+      if (/^[A-Z][A-Z0-9_]+-\d+$/.test(key)) out.push({ pick: { kind: "ticket", key }, title: `${key} 보기`, meta: "티켓 화면", isLink: true });
+      const low = jiraText.toLowerCase();
+      const fit = (t: Ticket) => !low || t.key.toLowerCase().startsWith(low) || t.title.toLowerCase().includes(low);
+      const rank = (t: Ticket) => (t.statusCategory === "indeterminate" ? 0 : t.statusCategory === "new" ? 1 : 2);
+      const seen = new Set<string>();
+      for (const t of tickets.filter(fit).sort((a, b) => rank(a) - rank(b))) {
+        seen.add(t.key);
+        out.push({ pick: { kind: "ticket", key: t.key }, title: `${t.key} ${t.title}`, meta: [CATEGORY[t.statusCategory] ?? t.status, t.status, t.type, t.priority].filter(Boolean).join(" · "), isLink: true });
+      }
+      for (const t of hits.filter((h) => !seen.has(h.key))) out.push({ pick: { kind: "ticket", key: t.key }, title: `${t.key} ${t.title}`, meta: ["검색", t.status, t.assignee || "담당 없음"].join(" · "), isLink: true });
+      if (!out.length) out.push({ pick: { kind: "ticket", key: "" }, title: jiraText.length >= 2 ? "찾는 중이거나 맞는 티켓이 없다" : "내게 배정된 티켓이 없다", meta: "jira 뒤에 키나 낱말을 친다", isLink: true });
+      return out;
+    }
     // "pr"이나 "#"으로 시작하면 PR만 찾는다. 뒤에 붙인 글로 번호 앞자리나 제목·브랜치를 거른다
     const prQuery = query.trim().match(/^(?:pr\b|#)\s*(.*)$/i);
     if (prQuery) {
@@ -159,7 +197,7 @@ export default function Palette({ open, sessions, byId, cwd, onPick, onAttach, o
     for (const folder of folders)
       out.push({ pick: { kind: "new", cwd: folder }, title: `+ 새 세션 · ${repoOf(folder)}`, meta: folder.replace(/^\/Users\/[^/]+/, "~"), isNew: true });
     return out;
-  }, [query, open, sessions, byId, cwd, prs]);
+  }, [query, open, sessions, byId, cwd, prs, tickets, hits, !!jira]);
 
   const at = Math.min(sel, rows.length - 1);
   useEffect(() => {

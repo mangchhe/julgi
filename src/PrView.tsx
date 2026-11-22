@@ -5,6 +5,7 @@ import { langOf, paint, parse, Line } from "./CodeReview";
 import { md } from "./md";
 import { ago, config } from "./model";
 import { openPr, prNo, prOf, PrTarget, repoName } from "./pr";
+import { firstKey, openTicket } from "./jira";
 
 type Who = { login: string };
 type Check = { __typename?: string; name?: string; context?: string; status?: string; conclusion?: string; state?: string };
@@ -274,6 +275,15 @@ export default function PrView({ target, onClose, inline = false, autoFocus = tr
               )}
               {view.reviewDecision && <span className={view.reviewDecision === "APPROVED" ? "pr-ok" : view.reviewDecision === "CHANGES_REQUESTED" ? "pr-bad" : ""}>{DECISION[view.reviewDecision] ?? view.reviewDecision}</span>}
               {notes.length > 0 && <span>줄 코멘트 {notes.length}</span>}
+              {(() => {
+                // PR 제목이나 브랜치에 티켓 키가 있으면 그 티켓으로 가는 칩
+                const key = firstKey(`${view.title} ${view.headRefName}`);
+                return key ? (
+                  <button type="button" tabIndex={-1} onClick={() => openTicket(key)} title="티켓 화면 열기">
+                    {key}
+                  </button>
+                ) : null;
+              })()}
               {busy && <span className="pr-run">{busy} 보내는 중</span>}
               {view.state === "OPEN" && (
                 <button type="button" tabIndex={-1} className="pr-merge-btn" onClick={() => (setMerging(!merging), setClosing(false))}>

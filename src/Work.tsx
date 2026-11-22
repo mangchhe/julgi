@@ -1,4 +1,5 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { ReactNode, useEffect, useMemo, useRef, useState } from "react";
+import { CATEGORY, Ticket } from "./jira";
 import PrView from "./PrView";
 import { ago } from "./model";
 import { prNo, prParts, PrStatus, PrTarget, repoName, ReviewAsk } from "./pr";
@@ -21,8 +22,17 @@ export type WorkRow = {
 };
 export type WorkGroup = { id: string; title: string; hint: string; rows: WorkRow[] };
 
+/** 티켓 묶음: JQL 하나 */
+export type TicketGroup = { id: string; title: string; hint: string; jql: string };
+
 type Props = {
   groups: WorkGroup[];
+  /** Jira가 연결돼 있으면 티켓 묶음. 고르면 그 JQL로 읽고, 오른쪽에 ticketPane을 편다 */
+  ticketGroups?: TicketGroup[];
+  loadTickets?: (jql: string) => Promise<Ticket[]>;
+  ticketPane?: (key: string) => ReactNode;
+  ticketNews?: Record<string, string>;
+  onStartTicket?: (key: string) => void;
   onClose: () => void;
   /** PR과 리뷰 요청을 바로 다시 읽는다 */
   onRefresh: () => void;
@@ -36,24 +46,46 @@ const idOf = (t: PrTarget) => `${t.repo}#${t.number}`;
  * 작업 (⌘U). PR을 묶음별로 한 화면에서 둘러본다: 왼쪽 묶음, 가운데 목록, 오른쪽 PR 화면.
  * ⌘J가 "지금 손댈 것"만 모은다면, 여기는 "전부 둘러보기"다. Jira를 붙이면 티켓 묶음이 같은 자리에 들어온다
  */
-export default function Work({ groups, onClose, onRefresh, onOpenSession, onHand }: Props) {
+export default function Work({ groups, ticketGroups = [], loadTickets, ticketPane, ticketNews = {}, onStartTicket, onClose, onRefresh, onOpenSession, onHand }: Props) {
+  const allCount = groups.length + ticketGroups.length;
   // 새 소식이 있는 묶음부터 연다
   const [groupAt, setGroupAt] = useState(() => Math.max(0, groups.findIndex((g) => g.rows.some((r) => r.news))));
-  const group = groups[Math.min(groupAt, groups.length - 1)];
+  const tgroup = groupAt >= groups.length ? ticketGroups[groupAt - groups.length] : undefined;
+  const group = tgroup ? undefined : groups[Math.min(groupAt, groups.length - 1)];
   const [picked, setPicked] = useState<string | null>(null);
+  // 티켓 묶음은 고를 때 읽는다(묶음마다 한 번, r로 다시)
+  const [ticketRows, setTicketRows] = useState<Record<string, Ticket[] | string>>({});
+  const [ticketLoads, setTicketLoads] = useState(0);
+  useEffect(() => {
+    if (!tgroup || !loadTickets || (ticketRows[tgroup.id] && !ticketLoads)) return;
+    const id = tgroup.id;
+    void loadTickets(tgroup.jql).then(
+      (list) => setTicketRows((old) => ({ ...old, [id]: list })),
+      (e) => setTicketRows((old) => ({ ...old, [id]: String(e) })),
+    );
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tgroup?.id, ticketLoads]);
+  const tickets = tgroup ? ticketRows[tgroup.id] : undefined;
+  const tlist = Array.isArray(tickets) ? tickets : [];
   const rows = group?.rows ?? [];
-  const at = Math.max(0, rows.findIndex((r) => idOf(r.target) === picked));
-  const row = rows[at];
+  const at = tgroup ? Math.max(0, tlist.findIndex((t) => t.key === picked)) : Math.max(0, rows.findIndex((r) => idOf(r.target) === picked));
+  const row = tgroup ? undefined : rows[at];
+  const ticket = tgroup ? tlist[at] : undefined;
   const box = useRef<HTMLDivElement>(null);
   const list = useRef<HTMLDivElement>(null);
   useEffect(() => box.current?.focus(), []);
   useEffect(() => void list.current?.querySelector(".wk-row.on")?.scrollIntoView({ block: "nearest" }), [at, groupAt]);
   const total = useMemo(() => groups.reduce((n, g) => n + g.rows.length, 0), [groups]);
+  const count = tgroup ? tlist.length : rows.length;
 
-  const pick = (i: number) => rows[i] && setPicked(idOf(rows[i].target));
+  const pick = (i: number) => {
+    if (tgroup) return tlist[i] && setPicked(tlist[i].key);
+    if (rows[i]) setPicked(idOf(rows[i].target));
+  };
   const switchGroup = (n: number) => {
     setGroupAt(n);
-    setPicked(groups[n]?.rows[0] ? idOf(groups[n].rows[0].target) : null);
+    setTicketLoads(0);
+    setPicked(n < groups.length && groups[n]?.rows[0] ? idOf(groups[n].rows[0].target) : null);
   };
   /** 오른쪽 PR 화면으로 키를 넘긴다 */
   const enterPr = () => (document.querySelector<HTMLElement>(".pr-inline .rv") ?? null)?.focus();
@@ -62,13 +94,14 @@ export default function Work({ groups, onClose, onRefresh, onOpenSession, onHand
     // 오른쪽 PR 화면 안의 키는 그 화면이 받는다. Esc만 목록으로 돌아오게 PrView가 onClose를 부른다
     if ((e.target as Element).closest(".pr-inline")) return;
     if (e.key === "Escape") onClose();
-    else if (e.key === "ArrowDown" || e.key === "j") pick(Math.min(rows.length - 1, at + 1));
+    else if (e.key === "ArrowDown" || e.key === "j") pick(Math.min(count - 1, at + 1));
     else if (e.key === "ArrowUp" || e.key === "k") pick(Math.max(0, at - 1));
-    else if (e.key === "Tab") switchGroup((groupAt + (e.shiftKey ? groups.length - 1 : 1)) % groups.length);
+    else if (e.key === "Tab") switchGroup((groupAt + (e.shiftKey ? allCount - 1 : 1)) % allCount);
     else if (e.key === "Enter" && e.metaKey && row?.ask) onHand(row.ask);
+    else if (e.key === "Enter" && e.metaKey && ticket) onStartTicket?.(ticket.key);
     else if (e.key === "Enter" || e.key === "ArrowRight") enterPr();
     else if (e.key === "s" && row?.sessionId) onOpenSession(row.sessionId);
-    else if (e.key === "r") onRefresh();
+    else if (e.key === "r") (tgroup ? setTicketLoads((n) => n + 1) : onRefresh());
     else return;
     e.preventDefault();
     e.stopPropagation();
@@ -86,7 +119,17 @@ export default function Work({ groups, onClose, onRefresh, onOpenSession, onHand
           </button>
         ))}
         <div className="wk-sec">티켓</div>
-        <div className="wk-soon">Jira를 붙이면 내 티켓, 진행 중, 스프린트가 여기 온다</div>
+        {!ticketGroups.length && <div className="wk-soon">⌘,의 연결에서 Jira를 붙이면 진행 중, 할 일, 스프린트가 여기 온다</div>}
+        {ticketGroups.map((g, n) => {
+          const list = ticketRows[g.id];
+          const hot = Array.isArray(list) && list.some((t) => ticketNews[t.key]);
+          return (
+            <button key={g.id} type="button" tabIndex={-1} className={"wk-grp" + (groups.length + n === groupAt ? " on" : "") + (hot ? " hot" : "")} onClick={() => switchGroup(groups.length + n)} title={g.jql}>
+              <span>{g.title}</span>
+              <b>{Array.isArray(list) ? list.length : ""}</b>
+            </button>
+          );
+        })}
         <div className="wk-navfoot">
           <button type="button" tabIndex={-1} onClick={onRefresh} title="PR과 리뷰 요청을 바로 다시 읽는다 (r)">
             새로 읽기
@@ -95,10 +138,28 @@ export default function Work({ groups, onClose, onRefresh, onOpenSession, onHand
       </nav>
       <div className="wk-list" ref={list}>
         <div className="wk-head">
-          <b>{group?.title}</b>
-          <small>{group?.hint}</small>
+          <b>{(tgroup ?? group)?.title}</b>
+          <small>{(tgroup ?? group)?.hint}</small>
         </div>
-        {!rows.length && <div className="side-none">{total ? "이 묶음은 비었다" : "챙기는 PR이 없다. ⌘,의 연결에서 GitHub를 연결하고 챙길 범위를 고른다"}</div>}
+        {tgroup && tickets === undefined && <div className="side-none">읽는 중</div>}
+        {tgroup && typeof tickets === "string" && <div className="side-none">{tickets}</div>}
+        {tgroup && Array.isArray(tickets) && !tickets.length && <div className="side-none">이 묶음은 비었다</div>}
+        {tlist.map((t, i) => (
+          <button key={t.key} type="button" tabIndex={-1} className={"wk-row" + (i === at ? " on" : "")} onClick={() => pick(i)} onDoubleClick={enterPr}>
+            <span className="wk-row-title">
+              <em>{t.key}</em> {t.title}
+            </span>
+            <span className="wk-row-meta">
+              {ticketNews[t.key] && <b className="loud">{ticketNews[t.key]} · </b>}
+              {CATEGORY[t.statusCategory] ? `${t.status}` : t.status}
+              {t.type && ` · ${t.type}`}
+              {t.priority && ` · ${t.priority}`}
+              {` · ${t.assignee || "담당 없음"}`}
+              {t.updated && ` · ${ago(Date.parse(t.updated) / 1000)}`}
+            </span>
+          </button>
+        ))}
+        {!tgroup && !rows.length && <div className="side-none">{total ? "이 묶음은 비었다" : "챙기는 PR이 없다. ⌘,의 연결에서 GitHub를 연결하고 챙길 범위를 고른다"}</div>}
         {rows.map((r, i) => (
           <button key={idOf(r.target)} type="button" tabIndex={-1} className={"wk-row" + (i === at ? " on" : "")} onClick={() => pick(i)} onDoubleClick={enterPr}>
             <span className="wk-row-title">
@@ -123,13 +184,16 @@ export default function Work({ groups, onClose, onRefresh, onOpenSession, onHand
       <div className="wk-main">
         {row ? (
           <PrView key={idOf(row.target)} target={row.target} inline autoFocus={false} onClose={() => box.current?.focus()} />
+        ) : ticket && ticketPane ? (
+          ticketPane(ticket.key)
         ) : (
-          <div className="wk-empty">왼쪽에서 PR을 고른다</div>
+          <div className="wk-empty">왼쪽에서 {tgroup ? "티켓" : "PR"}을 고른다</div>
         )}
       </div>
       <div className="wk-foot">
-        Tab 묶음 · ↑↓ PR · Enter·→ PR 화면으로 (Esc로 목록에 돌아옴) · {row?.sessionId ? "s 세션 열기 · " : ""}
-        {row?.ask ? "⌘Enter 세션에 리뷰 맡기기 · " : ""}r 새로 읽기 · Esc 닫기
+        Tab 묶음 · ↑↓ 고르기 · Enter·→ {tgroup ? "티켓" : "PR"} 화면으로 (Esc로 목록에 돌아옴) · {row?.sessionId ? "s 세션 열기 · " : ""}
+        {row?.ask ? "⌘Enter 세션에 리뷰 맡기기 · " : ""}
+        {ticket ? "⌘Enter 이 티켓으로 시작 · " : ""}r 새로 읽기 · Esc 닫기
       </div>
     </div>
   );

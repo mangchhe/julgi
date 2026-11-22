@@ -20,6 +20,9 @@ import Sidebar from "./Sidebar";
 import PrView from "./PrView";
 import Work, { WorkGroup, WorkRow } from "./Work";
 import Usage from "./Usage";
+import TicketView from "./TicketView";
+import StartTicket from "./StartTicket";
+import { firstKey, JiraConn, keyOfUrl, setKnownKeys, Ticket, TicketFull, TicketSeen, ticketNews } from "./jira";
 import { isLab, newsOf, openPr, prOf, PrStatus, PrTarget, prUrl, repoName, ReviewAsk } from "./pr";
 import * as terms from "./terms";
 import { rank } from "./route";
@@ -28,6 +31,13 @@ import { selftest } from "./selftest";
 import "./App.css";
 
 const MAX_PANES = 12;
+/** 작업 페이지의 티켓 묶음 (JQL) */
+const TICKET_GROUPS = [
+  { id: "doing", title: "진행 중", hint: "내게 배정된 진행 중 티켓", jql: 'assignee = currentUser() AND statusCategory = "In Progress" ORDER BY updated DESC' },
+  { id: "todo", title: "할 일", hint: "내게 배정된 아직 시작 안 한 티켓", jql: 'assignee = currentUser() AND statusCategory = "To Do" ORDER BY priority DESC, updated DESC' },
+  { id: "sprint", title: "이번 스프린트", hint: "열린 스프린트의 내 티켓 (Jira Software)", jql: "sprint in openSprints() AND assignee = currentUser() ORDER BY updated DESC" },
+  { id: "reported", title: "내가 보고한 것", hint: "내가 만든 안 끝난 티켓", jql: "reporter = currentUser() AND statusCategory != Done ORDER BY updated DESC" },
+];
 const MIN_PANE_PX = 120;
 /** 이보다 빨리 끝난 터미널은 닫지 않고 남겨서 왜 끝났는지 보이게 한다 */
 const QUICK_EXIT_MS = 5000;
@@ -119,6 +129,18 @@ export default function App() {
   const prSeen = useRef<Record<string, PrStatus>>({});
   // 작업 페이지의 "새로 읽기": 주기를 기다리지 않고 PR과 리뷰 요청을 바로 다시 읽는다
   const refreshPrs = useRef(() => {});
+  // ── Jira ──
+  const [ticketShown, setTicketShown] = useState<string | null>(null); // 펴 둔 티켓 화면
+  const [startTicket, setStartTicket] = useState<TicketFull | null>(null); // "이 티켓으로 시작" 창
+  const [tickets, setTickets] = useState<Ticket[]>([]); // 내게 배정된 안 끝난 티켓
+  const [ticketNewsMap, setTicketNews] = useState<Record<string, string>>({}); // 티켓 키 → 새 소식
+  const ticketNewsRef = useRef(ticketNewsMap);
+  ticketNewsRef.current = ticketNewsMap;
+  const jiraSeen = useRef<Record<string, TicketSeen>>({});
+  const [ticketLinks, setTicketLinks] = useState<Record<string, string>>({}); // 세션 ID → 티켓 키
+  const refreshTickets = useRef((_keys = false) => {});
+  // 화면 아래에 뜨는 한 번 묻기 (예: PR이 올라왔으니 티켓을 In Review로 옮길까?)
+  const [offer, setOffer] = useState<{ text: string; yes: string; run: () => void } | null>(null);
   // 나한테 온 리뷰 요청. ⌘J 대기열의 아래 묶음이 된다
   const [asks, setAsks] = useState<ReviewAsk[]>([]);
   // 세션과 이어지지 않은 내 PR 가운데 봐야 할 일이 생긴 것: "소유자/레포#번호" → { PR, 까닭 }. ⌘J의 "내 PR"이 된다
@@ -207,8 +229,8 @@ export default function App() {
   const waitCount = open.filter((o) => waiting(states[o.key])).length;
 
   // 키 처리와 이벤트 콜백은 한 번만 걸고, 최신 상태는 여기서 읽는다
-  const live = useRef({ open, panes, widths, focus, states, overlay, sessions, home, base, fontSize, handing, byId, threads, memories, pinned, items, folders, names, zoom, notes, skills, reviews, acts, skillUses, closing, dead, mapText, skillCands, reviewing, prNews, asks, mineNews, prShown, sleepNews });
-  live.current = { open, panes, widths, focus, states, overlay, sessions, home, base, fontSize, handing, byId, threads, memories, pinned, items, folders, names, zoom, notes, skills, reviews, acts, skillUses, closing, dead, mapText, skillCands, reviewing, prNews, asks, mineNews, prShown, sleepNews };
+  const live = useRef({ open, panes, widths, focus, states, overlay, sessions, home, base, fontSize, handing, byId, threads, memories, pinned, items, folders, names, zoom, notes, skills, reviews, acts, skillUses, closing, dead, mapText, skillCands, reviewing, prNews, asks, mineNews, prShown, sleepNews, ticketShown, ticketLinks, tickets });
+  live.current = { open, panes, widths, focus, states, overlay, sessions, home, base, fontSize, handing, byId, threads, memories, pinned, items, folders, names, zoom, notes, skills, reviews, acts, skillUses, closing, dead, mapText, skillCands, reviewing, prNews, asks, mineNews, prShown, sleepNews, ticketShown, ticketLinks, tickets };
 
   const say = (message: string, ms = 3500) => {
     setToast(message);
@@ -846,7 +868,7 @@ export default function App() {
       void (async () => {
         const leadName = nameOf("c:" + task.lead).slice(0, 40);
         // 이 일감만을 위한 워크트리를 딴다. git 레포가 아니거나 못 따면 레포의 작업 폴더에서 한다
-        const work = config.taskWorktree ? await invoke<string>("worktree_add", { repo: task.cwd, name: task.id }).catch(() => undefined) : undefined;
+        const work = config.taskWorktree ? await invoke<string>("worktree_add", { repo: task.cwd, name: task.id, branch: null }).catch(() => undefined) : undefined;
         const where = work ? ` 이 폴더는 이 일감만을 위해 딴 워크트리이고 브랜치는 julgi/${task.id}다. 여기서 고치고 커밋해도 원래 작업 폴더와 기본 브랜치에는 영향이 없다.` : "";
         const text = `[Julgi 조율: "${leadName}"이 맡긴 일감 ${task.id}다.${where} 이 대화를 모르는 조율자가 결과를 읽으니, 끝나면 이렇게 답한다: 무엇을 했는지, 바뀐 파일, 확인한 방법, 남은 문제나 정해야 할 것. 머지·푸시·배포·데이터 변경은 하지 않는다. 막히면 짐작으로 밀고 가지 말고 무엇이 막혔는지 적고 끝낸다]\n\n${task.ask}`;
         const session = await dispatch({ kind: "new", cwd: work ?? task.cwd }, text, { rank: -1, by: `일감 ${task.id}` }, false, true);
@@ -1083,6 +1105,11 @@ export default function App() {
     if (key === "remote") applyRemote();
     if (key === "usage") readUsage();
     if (key === "theme") applyTheme(String(value));
+    // Jira를 연결하거나 끊으면 프로젝트 키와 내 티켓을 바로 다시 받는다
+    if (key === "jiraSite") {
+      if (!value) (setTickets([]), setTicketNews({}), setKnownKeys([]));
+      else refreshTickets.current(true);
+    }
     // 창 꺼내기 키는 바꾸는 즉시 다시 건다. 다른 앱이 쓰는 키면 알려 준다
     if (key === "hotkey") void invoke("set_hotkey", { shortcut: String(value) }).catch((e) => say(`그 키는 쓸 수 없다: ${String(e).slice(0, 80)}`, 6000));
     if (key === "defaultDir") void invoke<string>("default_dir", { path: String(value) || null }).then((dir) => setBase(dir ?? ""));
@@ -1573,6 +1600,10 @@ export default function App() {
       const pr = prOf(p.url);
       if (pr) openPr(pr);
       else void openUrl(p.url);
+    } else if (p.kind === "ticket") {
+      if (!p.key) return;
+      setTicketShown(p.key);
+      setTicketNews(({ [p.key]: _, ...rest }) => rest);
     } else if (p.kind === "pr") {
       if (!p.number) return;
       if (p.repo) return openPr({ repo: p.repo, number: p.number });
@@ -1632,6 +1663,60 @@ export default function App() {
     if (news) setPrNews((old) => ({ ...old, ["c:" + sessionId]: news }));
     openSession(s);
   };
+  // ── Jira 도우미 ──
+  const jiraConn = (): JiraConn => ({ site: config.jiraSite, email: config.jiraEmail, kind: config.jiraKind });
+  /** 세션의 티켓: 직접 이은 것 → 브랜치 이름의 키 → 세션이 남긴 티켓 주소 */
+  const ticketOfSession = (id?: string) => {
+    if (!id || !config.jiraSite) return undefined;
+    const s = live.current.byId.get(id);
+    return live.current.ticketLinks[id] ?? (s && firstKey(s.branch)) ?? s?.links.map(keyOfUrl).find(Boolean);
+  };
+  const ticketNotice = (t: Ticket, news: string) => {
+    record("티켓", `${t.key} ${news}: ${t.title.slice(0, 60)}`);
+    if (!config.notify || document.hasFocus()) return;
+    void invoke("notify", { title: `${t.key} · ${news}`, body: t.title.slice(0, 80) });
+  };
+  /** 이름으로 전환한다. 그 이름의 전환이 지금 없으면 알려만 준다 */
+  const moveTicket = async (key: string, name: string) => {
+    const list = await invoke<{ id: string; name: string; to: string }[]>("jira_transitions", { conn: jiraConn(), key }).catch(() => []);
+    const hit = list.find((t) => t.to.toLowerCase() === name.toLowerCase() || t.name.toLowerCase() === name.toLowerCase());
+    if (!hit) return say(`${key}에는 지금 "${name}"로 가는 전환이 없다. 티켓 화면에서 고른다.`, 6000);
+    await invoke("jira_transition", { conn: jiraConn(), key, id: hit.id, comment: "" }).then(
+      () => (record("티켓", `${key}을 ${hit.to}로 옮김`), say(`${key} → ${hit.to}`), refreshTickets.current()),
+      (e) => say(`옮기지 못했다: ${String(e).slice(0, 80)}`, 6000),
+    );
+  };
+  /** 티켓과 이어진 세션의 PR이 올라오거나 머지되면 상태를 옮길지 한 번 묻는다 */
+  const ticketOffer = (sessionId: string | undefined, pr: PrTarget, kind: "pr" | "merge") => {
+    const key = ticketOfSession(sessionId);
+    const name = kind === "pr" ? config.jiraPrTransition : config.jiraMergeTransition;
+    if (!key || !name.trim()) return;
+    setOffer({ text: `${kind === "pr" ? "PR이 올라왔다" : "PR이 머지됐다"} (#${pr.number}). ${key}을 ${name}로 옮길까?`, yes: `${name}로 옮기기`, run: () => void moveTicket(key, name) });
+  };
+  /** 이 티켓으로 시작: 워크트리 + 브랜치를 따고, 첫 지시를 들려 새 세션을 띄우고, 세션과 티켓을 잇는다 */
+  const startFromTicket = async (t: TicketFull, o: { cwd: string; repo: string; branch: string; prompt: string; transition: boolean }) => {
+    setStartTicket(null);
+    setTicketShown(null);
+    setOverlay(null);
+    const name = o.branch.replace(/[^A-Za-z0-9-]/g, "-").slice(0, 60);
+    const path = await invoke<string>("worktree_add", { repo: o.cwd, name, branch: o.branch }).catch((e) => (say(`워크트리를 따지 못했다: ${String(e).slice(0, 100)}`, 8000), ""));
+    if (!path) return;
+    const id = crypto.randomUUID();
+    const key = "c:" + id;
+    const brief = await invoke<string>("data_write", { name: `outbox/${crypto.randomUUID()}.md`, text: o.prompt });
+    terms.create({ key, cwd: path, command: withPrompt(newCommand(id), brief) });
+    setOpen((list) => [...list, { key, label: `${t.key} ${t.title}`.slice(0, 40), cwd: path, sessionId: id }]);
+    show(key);
+    const links = { ...live.current.ticketLinks, [id]: t.key };
+    setTicketLinks(links);
+    void invoke("data_write", { name: "tickets.json", text: JSON.stringify(links) });
+    // 프로젝트 키 → 레포를 기억한다
+    const project = t.key.split("-")[0];
+    const pairs = config.jiraRepos.split(",").map((p) => p.trim()).filter((p) => p && !p.startsWith(project + "="));
+    setConfig("jiraRepos", [...pairs, `${project}=${o.repo}`].join(", "));
+    record("시작", `${t.key} "${t.title.slice(0, 40)}"을 ${o.repo}의 ${o.branch}에서 새 세션으로 시작`, id);
+    if (o.transition && config.jiraStartTransition.trim()) void moveTicket(t.key, config.jiraStartTransition);
+  };
   /** 세션과 이어지지 않은 내 PR에 일이 생겼다 */
   const mineNotice = (pr: ReviewAsk, news: string) => {
     const repo = repoName(pr.repository.nameWithOwner);
@@ -1690,8 +1775,8 @@ export default function App() {
       (extra ? `\n\n덧붙여: ${extra}` : "");
     void dispatch({ kind: "new", cwd }, ask, { rank: 0, by: "리뷰 요청" });
   };
-  const actions = useRef({ readUsage, publishRemote, say, dispatch, show, close, sleep, requestQuit, handoff, exited, newSession, newShell, nextWaiting, openTerm, resize, split, unsplit, finishThread, move, togglePin, tend, serve, confirmClose, toggleReview, prNotice, askNotice, mineNotice, sleepNotice, wake });
-  actions.current = { readUsage, publishRemote, say, dispatch, show, close, sleep, requestQuit, handoff, exited, newSession, newShell, nextWaiting, openTerm, resize, split, unsplit, finishThread, move, togglePin, tend, serve, confirmClose, toggleReview, prNotice, askNotice, mineNotice, sleepNotice, wake };
+  const actions = useRef({ readUsage, publishRemote, say, dispatch, show, close, sleep, requestQuit, handoff, exited, newSession, newShell, nextWaiting, openTerm, resize, split, unsplit, finishThread, move, togglePin, tend, serve, confirmClose, toggleReview, prNotice, askNotice, mineNotice, sleepNotice, wake, ticketNotice, ticketOffer });
+  actions.current = { readUsage, publishRemote, say, dispatch, show, close, sleep, requestQuit, handoff, exited, newSession, newShell, nextWaiting, openTerm, resize, split, unsplit, finishThread, move, togglePin, tend, serve, confirmClose, toggleReview, prNotice, askNotice, mineNotice, sleepNotice, wake, ticketNotice, ticketOffer };
 
   /** 세션이 남긴 링크 가운데 마지막 PR */
   const prOfSession = (id?: string) => {
@@ -1710,6 +1795,8 @@ export default function App() {
     });
     const poll = async () => {
       if (config.prWatch === "off") return setPrs({});
+      // 처음 보는 조회(지난 기록이 없음)에서는 모든 PR이 새로 보이므로 티켓 제안을 하지 않는다
+      const firstRun = Object.keys(prSeen.current).length === 0;
       const targets = new Map<string, { target: PrTarget; keys: string[]; sleeper?: string; pr?: ReviewAsk }>();
       for (const o of live.current.open) {
         const target = prOfSession(o.sessionId);
@@ -1760,6 +1847,10 @@ export default function App() {
         const before = prSeen.current[id];
         const news = before ? newsOf(before, now) : "";
         prSeen.current[id] = now;
+        // 티켓과 이어진 세션의 PR이 처음 보이거나 머지되면 티켓 상태를 옮길지 묻는다
+        const sid = keys.length ? live.current.open.find((o) => o.key === keys[0])?.sessionId : sleeper;
+        if (sid && !before && !firstRun && now.state === "OPEN") actions.current.ticketOffer(sid, target, "pr");
+        if (sid && news === "머지됨") actions.current.ticketOffer(sid, target, "merge");
         if (!news) continue;
         if (!keys.length && sleeper) {
           actions.current.sleepNotice(sleeper, target, news);
@@ -1811,6 +1902,71 @@ export default function App() {
       clearTimeout(timer);
       clearTimeout(askTimer);
       window.removeEventListener("focus", onFocus);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  // 정한 주기마다 내 티켓을 본다: 새로 배정됨, 상태가 바뀜, 남이 코멘트를 닮 → 알리고 ⌘J에 넣는다. 프로젝트 키는 하루에 한 번
+  useEffect(() => {
+    void invoke<string | null>("data_read", { name: "jira-seen.json" }).then((t) => {
+      try {
+        jiraSeen.current = t ? JSON.parse(t) : {};
+      } catch {
+        jiraSeen.current = {};
+      }
+    });
+    void invoke<string | null>("data_read", { name: "tickets.json" }).then((t) => {
+      try {
+        setTicketLinks(t ? JSON.parse(t) : {});
+      } catch {
+        // 깨졌으면 비운 채로 둔다
+      }
+    });
+    let keysAt = 0;
+    let timer = 0;
+    let lastFocus = 0;
+    const poll = async (keys = false) => {
+      if (!config.jiraSite) return;
+      if (keys || Date.now() - keysAt > 86_400_000) {
+        keysAt = Date.now();
+        void invoke<string[]>("jira_projects", { conn: jiraConn() }).then(setKnownKeys, () => {});
+      }
+      if (config.jiraWatch === "off") return setTickets([]);
+      const list = await invoke<Ticket[]>("jira_mine", { conn: jiraConn() }).catch(() => null);
+      if (!list) return;
+      setTickets(list);
+      const first = Object.keys(jiraSeen.current).length === 0;
+      const next: Record<string, TicketSeen> = {};
+      for (const t of list) {
+        const news = ticketNews(jiraSeen.current[t.key], t, first);
+        next[t.key] = { status: t.status, others: t.others, assigned: true };
+        if (!news) continue;
+        setTicketNews((old) => ({ ...old, [t.key]: news }));
+        actions.current.ticketNotice(t, news);
+      }
+      jiraSeen.current = next;
+      void invoke("data_write", { name: "jira-seen.json", text: JSON.stringify(next) });
+    };
+    refreshTickets.current = (keys = false) => void poll(keys);
+    const loop = () => void poll().finally(() => (timer = window.setTimeout(loop, config.jiraEveryMin * 60_000)));
+    timer = window.setTimeout(loop, 10_000);
+    const onFocus = () => {
+      if (!config.refreshOnFocus || Date.now() - lastFocus < 20_000) return;
+      lastFocus = Date.now();
+      void poll();
+    };
+    window.addEventListener("focus", onFocus);
+    // 티켓 키·주소는 어디서 눌러도 여기로 와서 티켓 화면으로 열린다
+    const onTicket = (e: Event) => {
+      const key = (e as CustomEvent<string>).detail;
+      if (!config.jiraSite) return say("Jira에 연결돼 있지 않다. ⌘,의 연결에서 연결한다.");
+      setTicketShown(key);
+      setTicketNews(({ [key]: _, ...rest }) => rest);
+    };
+    window.addEventListener("julgi:ticket", onTicket);
+    return () => {
+      clearTimeout(timer);
+      window.removeEventListener("focus", onFocus);
+      window.removeEventListener("julgi:ticket", onTicket);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -1879,12 +2035,14 @@ export default function App() {
       const cmd = e.metaKey && !e.altKey && !e.ctrlKey;
       // PR 화면이 떠 있으면 그 화면만 상대한다. ⌘W는 뒤의 세션이 아니라 PR 화면을 닫는다.
       // 포커스가 PR 화면 밖으로 빠졌어도 Esc로 닫히게 여기서도 받는다
-      if (live.current.prShown) {
+      if (live.current.prShown || live.current.ticketShown) {
         const inside = e.target instanceof Element && !!e.target.closest(".pr-wrap");
         if ((cmd && e.code === "KeyW") || (e.key === "Escape" && !inside)) {
           e.preventDefault();
           e.stopPropagation();
-          setPrShown(null);
+          // 위에 떠 있는 것부터 닫는다(티켓 화면이 PR 화면 위에 뜬다)
+          if (live.current.ticketShown) setTicketShown(null);
+          else setPrShown(null);
         }
         return;
       }
@@ -1936,7 +2094,7 @@ export default function App() {
       } else if (cmd && e.code === "KeyJ") {
         // 내 차례인 세션들과 마지막에 물은 말을 편다. 거기서 바로 답한다
         if (overlay === "queue") setOverlay(null);
-        else if (live.current.open.some((o) => waiting(live.current.states[o.key]) || live.current.prNews[o.key]) || live.current.asks.length || Object.keys(live.current.mineNews).length || Object.keys(live.current.sleepNews).length) setOverlay("queue");
+        else if (live.current.open.some((o) => waiting(live.current.states[o.key]) || live.current.prNews[o.key]) || live.current.asks.length || Object.keys(live.current.mineNews).length || Object.keys(live.current.sleepNews).length || Object.keys(ticketNewsRef.current).length) setOverlay("queue");
         else a.say("내 차례인 세션이 없다");
       }
       // 창만 닫아 메뉴 막대로 보낸다. 세션은 계속 돈다
@@ -2269,6 +2427,11 @@ export default function App() {
           }}
           prNews={prNews}
           sleepNews={sleepNews}
+          ticketOf={(key) => {
+            const tk = ticketOfSession(open.find((o) => o.key === key)?.sessionId);
+            if (!tk) return undefined;
+            return { key: tk, status: tickets.find((t) => t.key === tk)?.status ?? "", news: ticketNewsMap[tk] };
+          }}
           work={{ prs: minePrs.length, asks: asks.length, news: Object.keys(mineNews).length + Object.keys(prNews).length + Object.keys(sleepNews).length }}
           onWork={() => setOverlay("work")}
         />
@@ -2336,7 +2499,7 @@ export default function App() {
         })}
       </div>
       {overlay === "palette" && (
-        <Palette open={open} sessions={sessions} byId={byId} cwd={cwdOf(current)} onPick={pick} onAttach={attach} onJoin={join} onClose={() => setOverlay(null)} asks={asks} mine={minePrs} />
+        <Palette open={open} sessions={sessions} byId={byId} cwd={cwdOf(current)} onPick={pick} onAttach={attach} onJoin={join} onClose={() => setOverlay(null)} asks={asks} mine={minePrs} jira={config.jiraSite ? jiraConn() : null} tickets={tickets} />
       )}
       {overlay === "send" && (
         <Send
@@ -2388,6 +2551,15 @@ export default function App() {
             )}
           asks={asks}
           mine={Object.values(mineNews)}
+          tickets={Object.entries(ticketNewsMap).map(([key, news]) => {
+            const t = tickets.find((x) => x.key === key);
+            return { key, news, title: t?.title ?? key, url: t?.url ?? `${config.jiraSite}/browse/${key}` };
+          })}
+          onTicket={(key) => (setTicketShown(key), setTicketNews(({ [key]: _, ...rest }) => rest))}
+          onStartTicket={(key) => {
+            setTicketNews(({ [key]: _, ...rest }) => rest);
+            void invoke<TicketFull>("jira_view", { conn: jiraConn(), key }).then(setStartTicket, (e) => say(String(e).slice(0, 100)));
+          }}
           onView={(a) => {
             // 내 PR을 열어 봤으면 그 일은 본 것이다
             const id = `${a.repository.nameWithOwner}#${a.number}`;
@@ -2494,6 +2666,29 @@ export default function App() {
       {overlay === "work" && (
         <Work
           groups={workGroups()}
+          ticketGroups={config.jiraSite ? TICKET_GROUPS : []}
+          loadTickets={(jql) => invoke<Ticket[]>("jira_search", { conn: jiraConn(), jql, limit: 50 })}
+          ticketNews={ticketNewsMap}
+          onStartTicket={(key) => void invoke<TicketFull>("jira_view", { conn: jiraConn(), key }).then(setStartTicket, (e) => say(String(e).slice(0, 100)))}
+          ticketPane={(key) => (
+            <TicketView
+              key={key}
+              ticketKey={key}
+              conn={jiraConn()}
+              inline
+              autoFocus={false}
+              onClose={() => document.querySelector<HTMLElement>(".wk")?.focus()}
+              onStart={setStartTicket}
+              sessions={Object.entries(ticketLinks)
+                .filter(([, k]) => k === key)
+                .map(([id]) => ({ id, name: names[id] || byId.get(id)?.title || "세션" }))}
+              onOpenSession={(id) => {
+                setOverlay(null);
+                if (open.some((o) => o.sessionId === id)) show("c:" + id);
+                else wake(id);
+              }}
+            />
+          )}
           onClose={() => setOverlay(null)}
           onRefresh={() => {
             refreshPrs.current();
@@ -2512,6 +2707,44 @@ export default function App() {
         />
       )}
       {prShown && <PrView key={`${prShown.repo}#${prShown.number}`} target={prShown} onClose={() => setPrShown(null)} />}
+      {ticketShown && (
+        <TicketView
+          key={ticketShown}
+          ticketKey={ticketShown}
+          conn={jiraConn()}
+          onClose={() => setTicketShown(null)}
+          onStart={setStartTicket}
+          sessions={Object.entries(ticketLinks)
+            .filter(([, k]) => k === ticketShown)
+            .map(([id]) => ({ id, name: names[id] || byId.get(id)?.title || "세션" }))}
+          onOpenSession={(id) => {
+            setTicketShown(null);
+            if (open.some((o) => o.sessionId === id)) show("c:" + id);
+            else wake(id);
+          }}
+        />
+      )}
+      {startTicket && (
+        <StartTicket
+          ticket={startTicket}
+          repos={mapState.current.repos}
+          remembered={config.jiraRepos.split(",").map((p) => p.trim().split("=")).find(([k]) => k === startTicket.key.split("-")[0])?.[1]}
+          startTransition={config.jiraStartTransition}
+          onStart={(o) => void startFromTicket(startTicket, o)}
+          onClose={() => setStartTicket(null)}
+        />
+      )}
+      {offer && (
+        <div className="offer">
+          <span>{offer.text}</span>
+          <button type="button" className="primary" onClick={() => (offer.run(), setOffer(null))}>
+            {offer.yes}
+          </button>
+          <button type="button" onClick={() => setOffer(null)}>
+            아니
+          </button>
+        </div>
+      )}
       {overlay === "history" && (
         <History
           acts={acts}

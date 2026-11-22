@@ -12,6 +12,7 @@ import { openPath, openUrl } from "@tauri-apps/plugin-opener";
 import "@xterm/xterm/css/xterm.css";
 import { config } from "./model";
 import { openPr, prOf } from "./pr";
+import { findKeys, keyOfUrl, openTicket } from "./jira";
 
 export type TermSpec = { key: string; cwd?: string; command?: string };
 
@@ -72,7 +73,10 @@ function openLink(e: MouseEvent, uri: string) {
     void openPath(path).catch(() => {});
   } else {
     const pr = prOf(uri);
+    // 연결한 Jira 사이트의 티켓 주소면 티켓 화면으로
+    const ticket = config.jiraSite && uri.startsWith(config.jiraSite) ? keyOfUrl(uri) : undefined;
     if (pr) openPr(pr);
+    else if (ticket) openTicket(ticket);
     else void openUrl(uri).catch(() => {});
   }
 }
@@ -128,6 +132,12 @@ export function create(spec: TermSpec) {
         for (const _ of chars) col.push(x);
         text += chars;
       }
+      // 티켓 키(아는 프로젝트 키만): ⌘ 클릭하면 티켓 화면
+      const tickets = findKeys(text).map(({ start, end, key }) => ({
+        range: { start: { x: col[start] + 1, y }, end: { x: col[end - 1] + 1, y } },
+        text: key,
+        activate: (e: MouseEvent) => e.metaKey && openTicket(key),
+      }));
       const links = findPaths(text.trimEnd()).map(({ start, end, path }) => ({
         range: { start: { x: col[start] + 1, y }, end: { x: col[end - 1] + 1, y } },
         text: path,
@@ -137,7 +147,8 @@ export function create(spec: TermSpec) {
           void openPath(full).catch(() => {});
         },
       }));
-      callback(links.length ? links : undefined);
+      const all = [...tickets, ...links];
+      callback(all.length ? all : undefined);
     },
   });
   const search = new SearchAddon();

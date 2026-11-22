@@ -1,6 +1,7 @@
 import qrcode from "qrcode-generator";
 import { useEffect, useRef, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
+import { openUrl } from "@tauri-apps/plugin-opener";
 import { config, kilo } from "./model";
 import { THEMES } from "./themes";
 import { CORE, MORE } from "./Help";
@@ -26,6 +27,7 @@ type Row =
   | { kind: "text"; key: Key; label: string; note: string; hint: string }
   | { kind: "github"; label: string; note: string }
   | { kind: "gitlab"; label: string; note: string }
+  | { kind: "jira"; label: string; note: string }
   | { kind: "keys"; label: string; note: string };
 
 /** 묶음마다 줄 몇 개. 왼쪽에서 묶음을 고르면 오른쪽에 그 줄들만 나온다 */
@@ -94,10 +96,17 @@ const SECTIONS: { title: string; hint: string; rows: Row[] }[] = [
   },
   {
     title: "연결",
-    hint: "GitHub · GitLab · 동기화",
+    hint: "GitHub · GitLab · Jira",
     rows: [
       { kind: "github", label: "GitHub", note: "연결하면 PR을 Julgi 안에서 본다. 터미널의 PR 링크를 ⌘ 클릭하거나 ⌘K에서 #번호를 친다. 로그인은 gh(GitHub CLI)가 하고 토큰도 gh가 키체인에 둔다. Julgi는 토큰을 보지 않는다" },
       { kind: "gitlab", label: "GitLab", note: "연결하면 MR도 PR과 똑같이 본다(PR 화면, 작업 페이지, 알림). 로그인은 glab(GitLab CLI)이 하고 토큰도 glab이 둔다. 회사 GitLab이면 glab auth login에서 그 호스트를 고른다" },
+      { kind: "jira", label: "Jira", note: "연결하면 티켓을 Julgi 안에서 보고, 티켓으로 일을 시작하고, 상태를 옮긴다. 토큰은 macOS 키체인에만 둔다(Cloud는 id.atlassian.com에서 만든 API 토큰, Server/DC는 개인 액세스 토큰)" },
+      { kind: "pick", key: "jiraWatch", label: "챙길 티켓", note: "정한 주기마다 내게 배정된 티켓을 보고 새로 배정되거나 상태가 바뀌거나 남이 코멘트를 달면 알리고 ⌘J에 넣는다", options: [["mine", "내게 배정된 것"], ["off", "끔"]] },
+      { kind: "number", key: "jiraEveryMin", label: "티켓 확인 주기", note: "내 티켓을 이만큼마다 본다", step: 1, min: 1, max: 60, show: (n) => `${n}분` },
+      { kind: "text", key: "jiraStartTransition", label: "시작할 때 옮길 상태", note: "이 티켓으로 시작할 때 이 상태로 옮길지 묻는다. 비우면 묻지 않는다", hint: "In Progress" },
+      { kind: "text", key: "jiraPrTransition", label: "PR 올리면 옮길 상태", note: "티켓과 이어진 세션이 PR을 올리면 이 상태로 옮길지 묻는다", hint: "In Review" },
+      { kind: "text", key: "jiraMergeTransition", label: "머지되면 옮길 상태", note: "그 PR이 머지되면 이 상태로 옮길지 묻는다", hint: "Done" },
+      { kind: "text", key: "jiraRepos", label: "프로젝트 키 → 레포", note: "이 티켓으로 시작할 때 고를 레포. 시작 창에서 고르면 저절로 채운다", hint: "ABC=api-server, OPS=infra" },
       { kind: "pick", key: "prWatch", label: "챙길 PR", note: "정한 주기마다 PR을 보고 CI가 깨지거나 남이 코멘트를 달거나 리뷰를 받거나 머지되면 알린다. 세션이 올린 PR은 그 세션을 내 차례로 올리고, 나머지 내 PR은 ⌘J의 \"내 PR\"에 넣는다", options: [["mine", "내 PR 전부"], ["session", "세션이 올린 PR만"], ["off", "끔"]] },
       { kind: "number", key: "prEveryMin", label: "PR 확인 주기", note: "세션 줄의 PR과 내 PR을 이만큼마다 본다. 짧을수록 알림이 빨리 온다", step: 1, min: 1, max: 30, show: (n) => `${n}분` },
       { kind: "number", key: "askEveryMin", label: "리뷰 요청 확인 주기", note: "나한테 온 리뷰 요청을 이만큼마다 본다", step: 1, min: 1, max: 60, show: (n) => `${n}분` },
@@ -145,6 +154,35 @@ export default function Settings({ onChange, onClose, remoteUrl, onConnect, onCo
   const [gh, setGh] = useState<[boolean, string] | undefined>(undefined);
   useEffect(() => void invoke<[boolean, string]>("gh_status").then(setGh, () => setGh([false, ""])), []);
   const [lab, setLab] = useState<[boolean, string] | undefined>(undefined);
+  // Jira: 연결돼 있으면 표시 이름, 아니면 입력 칸
+  const [jira, setJira] = useState<{ name?: string; error?: string; busy?: boolean }>({});
+  const [jiraForm, setJiraForm] = useState({ site: config.jiraSite || "https://", email: config.jiraEmail, token: "", kind: config.jiraKind || "cloud" });
+  useEffect(() => {
+    if (!config.jiraSite) return;
+    void invoke<string>("jira_me", { conn: { site: config.jiraSite, email: config.jiraEmail, kind: config.jiraKind } }).then(
+      (name) => setJira({ name }),
+      (e) => setJira({ error: String(e) }),
+    );
+  }, []);
+  const connectJira = () => {
+    setJira({ busy: true });
+    const site = jiraForm.site.trim().replace(/\/+$/, "");
+    void invoke<string>("jira_connect", { site, email: jiraForm.email.trim(), token: jiraForm.token, kind: jiraForm.kind }).then(
+      (name) => {
+        set("jiraSite", site);
+        set("jiraEmail", jiraForm.email.trim());
+        set("jiraKind", jiraForm.kind);
+        setJiraForm((f) => ({ ...f, token: "" }));
+        setJira({ name });
+      },
+      (e) => setJira({ error: String(e) }),
+    );
+  };
+  const disconnectJira = () => {
+    void invoke("jira_disconnect", { site: config.jiraSite });
+    set("jiraSite", "");
+    setJira({});
+  };
   useEffect(() => void invoke<[boolean, string]>("glab_status").then(setLab, () => setLab([false, ""])), []);
   const [taking, setTaking] = useState(false); // 키 조합을 받는 중
   const [, redraw] = useState(0);
@@ -302,6 +340,37 @@ export default function Settings({ onChange, onClose, remoteUrl, onConnect, onCo
                         )}
                       </span>
                     )}
+                    {row.kind === "jira" &&
+                      (config.jiraSite && jira.name ? (
+                        <span className="set-gh">
+                          <span className="set-on">● {jira.name} · {config.jiraSite.replace(/^https:\/\//, "")}</span>
+                          <button type="button" tabIndex={-1} className="set-toggle" onClick={disconnectJira}>
+                            끊기
+                          </button>
+                        </span>
+                      ) : (
+                        <span className="set-jira" onClick={(e) => e.stopPropagation()}>
+                          <input tabIndex={-1} value={jiraForm.site} placeholder="https://회사.atlassian.net" spellCheck={false} onChange={(e) => setJiraForm({ ...jiraForm, site: e.target.value })} />
+                          {jiraForm.kind === "cloud" && <input tabIndex={-1} value={jiraForm.email} placeholder="이메일" spellCheck={false} onChange={(e) => setJiraForm({ ...jiraForm, email: e.target.value })} />}
+                          <input tabIndex={-1} type="password" value={jiraForm.token} placeholder={jiraForm.kind === "cloud" ? "API 토큰" : "개인 액세스 토큰"} onChange={(e) => setJiraForm({ ...jiraForm, token: e.target.value })} />
+                          <span className="set-seg">
+                            {[["cloud", "Cloud"], ["server", "Server/DC"]].map(([v, l]) => (
+                              <button key={v} type="button" tabIndex={-1} className={jiraForm.kind === v ? "yes" : ""} onClick={() => setJiraForm({ ...jiraForm, kind: v })}>
+                                {l}
+                              </button>
+                            ))}
+                          </span>
+                          <button type="button" tabIndex={-1} className="set-toggle" disabled={jira.busy || !jiraForm.token || jiraForm.site.length < 10} onClick={connectJira}>
+                            {jira.busy ? "확인 중" : "연결"}
+                          </button>
+                          {jira.error && <span className="set-err">{jira.error}</span>}
+                          {jiraForm.kind === "cloud" && (
+                            <button type="button" tabIndex={-1} className="set-link" onClick={() => void openUrl("https://id.atlassian.com/manage-profile/security/api-tokens")}>
+                              토큰 만들기 ↗
+                            </button>
+                          )}
+                        </span>
+                      ))}
                     {row.kind === "gitlab" && (
                       <span className="set-gh">
                         {lab === undefined ? (

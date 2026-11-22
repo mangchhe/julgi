@@ -23,9 +23,15 @@ fn git(dir: &str, args: &[&str]) -> Option<String> {
 /// 레포에 `julgi/<name>` 브랜치의 워크트리를 만든다. 지금 체크아웃된 커밋에서 갈라진다.
 /// 돌려주는 값은 워크트리 폴더. git 레포가 아니면 오류
 #[tauri::command(async)]
-pub fn worktree_add(repo: String, name: String) -> Result<String, String> {
+/// branch를 주면 그 이름으로, 원격 기본 브랜치(origin/HEAD)에서 딴다(티켓으로 시작할 때). 없으면 julgi/이름으로 지금 HEAD에서 딴다(일감)
+pub fn worktree_add(repo: String, name: String, branch: Option<String>) -> Result<String, String> {
     if !name.chars().all(|c| c.is_ascii_alphanumeric() || c == '-') || name.is_empty() {
         return Err(format!("쓸 수 없는 이름: {name}"));
+    }
+    if let Some(b) = &branch {
+        if b.is_empty() || b.starts_with('-') || !b.chars().all(|c| c.is_ascii_alphanumeric() || "-_/.".contains(c)) || b.contains("..") {
+            return Err(format!("쓸 수 없는 브랜치 이름: {b}"));
+        }
     }
     let top = git(&repo, &["rev-parse", "--show-toplevel"]).ok_or("git 레포가 아니다")?;
     let folder = PathBuf::from(&top).file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_default();
@@ -34,8 +40,9 @@ pub fn worktree_add(repo: String, name: String) -> Result<String, String> {
         std::fs::create_dir_all(parent).map_err(|e| e.to_string())?;
     }
     let path = dir.to_string_lossy().into_owned();
+    let base = if branch.is_some() { git(&top, &["rev-parse", "--abbrev-ref", "origin/HEAD"]).unwrap_or_else(|| "HEAD".into()) } else { "HEAD".into() };
     let out = Command::new("git")
-        .args(["-C", &top, "worktree", "add", "-b", &format!("julgi/{name}"), &path, "HEAD"])
+        .args(["-C", &top, "worktree", "add", "-b", &branch.clone().unwrap_or_else(|| format!("julgi/{name}")), &path, &base])
         .output()
         .map_err(|e| e.to_string())?;
     if !out.status.success() {

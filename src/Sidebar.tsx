@@ -1,4 +1,5 @@
 import { openPr, prParts, PrStatus, PrTarget } from "./pr";
+import { openTicket } from "./jira";
 import { Change, Job, ago, config, elsewhere, hot, Item, kilo, Open, Session, STATE_LABEL, TermState, Thread, waiting } from "./model";
 
 /** 이름을 붙였거나 세션이 이어진 줄기는 폴더와 상관없이 이 묶음으로 맨 위에 모은다 */
@@ -34,12 +35,14 @@ type Props = {
   prNews: Record<string, string>;
   /** 잠든 세션 가운데 PR에 일이 생긴 것: 세션 ID → 까닭과 PR */
   sleepNews: Record<string, { news: string; pr: PrTarget }>;
+  /** 이 세션의 티켓과 그 상태 (Jira가 연결돼 있을 때) */
+  ticketOf: (key: string) => { key: string; status: string; news?: string } | undefined;
   /** 작업 페이지 줄에 보일 숫자: 내 PR, 리뷰 요청, 새 소식 */
   work: { prs: number; asks: number; news: number };
   onWork: () => void;
 };
 
-export default function Sidebar({ open, items, threads, byId, states, tasks, changes, pinned, dead, loading, current, shown, onShow, onClose, onOpenSession, onSearch, prOf, prNews, sleepNews, work, onWork }: Props) {
+export default function Sidebar({ open, items, threads, byId, states, tasks, changes, pinned, dead, loading, current, shown, onShow, onClose, onOpenSession, onSearch, prOf, prNews, sleepNews, ticketOf, work, onWork }: Props) {
   const openIds = new Set(open.map((o) => o.sessionId));
   const cutoff = Date.now() / 1000 - config.recentDays * 86400;
 
@@ -147,6 +150,24 @@ export default function Sidebar({ open, items, threads, byId, states, tasks, cha
                         </span>
                       ))}
                       {pr.news?.startsWith("새 코멘트") && <span className="loud"> · {pr.news}</span>}
+                    </div>
+                  );
+                })()}
+                {(() => {
+                  const tk = job ? undefined : ticketOf(o.key);
+                  if (!tk) return null;
+                  return (
+                    <div
+                      className={"row-meta pr-line" + (tk.news ? " news" : "")}
+                      title="티켓 화면 열기"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        openTicket(tk.key);
+                      }}
+                    >
+                      {tk.key}
+                      {tk.status && ` · ${tk.status}`}
+                      {tk.news && <span className="loud"> · {tk.news}</span>}
                     </div>
                   );
                 })()}

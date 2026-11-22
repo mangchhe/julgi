@@ -14,7 +14,7 @@ const SCREEN = [
   "⏺ RefundCalculator.kt:88 에서 쿠폰별로 따로 반올림합니다.",
   "  \x1b[2m테스트 추가: RefundCalculatorTest.kt\x1b[0m",
   "",
-  "⏺ PR을 올렸습니다. https://github.com/example/api-server/pull/1852",
+  "⏺ PR을 올렸습니다. https://github.com/example/api-server/pull/1852 (ABC-123, UTF-8)",
   "",
   "\x1b[1m>\x1b[0m ",
 ].join("\r\n");
@@ -66,7 +66,7 @@ async function invoke(cmd: string, args: Record<string, unknown> = {}): Promise<
     case "repo_diff":
       return flags.has("review") ? 'diff --git a/src/refund/RefundCalculator.kt b/src/refund/RefundCalculator.kt\nindex 1a2b3c4..5d6e7f8 100644\n--- a/src/refund/RefundCalculator.kt\n+++ b/src/refund/RefundCalculator.kt\n@@ -84,9 +84,12 @@ class RefundCalculator(private val policy: RefundPolicy) {\n     fun refund(order: Order): Money {\n         val paid = order.paidAmount\n-        val discount = order.coupons.sumOf { it.amount }\n-        return (paid - discount).roundToWon()\n+        // 쿠폰마다 따로 반올림한 뒤 더한다. 한꺼번에 반올림하면 1원이 어긋난다\n+        val discount = order.coupons.sumOf { it.amount.roundToWon() }\n+        val refund = paid - discount\n+        require(refund >= Money.ZERO) { "환불액이 음수다: $refund" }\n+        return refund\n     }\n \n     private fun Money.roundToWon(): Money = Money(amount.setScale(0, RoundingMode.HALF_UP))\ndiff --git a/src/refund/RefundCalculatorTest.kt b/src/refund/RefundCalculatorTest.kt\nnew file mode 100644\nindex 0000000..9f8e7d6\n--- /dev/null\n+++ b/src/refund/RefundCalculatorTest.kt\n@@ -0,0 +1,9 @@\n+class RefundCalculatorTest {\n+    @Test\n+    fun `쿠폰 두 개가 겹쳐도 1원이 어긋나지 않는다`() {\n+        val order = orderWith(paid = 10_000, coupons = listOf(333.3, 333.3))\n+\n+        assertEquals(Money(9_334), RefundCalculator(policy).refund(order))\n+    }\n+}\n+' : null;
     case "config_load":
-      return JSON.stringify({ ...(flags.has("theme") ? { theme: flags.get("theme") } : {}), usage: flags.has("usage"), remote: flags.has("remote") });
+      return JSON.stringify({ ...(flags.has("theme") ? { theme: flags.get("theme") } : {}), usage: flags.has("usage"), remote: flags.has("remote"), ...(flags.has("jira") ? { jiraSite: "https://example.atlassian.net", jiraEmail: "me@example.com" } : {}) });
     case "layout_load": {
       if (!flags.has("open")) return null;
       const sessions = await fetch("/mock-ledger.json").then((r) => r.json());
@@ -113,6 +113,8 @@ async function invoke(cmd: string, args: Record<string, unknown> = {}): Promise<
         });
       }
       // PR 형편을 지난번과 견주는 기록: 첫 PR은 그새 코멘트가 둘 늘고 CI가 깨진 것으로 보이게
+      // Jira 감시 기록: ABC-123은 그새 코멘트가 하나 늘어난 것으로
+      if (args.name === "jira-seen.json" && flags.has("jira")) return JSON.stringify({ "ABC-123": { status: "In Progress", others: 1, assigned: true }, "ABC-130": { status: "To Do", others: 0, assigned: true }, "ABC-131": { status: "To Do", others: 0, assigned: true } });
       if (args.name === "pr-seen.json") return JSON.stringify({ "example/api-server#1852": { state: "OPEN", ci: "SUCCESS", decision: "REVIEW_REQUIRED", others: 1 }, "example/api-server#1700": { state: "OPEN", ci: "SUCCESS", decision: "APPROVED", others: -1 }, "example/api-server#1830": { state: "OPEN", ci: "SUCCESS", decision: "REVIEW_REQUIRED", others: 0 } });
       if (args.name === "activity.jsonl" && flags.has("hist")) return `{"at": 1795184436364, "kind": "보냄", "text": "쿠폰 중복 환불 ← \\"환불 테스트도 돌려줘\\" (모델이 고름)", "sessionId": "x"}\n{"at": 1795184441364, "kind": "갈아탐", "text": "알림 스펙 정리 · 인계 글만 들고 새 세션으로, 이어서 보냄. 이전 세션은 재움", "sessionId": "x"}\n{"at": 1795261841364, "kind": "배움", "text": "\\"알림 스펙 정리\\"에서 브레인에 3개: 푸시는 10초 배치로 판정된다 / 하루 1회 제한은 상태 알림에만 적용된다 / 품절 임박 푸시는 찜한 고객만 받는다", "sessionId": "x"}\n{"at": 1795263641364, "kind": "지도", "text": "레포 5개의 지도를 그림 · 최신으로 당긴 것 2개(web-admin, shop-app) · 작업 중이라 그대로 둔 것: api-server(4커밋)"}\n{"at": 1795263741364, "kind": "지도", "text": "레포 5개의 지도를 그림 · 작업 중이라 그대로 둔 것: api-server(4커밋)"}\n{"at": 1795267241364, "kind": "점검", "text": "2판(매주): 손댄 것 13개, 눈에 띈 것 2개. ⌘G의 통계에서 본다"}\n{"at": 1795269041364, "kind": "확인 필요", "text": "\\"배포 상태 확인\\" 세션이 시작하지 못하고 있다", "sessionId": "x"}\n{"at": 1795270241364, "kind": "칸", "text": "칸을 하나 늘려 기다리던 \\"JDK 교체\\"을 올림", "sessionId": "x"}\n{"at": 1795270781364, "kind": "보냄", "text": "새 줄기 · api-server ← \\"쿠폰 기능 넣으려면 어디부터 봐야 해?\\" (이어 갈 줄기가 없어서)", "sessionId": "x"}`;
       if (args.name !== "threads.json" || !flags.has("threads")) return null;
@@ -161,6 +163,26 @@ async function invoke(cmd: string, args: Record<string, unknown> = {}): Promise<
         }
       return out;
     }
+    // Jira 화면 확인용
+    case "jira_me":
+      return "Me";
+    case "jira_projects":
+      return ["ABC", "OPS"];
+    case "jira_mine":
+    case "jira_search": {
+      const t = (key: string, title: string, status: string, cat: string, type: string, others = 0) => ({ key, url: `https://example.atlassian.net/browse/${key}`, title, status, statusCategory: cat, type, priority: "High", assignee: "Me", updated: new Date(Date.now() - 3600_000).toISOString(), others });
+      return [t("ABC-123", "주문 취소 시 쿠폰 복구", "In Progress", "indeterminate", "Story", 2), t("ABC-130", "결제 실패 재시도 간격 조정", "To Do", "new", "Bug"), t("ABC-131", "관리자 환불 내역 CSV", "To Do", "new", "Task")];
+    }
+    case "jira_view":
+      return {
+        key: args.key, url: `https://example.atlassian.net/browse/${args.key}`, title: "주문 취소 시 쿠폰 복구", status: "In Progress", statusCategory: "indeterminate", type: "Story", priority: "High", assignee: "Me", reporter: "pm", sprint: "Sprint 42", parent: "",
+        description: { type: "doc", content: [{ type: "heading", attrs: { level: 2 }, content: [{ type: "text", text: "배경" }] }, { type: "paragraph", content: [{ type: "text", text: "주문을 취소하면 쓴 쿠폰이 " }, { type: "text", text: "사라진다", marks: [{ type: "strong" }] }, { type: "text", text: ". 고객 문의가 주 10건." }] }, { type: "heading", attrs: { level: 2 }, content: [{ type: "text", text: "수용 조건" }] }, { type: "bulletList", content: [{ type: "listItem", content: [{ type: "paragraph", content: [{ type: "text", text: "전체 취소 시 쿠폰을 되돌린다" }] }] }, { type: "listItem", content: [{ type: "paragraph", content: [{ type: "text", text: "부분 취소는 남은 금액 기준으로 판단" }] }] }] }] },
+        subtasks: [{ key: "ABC-124", title: "쿠폰 복구 API", status: "Done", statusCategory: "done" }, { key: "ABC-125", title: "관리자 화면 표시", status: "To Do", statusCategory: "new" }],
+        comments: [{ who: "qa", at: new Date(Date.now() - 86400_000).toISOString(), body: { type: "doc", content: [{ type: "paragraph", content: [{ type: "text", text: "부분 취소 후 재취소 케이스도 봐 주세요." }] }] } }],
+        updated: new Date(Date.now() - 7200_000).toISOString(),
+      };
+    case "jira_transitions":
+      return [{ id: "31", name: "Review", to: "In Review", category: "indeterminate" }, { id: "41", name: "Done", to: "Done", category: "done" }];
     case "pr_review_requests":
       return JSON.stringify([
         { number: 215, title: "결제 취소 API에 부분 취소 추가", repository: { nameWithOwner: "example/api-server" }, author: { login: "teammate" }, updatedAt: new Date(Date.now() - 7200_000).toISOString(), url: "https://github.com/example/api-server/pull/215", isDraft: false },
@@ -176,6 +198,8 @@ async function invoke(cmd: string, args: Record<string, unknown> = {}): Promise<
         { id: 2, path: "src/refund/RefundCalculator.kt", line: 90, side: "RIGHT", in_reply_to_id: 1, user: { login: "me" }, body: "배치 쪽에서 잡고 넘기게 할게요.", created_at: new Date(Date.now() - 1500_000).toISOString() },
         { id: 3, path: "src/refund/RefundCalculator.kt", line: null, side: "RIGHT", user: { login: "teammate" }, body: "이전 버전에 단 코멘트", created_at: new Date(Date.now() - 5000_000).toISOString() },
       ]);
+    case "dirs_exist":
+      return (args.paths as string[]).map(() => true);
     case "env_flag":
       return false;
     case "plugin:event|listen":
