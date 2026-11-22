@@ -23,6 +23,12 @@
 > [!NOTE]
 > The UI comes in English and Korean (it follows the system language; change it in `⌘,`). It has only been used on macOS. There is no signed installer; you build it yourself (one script).
 
+## Why
+
+Run a few projects with an agent and you end up with several repos, several tabs in each and several sessions in each tab. Soon you are the one keeping track: which session was doing what, which one is waiting on you, which one you can forget. That bookkeeping is what scatters your attention, not the work.
+
+Julgi takes the bookkeeping. **You throw work at it; it looks after the sessions.** It picks the session a message belongs to, brings up only the ones that need you, puts idle ones to sleep, joins sessions doing the same work, and splits a job that spans repos across several sessions and collects the results.
+
 ## Features
 
 <table>
@@ -152,6 +158,10 @@ The rest are under `⌘/` in the app.
 3. **Judgment goes through `claude -p`.** Routing, summaries, briefings and housekeeping are short text-only calls on your own Claude login.
 
 GitHub goes through `gh`, GitLab through `glab`, and Jira through its REST API with the token kept in the macOS keychain. Julgi polls them; it has nothing that could receive a webhook.
+
+## Only Claude Code, on purpose
+
+Julgi does not run other agents such as Codex CLI or Gemini CLI. What it does for you (knowing whose turn it is, summaries, handing off, carrying memory into a session) leans on Claude Code's hooks, transcripts and launch options. The other CLIs cover part of that today, not all of it, and a session that is only half looked after would put the bookkeeping back on you. This will be revisited as they catch up.
 
 ## Reference
 
