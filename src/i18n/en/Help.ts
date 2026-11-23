@@ -38,4 +38,5 @@ export default {
   "나머지는 Julgi가 알아서 한다: 내 차례인 세션을 칸에 올리기, 너무 큰 세션 갈아타기, 같은 일 합치기, 세션 요약, 오래 쉰 세션 재우기, 믿는 폴더 확인 넘기기.": "Julgi handles the rest: putting sessions that are My turn into panes, handing off sessions that got too large, merging the same work, summarizing sessions, putting long-resting sessions to sleep, and answering trusted-folder prompts.",
   "몰라도 된다 · 직접 하고 싶을 때만": "Optional · only when you want to do it yourself",
   "세션은 닫는 게 아니라 재운다. 창을 닫아도 메뉴 막대에 남아 세션이 계속 돈다. 끄는 건 ⌘Q뿐이다.": "Sessions are put to sleep, not closed. Closing the window leaves Julgi in the menu bar and sessions keep running. Only ⌘Q quits.",
+  "답의 처음으로: 지금 칸에서 내가 한 말 사이를 위아래로 건너뛴다": "To the start of a reply: jump up and down between your own messages in this pane",
 } as Record<string, string>;

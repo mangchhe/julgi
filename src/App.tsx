@@ -2602,6 +2602,8 @@ export default function App() {
       } else if (cmd && !e.shiftKey && e.code === "KeyF") {
         if (key) setFinding(true);
       } else if (cmd && e.key === "Enter") setZoom((z) => !z);
+      // ⌘↑ / ⌘↓: 지금 칸에서 내가 한 말 사이를 건너뛴다. 긴 답의 처음으로 바로 간다
+      else if (cmd && !e.shiftKey && !e.altKey && (e.key === "ArrowUp" || e.key === "ArrowDown") && !live.current.overlay && key && !live.current.reviewing.includes(key)) terms.jumpTurn(key, e.key === "ArrowUp" ? -1 : 1);
       // ⌘E: 지금 칸을 코드 검토로 바꾼다(다시 누르면 터미널). 코드는 폭이 필요해서 칸을 키운다
       else if (cmd && !e.shiftKey && e.code === "KeyE") {
         if (key) a.toggleReview(key);

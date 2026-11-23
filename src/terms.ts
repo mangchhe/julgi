@@ -170,6 +170,30 @@ export function carry(from: string, to: string, note: string) {
   b.term.write(`\x1b[2m${lines.join("\r\n")}\x1b[0m\r\n\r\n\x1b[2m── ${note} ──\x1b[0m\r\n\r\n`);
 }
 
+/**
+ * 내가 한 말(프롬프트 줄)을 찾아 그 줄이 화면 맨 위에 오게 옮긴다. 긴 답을 처음부터 읽을 때 끌어 올리지 않아도 된다.
+ * dir -1: 지금 화면보다 위에 있는 가장 가까운 내 말(= 보고 있는 답의 시작), +1: 아래의 다음 내 말. 더 없으면 맨 위/맨 아래로 간다
+ */
+export function jumpTurn(key: string, dir: -1 | 1) {
+  const entry = pool.get(key);
+  if (!entry?.opened) return;
+  const t = entry.term;
+  const buf = t.buffer.active;
+  // Claude Code는 내가 한 말을 "> 말" 한 줄로 되적는다. 맨 아래의 입력칸(커서가 있는 줄 언저리)은 뺀다
+  const asked = (y: number) => {
+    const line = buf.getLine(y);
+    return !!line && !line.isWrapped && /^[>❯›]\s+\S/.test(line.translateToString(true));
+  };
+  const input = buf.baseY + buf.cursorY - 1;
+  if (dir < 0) {
+    for (let y = buf.viewportY - 1; y >= 0; y--) if (asked(y)) return t.scrollToLine(y);
+    t.scrollToTop();
+  } else {
+    for (let y = buf.viewportY + 1; y < input; y++) if (asked(y)) return t.scrollToLine(y);
+    t.scrollToBottom();
+  }
+}
+
 /** 칸에 있던 터미널을 화면 밖으로 내보낸다 */
 export function park(container: HTMLElement) {
   parking().append(...container.children);
