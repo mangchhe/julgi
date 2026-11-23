@@ -1,3 +1,4 @@
+import Hint from "./Hint";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { openUrl } from "@tauri-apps/plugin-opener";
@@ -547,7 +548,7 @@ export default function Review({ places, known, sessions, onSay, onClose }: Prop
         </div>
         )}
       </div>
-      <div className="pal-foot">{tr`↑↓ 파일 · ←→ 이력에서 위아래로 · f 파일 전체 · h 이력 · n p 다음/이전 바뀐 곳 · 줄을 누르면 세션에게 말한다 · Esc`}</div>
+      <Hint text={tr`↑↓ 파일 · ←→ 이력에서 위아래로 · f 파일 전체 · h 이력 · n p 다음/이전 바뀐 곳 · 줄을 누르면 세션에게 말한다 · Esc`} />
     </div>
   );
 }

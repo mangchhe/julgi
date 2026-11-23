@@ -1,3 +1,4 @@
+import Hint from "./Hint";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Job } from "./model";
 import { tr } from "./i18n";
@@ -129,7 +130,7 @@ export default function History({ acts, tasks, onPick, onClose }: Props) {
             </div>
           ))}
         </div>
-        <div className="pal-foot">{tr("↑↓ 고르기 (고른 줄은 내용을 다 편다) · Enter 그 세션으로 · 위의 종류를 누르면 그것만 본다 · Esc")}</div>
+        <Hint text={tr("↑↓ 고르기 (고른 줄은 내용을 다 편다) · Enter 그 세션으로 · 위의 종류를 누르면 그것만 본다 · Esc")} />
       </div>
     </div>
   );

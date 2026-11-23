@@ -1,3 +1,4 @@
+import Hint from "./Hint";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { getCurrentWebview } from "@tauri-apps/api/webview";
@@ -2994,7 +2995,7 @@ export default function App() {
           <div className="confirm" onMouseDown={(e) => e.stopPropagation()}>
             <b>{tr`일하는 세션이 ${open.filter((o) => states[o.key]?.state === "run").length}개 있다`}</b>
             <p>{tr`지금 끄면 하던 일이 멈춘다. 대화는 남아서 다시 켜면 이어 열 수 있다.`}</p>
-            <div className="pal-foot">{tr`Enter 끄기 · Esc 취소`}</div>
+            <Hint text={tr`Enter 끄기 · Esc 취소`} />
           </div>
         </div>
       )}

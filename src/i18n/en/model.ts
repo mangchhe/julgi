@@ -1,6 +1,6 @@
 export default {
-  "멈춰 있음 · 확인 필요": "Stalled · check it",
-  "보고함 · 할 일 없음": "Reported · nothing to do",
+  "멈춰 있음": "Stalled",
+  "보고함": "Reported",
   "방금": "just now",
   "{0}분 전": "{0}m ago",
   "{0}시간 전": "{0}h ago",

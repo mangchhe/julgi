@@ -1,3 +1,4 @@
+import Hint from "./Hint";
 import { useEffect, useMemo, useRef, useState } from "react";
 import Numbers from "./Numbers";
 import { Act } from "./History";
@@ -446,7 +447,7 @@ export default function Threads({ repos, nameOf, onShow, map, drawing, onRedraw,
             </div>
           ))}
         </div>
-        <div className="pal-foot">{tab === "stems" ? tr("↑↓ 줄기 고르기 · ←→ 줄기 안의 세션 고르기 · Enter 그 세션으로 · ⌘1–⌘4 또는 Tab으로 탭 바꾸기 · Esc") : tab === "brain" ? tr("↑↓ 노트 고르기 · ⌫ 지우기 · Tab 스킬 · Esc") : tab === "git" ? tr("보기만 한다. 브랜치를 바꾸거나 올리는 것은 세션에게 시킨다 · ⌘1–⌘6 · Esc") : tab === "map" ? tr("레포를 넣고 빼는 것은 ⌘, 설정의 \"레포가 모여 있는 폴더\" · ⌘1–⌘5 · Esc") : tab === "nums" ? tr("⌘1–⌘5 또는 Tab으로 탭 바꾸기 · Esc") : tr("상태는 숫자로 정한다: 30일 안에 쓰였으면 쓰는 중, 안 쓰였으면 안 쓰임, 안 쓰이고 석 달 넘게 안 고쳤으면 낡음 · Tab 통계 · Esc")}</div>
+        <Hint text={tab === "stems" ? tr("↑↓ 줄기 고르기 · ←→ 줄기 안의 세션 고르기 · Enter 그 세션으로 · ⌘1–⌘4 또는 Tab으로 탭 바꾸기 · Esc") : tab === "brain" ? tr("↑↓ 노트 고르기 · ⌫ 지우기 · Tab 스킬 · Esc") : tab === "git" ? tr("보기만 한다. 브랜치를 바꾸거나 올리는 것은 세션에게 시킨다 · ⌘1–⌘6 · Esc") : tab === "map" ? tr("레포를 넣고 빼는 것은 ⌘, 설정의 \"레포가 모여 있는 폴더\" · ⌘1–⌘5 · Esc") : tab === "nums" ? tr("⌘1–⌘5 또는 Tab으로 탭 바꾸기 · Esc") : tr("상태는 숫자로 정한다: 30일 안에 쓰였으면 쓰는 중, 안 쓰였으면 안 쓰임, 안 쓰이고 석 달 넘게 안 고쳤으면 낡음 · Tab 통계 · Esc")} />
       </div>
     </div>
   );

@@ -1,3 +1,4 @@
+import Hint from "./Hint";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { ago } from "./model";
@@ -195,7 +196,7 @@ export default function Queue({ rows, asks, mine, tickets, onTicket, onStartTick
               />
             </>
           )}
-          <div className="pal-foot">{ask ? tr`↑↓ 고르기 · Enter PR 화면 (글이 있으면 세션에 맡기기) · ⌘Enter 세션에 맡기기 · Esc` : tr`↑↓ 고르기 · Enter 답 보내기 (빈 채면 세션 열기) · ⌘Enter 세션 열기 · ⇧Enter 줄바꿈 · Esc`}</div>
+          <Hint text={ask ? tr`↑↓ 고르기 · Enter PR 화면 (글이 있으면 세션에 맡기기) · ⌘Enter 세션에 맡기기 · Esc` : tr`↑↓ 고르기 · Enter 답 보내기 (빈 채면 세션 열기) · ⌘Enter 세션 열기 · ⇧Enter 줄바꿈 · Esc`} />
         </div>
       </div>
     </div>

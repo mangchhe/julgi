@@ -77,7 +77,7 @@ export default function Pane({ termKey, focused, active, label, cwd, session, th
               </button>
               {handing && <span className="wait">{tr`갈아타는 중`}</span>}
               {!handing && STATE_LABEL[state] && <span className={state}>{STATE_LABEL[state]}</span>}
-              {tokens > 0 && <span className={hot(tokens) ? "hot" : ""}>{kilo(tokens)}</span>}
+              {tokens > 0 && <span className={"tok" + (hot(tokens) ? " hot" : "")}>{kilo(tokens)}</span>}
             </span>
           </>
         ) : (

@@ -1,3 +1,4 @@
+import Hint from "./Hint";
 import { useEffect, useRef, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { openUrl } from "@tauri-apps/plugin-opener";
@@ -198,7 +199,7 @@ export default function TicketView({ ticketKey, conn, onClose, onStart, sessions
             )}
           </div>
         </div>
-        <div className="pal-foot">{tr`s 상태 옮기기 · c 코멘트 · Enter 이 티켓으로 시작 · o 웹에서 열기 · r 새로 읽기 · Esc`}</div>
+        <Hint text={tr`s 상태 옮기기 · c 코멘트 · Enter 이 티켓으로 시작 · o 웹에서 열기 · r 새로 읽기 · Esc`} />
       </div>
     </div>
   );

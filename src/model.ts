@@ -207,7 +207,7 @@ export const setAlive = (ids: string[]) => void (alive = new Set(ids));
 export const elsewhere = (s: Session) => alive.has(s.id) || (Date.now() / 1000 - s.mtime < ELSEWHERE_S && s.mtime > (sleptAt.get(s.id) ?? 0) + 5);
 /** 프로세스가 떠 있는 것을 직접 본 것인가 */
 export const aliveElsewhere = (s: Session) => alive.has(s.id);
-export const STATE_LABEL: Record<string, string> = { run: tr("일하는 중"), wait: tr("답함 · 내 차례"), hold: tr("일감 기다리는 중"), idle: tr("일감 끝냄"), ask: tr("확인이 필요함"), dead: tr("끝남"), stuck: tr("멈춰 있음 · 확인 필요"), told: tr("보고함 · 할 일 없음") };
+export const STATE_LABEL: Record<string, string> = { run: tr("일하는 중"), wait: tr("답함 · 내 차례"), hold: tr("일감 기다리는 중"), idle: tr("일감 끝냄"), ask: tr("확인이 필요함"), dead: tr("끝남"), stuck: tr("멈춰 있음"), told: tr("보고함") };
 
 // Julgi가 띄운 Claude 세션만 상태를 적게 한다. 전역 설정은 건드리지 않고 실행할 때만 훅을 얹는다.
 // 서브에이전트의 도구 호출도 부모 세션의 훅으로 온다(입력에 agent_id가 붙는다). 메인 답이 끝난 뒤 백그라운드 서브에이전트가

@@ -1,3 +1,4 @@
+import Hint from "./Hint";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { aboutOf, ago, Folder, hot, Item, kilo, modelFor, repoOf } from "./model";
@@ -270,7 +271,7 @@ export default function Send({ items, openIds, cwd, folders, base, notes, misses
             {hot(picked.item.session.tokens) && <span> · {tr`세션이 크다. ⌘Enter로 갈아탄 뒤 보낼 수 있다`}</span>}
           </div>
         )}
-        <div className="pal-foot">{tr`Enter 알아서 보내기 · ↑↓로 고르면 고른 곳으로 · Tab 모델에게 미리 묻기 · ⌘Enter 갈아탄 뒤 보내기 · ⇧Enter 줄바꿈 · Esc`}</div>
+        <Hint text={tr`Enter 알아서 보내기 · ↑↓로 고르면 고른 곳으로 · Tab 모델에게 미리 묻기 · ⌘Enter 갈아탄 뒤 보내기 · ⇧Enter 줄바꿈 · Esc`} />
       </div>
     </div>
   );

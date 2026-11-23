@@ -1,5 +1,6 @@
 // 브리핑: 한동안 자리를 비웠다 돌아왔을 때 한 화면으로 보는 것.
 // 지금 나를 기다리는 것, 그동안 PR과 티켓에 생긴 일, 하던 일들이 어디까지 왔는지, 그동안 Julgi가 알아서 한 일.
+import Hint from "./Hint";
 import { useEffect, useRef, useState } from "react";
 import { tr } from "./i18n";
 import { Progress, ago as agoSec } from "./model";
@@ -147,7 +148,7 @@ export default function Morning({ since, waits, news, told, stems, acts, onShow,
             </section>
           )}
         </div>
-        <div className="pal-foot">{tr`↑↓ 고르기 · Enter 그 세션으로 · j 내 차례(⌘J)에서 한꺼번에 답하기 · y 한 일 전부 · Esc 닫기`}</div>
+        <Hint text={tr`↑↓ 고르기 · Enter 그 세션으로 · j 내 차례(⌘J)에서 한꺼번에 답하기 · y 한 일 전부 · Esc 닫기`} />
       </div>
     </div>
   );

@@ -1,3 +1,4 @@
+import Hint from "./Hint";
 import { tr } from "./i18n";
 
 /** 이것만 알면 쓴다. 나머지는 Julgi가 알아서 한다 */
@@ -65,7 +66,7 @@ export default function Help({ onClose }: { onClose: () => void }) {
         <div className="help-more">
           <Rows keys={MORE} />
         </div>
-        <div className="pal-foot">{tr("세션은 닫는 게 아니라 재운다. 창을 닫아도 메뉴 막대에 남아 세션이 계속 돈다. 끄는 건 ⌘Q뿐이다.")}</div>
+        <Hint text={tr("세션은 닫는 게 아니라 재운다. 창을 닫아도 메뉴 막대에 남아 세션이 계속 돈다. 끄는 건 ⌘Q뿐이다.")} />
       </div>
     </div>
   );

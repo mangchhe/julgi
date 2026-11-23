@@ -1,3 +1,4 @@
+import Hint from "./Hint";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { openUrl } from "@tauri-apps/plugin-opener";
@@ -451,7 +452,7 @@ export default function PrView({ target, onClose, inline = false, autoFocus = tr
             </div>
           )}
         </div>
-        <div className="pal-foot">{tr`↑↓ 파일 · 줄을 누르면 코멘트 · h 대화 · m 머지 · o 웹에서 열기 · r 새로 읽기 · Esc`}</div>
+        <Hint text={tr`↑↓ 파일 · 줄을 누르면 코멘트 · h 대화 · m 머지 · o 웹에서 열기 · r 새로 읽기 · Esc`} />
       </div>
     </div>
   );

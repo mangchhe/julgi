@@ -1,3 +1,4 @@
+import Hint from "./Hint";
 import { tr } from "./i18n";
 import { ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import { CATEGORY, Ticket, TicketWork } from "./jira";
@@ -237,15 +238,19 @@ export default function Work({ groups, ticketGroups = [], loadTickets, ticketPan
           <div className="wk-empty">{tgroup ? tr`왼쪽에서 티켓을 고른다` : tr`왼쪽에서 PR을 고른다`}</div>
         )}
       </div>
-      <div className="wk-foot">
-        {tgroup ? tr`1–9·Tab 묶음 · ↑↓ 고르기 · Enter·→ 티켓 화면으로 (Esc로 목록에 돌아옴)` : tr`1–9·Tab 묶음 · ↑↓ 고르기 · Enter·→ PR 화면으로 (Esc로 목록에 돌아옴)`}
-        {" · "}
-        {row?.sessionId ? tr`s 세션 열기` + " · " : ""}
-        {row?.ask ? tr`⌘Enter 세션에 리뷰 맡기기` + " · " : ""}
-        {ticket && works.get(ticket.key)?.session ? tr`s 이어진 세션으로` + " · " : ""}
-        {ticket ? tr`⌘Enter 이 티켓으로 시작` + " · " : ""}
-        {tr`o 브라우저에서 열기 · r 새로 읽기 · Esc 닫기`}
-      </div>
+      <Hint
+        className="wk-foot"
+        text={[
+          tgroup ? tr`1–9·Tab 묶음 · ↑↓ 고르기 · Enter·→ 티켓 화면으로 (Esc로 목록에 돌아옴)` : tr`1–9·Tab 묶음 · ↑↓ 고르기 · Enter·→ PR 화면으로 (Esc로 목록에 돌아옴)`,
+          row?.sessionId ? tr`s 세션 열기` : "",
+          row?.ask ? tr`⌘Enter 세션에 리뷰 맡기기` : "",
+          ticket && works.get(ticket.key)?.session ? tr`s 이어진 세션으로` : "",
+          ticket ? tr`⌘Enter 이 티켓으로 시작` : "",
+          tr`o 브라우저에서 열기 · r 새로 읽기 · Esc 닫기`,
+        ]
+          .filter(Boolean)
+          .join(" · ")}
+      />
     </div>
   );
 }

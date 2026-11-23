@@ -1,3 +1,4 @@
+import Hint from "./Hint";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { ago, linkLabel, Open, repoOf, Session } from "./model";
 import { invoke } from "@tauri-apps/api/core";
@@ -251,7 +252,7 @@ export default function Palette({ open, sessions, byId, cwd, onPick, onAttach, o
             {rows[at].session!.links.length > 0 && <span> · {tr`링크 ${rows[at].session!.links.length}개`}</span>}
           </div>
         )}
-        <div className="pal-foot">{tr`Enter 열기 (↳ 산출물은 브라우저로) · Tab 요약만 붙이기 · ⌥Enter 지금 세션과 한 줄기로 · ↑ 새 세션 · Esc`}</div>
+        <Hint text={tr`Enter 열기 (↳ 산출물은 브라우저로) · Tab 요약만 붙이기 · ⌥Enter 지금 세션과 한 줄기로 · ↑ 새 세션 · Esc`} />
       </div>
     </div>
   );

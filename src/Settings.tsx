@@ -1,3 +1,4 @@
+import Hint from "./Hint";
 import qrcode from "qrcode-generator";
 import { useEffect, useRef, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
@@ -434,7 +435,7 @@ export default function Settings({ onChange, onClose, remoteUrl, onConnect, onCo
             <option key={name} value={name} />
           ))}
         </datalist>
-        <div className="pal-foot">{tr("Tab 묶음 넘기기 · ↑↓ 고르기 · ←→ 바꾸기 · Enter 켜고 끄기, 글 고치기 · 바로 적용된다 · Esc · 나머지 값은 ~/.julgi/config.json")}</div>
+        <Hint text={tr("Tab 묶음 넘기기 · ↑↓ 고르기 · ←→ 바꾸기 · Enter 켜고 끄기, 글 고치기 · 바로 적용된다 · Esc · 나머지 값은 ~/.julgi/config.json")} />
       </div>
     </div>
   );
