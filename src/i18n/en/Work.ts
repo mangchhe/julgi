@@ -1,4 +1,5 @@
 export default {
+  "s 이어진 세션으로": "s go to its session",
   "작업": "Work",
   "PR": "PR",
   "티켓": "Tickets",

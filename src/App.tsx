@@ -24,8 +24,8 @@ import Work, { WorkGroup, WorkRow } from "./Work";
 import Usage from "./Usage";
 import TicketView from "./TicketView";
 import StartTicket from "./StartTicket";
-import { firstKey, JiraConn, keyOfUrl, setKnownKeys, Ticket, TicketFull, TicketSeen, ticketNews } from "./jira";
-import { isLab, newsOf, openPr, prOf, PrStatus, PrTarget, prUrl, repoName, ReviewAsk } from "./pr";
+import { TicketWork, firstKey, JiraConn, keyOfUrl, setKnownKeys, Ticket, TicketFull, TicketSeen, ticketNews } from "./jira";
+import { prNo, isLab, newsOf, openPr, prOf, PrStatus, PrTarget, prUrl, repoName, ReviewAsk } from "./pr";
 import * as terms from "./terms";
 import { rank } from "./route";
 import { Brief, Change, Job, Progress, MAX_PARALLEL, setMapDirs, setPrefs, markAuto, isAuto, autoList, STATE_LABEL, replied, ago, Item, modelFor, SkillInfo, SkillUse, aboutOf, buildFolders, buildItems, aliveElsewhere, config, elsewhere, enrich, markSlept, setAlive, handoffCommand, Ledger, Merge, mergeCandidates, mergeKey, newCommand, Open, repoOf, resumeCommand, Session, TermState, Thread, waiting, withPrompt } from "./model";
@@ -1772,6 +1772,43 @@ export default function App() {
       (e) => say(tr`옮기지 못했다: ${String(e).slice(0, 80)}`, 6000),
     );
   };
+  /**
+   * 티켓에 Julgi가 아는 일을 붙인다: 이어진 세션과 그 상태, 그 세션의 PR과 그 형편에서 "지금 누가 무엇을 할 차례인지"를 한 줄로 낸다.
+   * Jira는 상태 이름만 알고, 그 일이 실제로 어디까지 갔는지는 세션과 PR이 안다
+   */
+  const ticketWork = (t: Ticket): TicketWork => {
+    const { open, states, byId, names } = live.current;
+    const ids = [...byId.values()].filter((s) => ticketOfSession(s.id) === t.key).sort((a, b) => b.mtime - a.mtime).map((s) => s.id);
+    const shown = open.filter((o) => o.sessionId && ids.includes(o.sessionId));
+    const nameOfId = (id: string) => names[id] || byId.get(id)?.title || tr("세션");
+    const pr = ids.map((id) => prOfSession(id)).find(Boolean) ?? minePrs.map((a) => (firstKey(a.title) === t.key ? { repo: a.repository.nameWithOwner, number: a.number } : null)).find(Boolean) ?? undefined;
+    const seen = pr ? prSeen.current[`${pr.repo}#${pr.number}`] : undefined;
+    const base = { pr: pr ?? undefined, session: shown[0]?.key ?? (ids[0] ? "c:" + ids[0] : undefined), sessionName: ids[0] ? nameOfId(ids[0]) : undefined };
+    const no = pr ? prNo(pr) : "";
+    const done = t.statusCategory === "done";
+    // 1. 세션이 나를 기다린다
+    const asking = shown.find((o) => waiting(states[o.key]));
+    if (asking) {
+      const is = states[asking.key]?.state;
+      const why = is === "wait" ? (asking.sessionId && triaged.current[asking.sessionId]?.why) || "" : "";
+      return { ...base, rank: 0, step: is === "ask" ? tr("세션이 허락을 기다린다") : is === "stuck" ? tr("세션이 일하다 멈춰 있다") : tr("세션이 내 답을 기다린다"), detail: why, session: asking.key, sessionName: nameOf(asking.key) };
+    }
+    // 2. PR에 내가 손댈 일이 있다
+    if (seen?.state === "OPEN" && seen.ci === "FAILURE") return { ...base, rank: 0, step: tr`PR ${no} CI가 깨졌다`, detail: tr("세션에 고치라고 한다") };
+    if (seen?.state === "OPEN" && seen.decision === "CHANGES_REQUESTED") return { ...base, rank: 0, step: tr`PR ${no} 수정 요청을 받았다`, detail: tr("리뷰 의견을 반영한다") };
+    if (seen?.state === "MERGED" && !done) return { ...base, rank: 0, step: tr`PR ${no}이 머지됐다`, detail: config.jiraMergeTransition ? tr`티켓을 ${config.jiraMergeTransition}로 옮길 차례` : tr("티켓 상태를 옮길 차례") };
+    if (seen?.state === "OPEN" && seen.decision === "APPROVED") return { ...base, rank: 0, step: tr`PR ${no} 승인됐다`, detail: tr("머지할 차례") };
+    // 3. 돌아가는 중
+    const running = shown.find((o) => states[o.key]?.state === "run" || states[o.key]?.state === "hold");
+    if (running) return { ...base, rank: 1, step: tr("세션이 일하는 중"), session: running.key, sessionName: nameOf(running.key) };
+    // 4. 남을 기다린다
+    if (seen?.state === "OPEN") return { ...base, rank: 2, step: tr`PR ${no} 리뷰를 기다리는 중` };
+    if (done) return { ...base, rank: 5, step: tr("끝남") };
+    if (seen?.state === "CLOSED") return { ...base, rank: 3, step: tr`PR ${no}이 머지 없이 닫혔다`, detail: tr("이어 할지 정한다") };
+    // 5. 하다 만 일, 시작 안 한 일
+    if (ids.length) return { ...base, rank: 3, step: pr ? tr`PR ${no}을 올린 뒤 멈춰 있다` : tr("하다가 멈춰 있다"), detail: tr("세션을 열어 이어 한다") };
+    return { ...base, rank: 4, step: tr("시작 안 함"), detail: tr("⌘Enter로 이 티켓을 시작한다") };
+  };
   /** 티켓과 이어진 세션의 PR이 올라오거나 머지되면 상태를 옮길지 한 번 묻는다 */
   const ticketOffer = (sessionId: string | undefined, pr: PrTarget, kind: "pr" | "merge") => {
     const key = ticketOfSession(sessionId);
@@ -2821,6 +2858,8 @@ export default function App() {
           onConnectJira={() => (setSettingsAt("연결"), setOverlay("settings"))} // i18n-ok
           loadTickets={(jql) => invoke<Ticket[]>("jira_search", { conn: jiraConn(), jql, limit: 50 })}
           ticketNews={ticketNewsMap}
+          ticketWork={ticketWork}
+          onShowSession={(key) => (setOverlay(null), show(key))}
           onStartTicket={(key) => void invoke<TicketFull>("jira_view", { conn: jiraConn(), key }).then(setStartTicket, (e) => say(String(e).slice(0, 100)))}
           ticketPane={(key) => (
             <TicketView

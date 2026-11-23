@@ -42,6 +42,12 @@ export const keyOfUrl = (url: string) => url.match(/\/browse\/([A-Z][A-Z0-9_]+-\
 export const openTicket = (key: string) => window.dispatchEvent(new CustomEvent<string>("julgi:ticket", { detail: key }));
 
 /** 상태 범주 → 묶음 이름 */
+/**
+ * 티켓 하나에 Julgi가 아는 일을 붙인 것: 이어진 세션과 PR, 그리고 지금 누가 무엇을 할 차례인지.
+ * rank가 작을수록 내가 먼저 봐야 한다. 0 내가 할 일, 1 돌아가는 중, 2 남을 기다림, 3 하다 만 일, 4 시작 안 함, 5 끝남
+ */
+export type TicketWork = { rank: number; step: string; detail?: string; /** 고르면 갈 세션(칸의 열쇠) */ session?: string; sessionName?: string; pr?: { repo: string; number: number } };
+
 export const CATEGORY: Record<string, string> = { new: "할 일", indeterminate: "진행 중", done: "끝남" }; // i18n-ok
 
 /**

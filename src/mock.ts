@@ -126,6 +126,8 @@ async function invoke(cmd: string, args: Record<string, unknown> = {}): Promise<
       }
       // PR 형편을 지난번과 견주는 기록: 첫 PR은 그새 코멘트가 둘 늘고 CI가 깨진 것으로 보이게
       // Jira 감시 기록: ABC-123은 그새 코멘트가 하나 늘어난 것으로
+      // 티켓과 세션을 이어 둔다: 작업 페이지에서 티켓마다 "지금 할 일"이 나오는 것을 본다
+      if (args.name === "tickets.json" && flags.has("jira")) return JSON.stringify({ "00000000-0000-4000-8000-000000000000": "ABC-123", "00000006-0000-4000-8000-000000000000": "ABC-130", "00000001-0000-4000-8000-000000000000": "ABC-132", "00000002-0000-4000-8000-000000000000": "ABC-133" });
       if (args.name === "jira-seen.json" && flags.has("jira")) return JSON.stringify({ "ABC-123": { status: "In Progress", others: 1, assigned: true }, "ABC-130": { status: "To Do", others: 0, assigned: true }, "ABC-131": { status: "To Do", others: 0, assigned: true } });
       if (args.name === "pr-seen.json") return JSON.stringify({ "example/acme-api#1852": { state: "OPEN", ci: "SUCCESS", decision: "REVIEW_REQUIRED", others: 1 }, "example/acme-api#1700": { state: "OPEN", ci: "SUCCESS", decision: "APPROVED", others: -1 }, "example/acme-api#1830": { state: "OPEN", ci: "SUCCESS", decision: "REVIEW_REQUIRED", others: 0 } });
       if (args.name === "activity.jsonl" && (flags.has("hist") || flags.has("morning"))) return `{"at": 1795184436364, "kind": "보냄", "text": "쿠폰 중복 환불 ← \\"환불 테스트도 돌려줘\\" (모델이 고름)", "sessionId": "x"}\n{"at": 1795184441364, "kind": "갈아탐", "text": "알림 스펙 정리 · 인계 글만 들고 새 세션으로, 이어서 보냄. 이전 세션은 재움", "sessionId": "x"}\n{"at": 1795261841364, "kind": "배움", "text": "\\"알림 스펙 정리\\"에서 브레인에 3개: 푸시는 10초 배치로 판정된다 / 하루 1회 제한은 상태 알림에만 적용된다 / 품절 임박 푸시는 찜한 고객만 받는다", "sessionId": "x"}\n{"at": 1795263641364, "kind": "지도", "text": "레포 5개의 지도를 그림 · 최신으로 당긴 것 2개(acme-admin, acme-shop) · 작업 중이라 그대로 둔 것: acme-api(4커밋)"}\n{"at": 1795263741364, "kind": "지도", "text": "레포 5개의 지도를 그림 · 작업 중이라 그대로 둔 것: acme-api(4커밋)"}\n{"at": 1795267241364, "kind": "점검", "text": "2판(매주): 손댄 것 13개, 눈에 띈 것 2개. ⌘G의 통계에서 본다"}\n{"at": 1795269041364, "kind": "확인 필요", "text": "\\"배포 상태 확인\\" 세션이 시작하지 못하고 있다", "sessionId": "x"}\n{"at": 1795270241364, "kind": "칸", "text": "칸을 하나 늘려 기다리던 \\"JDK 교체\\"을 올림", "sessionId": "x"}\n{"at": 1795270781364, "kind": "보냄", "text": "새 줄기 · acme-api ← \\"쿠폰 기능 넣으려면 어디부터 봐야 해?\\" (이어 갈 줄기가 없어서)", "sessionId": "x"}`;
@@ -185,7 +187,7 @@ async function invoke(cmd: string, args: Record<string, unknown> = {}): Promise<
     case "jira_mine":
     case "jira_search": {
       const t = (key: string, title: string, status: string, cat: string, type: string, others = 0) => ({ key, url: `https://example.atlassian.net/browse/${key}`, title, status, statusCategory: cat, type, priority: "High", assignee: "Me", updated: new Date(Date.now() - 3600_000).toISOString(), others });
-      return [t("ABC-123", "주문 취소 시 쿠폰 복구", "In Progress", "indeterminate", "Story", 2), t("ABC-130", "결제 실패 재시도 간격 조정", "To Do", "new", "Bug"), t("ABC-131", "관리자 환불 내역 CSV", "To Do", "new", "Task")];
+      return [t("ABC-123", "주문 취소 시 쿠폰 복구", "In Progress", "indeterminate", "Story", 2), t("ABC-130", "결제 실패 재시도 간격 조정", "To Do", "new", "Bug"), t("ABC-131", "관리자 환불 내역 CSV", "To Do", "new", "Task"), t("ABC-132", "알림 종류와 발송 조건 정리", "In Progress", "indeterminate", "Task"), t("ABC-133", "주문 목록 응답 지연", "In Progress", "indeterminate", "Bug")];
     }
     case "jira_view":
       return {

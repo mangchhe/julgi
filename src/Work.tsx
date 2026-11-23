@@ -1,6 +1,6 @@
 import { tr } from "./i18n";
 import { ReactNode, useEffect, useMemo, useRef, useState } from "react";
-import { CATEGORY, Ticket } from "./jira";
+import { CATEGORY, Ticket, TicketWork } from "./jira";
 import PrView from "./PrView";
 import { ago } from "./model";
 import { openUrl } from "@tauri-apps/plugin-opener";
@@ -32,9 +32,13 @@ type Props = {
   /** Jira가 연결돼 있으면 티켓 묶음. 고르면 그 JQL로 읽고, 오른쪽에 ticketPane을 편다 */
   ticketGroups?: TicketGroup[];
   loadTickets?: (jql: string) => Promise<Ticket[]>;
+  /** 티켓에 이어진 세션과 PR, 지금 할 일 */
+  ticketWork?: (t: Ticket) => TicketWork;
   ticketPane?: (key: string) => ReactNode;
   ticketNews?: Record<string, string>;
   onStartTicket?: (key: string) => void;
+  /** 티켓에 이어진 세션으로 간다 (칸의 열쇠) */
+  onShowSession?: (key: string) => void;
   /** Jira가 연결돼 있지 않을 때 설정의 연결 묶음을 연다 */
   onConnectJira?: () => void;
   onClose: () => void;
@@ -50,7 +54,7 @@ const idOf = (t: PrTarget) => `${t.repo}#${t.number}`;
  * 작업 (⌘U). PR을 묶음별로 한 화면에서 둘러본다: 왼쪽 묶음, 가운데 목록, 오른쪽 PR 화면.
  * ⌘J가 "지금 손댈 것"만 모은다면, 여기는 "전부 둘러보기"다. Jira를 붙이면 티켓 묶음이 같은 자리에 들어온다
  */
-export default function Work({ groups, ticketGroups = [], loadTickets, ticketPane, ticketNews = {}, onStartTicket, onConnectJira, onClose, onRefresh, onOpenSession, onHand }: Props) {
+export default function Work({ groups, ticketGroups = [], loadTickets, ticketPane, ticketNews = {}, ticketWork, onStartTicket, onShowSession, onConnectJira, onClose, onRefresh, onOpenSession, onHand }: Props) {
   const allCount = groups.length + ticketGroups.length;
   // 새 소식이 있는 묶음부터 연다
   const [groupAt, setGroupAt] = useState(() => Math.max(0, groups.findIndex((g) => g.rows.some((r) => r.news))));
@@ -80,7 +84,9 @@ export default function Work({ groups, ticketGroups = [], loadTickets, ticketPan
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ticketGroups.length]);
   const tickets = tgroup ? ticketRows[tgroup.id] : undefined;
-  const tlist = Array.isArray(tickets) ? tickets : [];
+  // 티켓마다 지금 할 일을 붙이고, 내가 손댈 것이 위로 오게 세운다. 같은 차례 안에서는 Jira가 준 순서 그대로
+  const works = useMemo(() => new Map((Array.isArray(tickets) ? tickets : []).map((t) => [t.key, ticketWork?.(t)])), [tickets, ticketWork]);
+  const tlist = useMemo(() => (Array.isArray(tickets) ? tickets.map((t, i) => ({ t, i })).sort((a, b) => (works.get(a.t.key)?.rank ?? 9) - (works.get(b.t.key)?.rank ?? 9) || a.i - b.i).map((x) => x.t) : []), [tickets, works]);
   const rows = group?.rows ?? [];
   const at = tgroup ? Math.max(0, tlist.findIndex((t) => t.key === picked)) : Math.max(0, rows.findIndex((r) => idOf(r.target) === picked));
   const row = tgroup ? undefined : rows[at];
@@ -115,6 +121,7 @@ export default function Work({ groups, ticketGroups = [], loadTickets, ticketPan
     else if (e.key === "Enter" && e.metaKey && ticket) onStartTicket?.(ticket.key);
     else if (e.key === "Enter" || e.key === "ArrowRight") enterPr();
     else if (e.key === "s" && row?.sessionId) onOpenSession(row.sessionId);
+    else if (e.key === "s" && ticket && works.get(ticket.key)?.session) onShowSession?.(works.get(ticket.key)!.session!);
     // 숫자: 왼쪽 묶음으로 바로. o: 브라우저에서 열기
     else if (/^[1-9]$/.test(e.key) && !e.metaKey && Number(e.key) <= allCount) switchGroup(Number(e.key) - 1);
     else if (e.key === "o" && ticket) void openUrl(ticket.url);
@@ -182,6 +189,13 @@ export default function Work({ groups, ticketGroups = [], loadTickets, ticketPan
             <span className="wk-row-title">
               <em>{t.key}</em> {t.title}
             </span>
+            {works.get(t.key) && (
+              <span className={"wk-step r" + works.get(t.key)!.rank}>
+                <b>{works.get(t.key)!.step}</b>
+                {works.get(t.key)!.detail && ` · ${works.get(t.key)!.detail}`}
+                {works.get(t.key)!.sessionName && works.get(t.key)!.rank !== 4 && <i> · {works.get(t.key)!.sessionName}</i>}
+              </span>
+            )}
             <span className="wk-row-meta">
               {ticketNews[t.key] && <b className="loud">{ticketNews[t.key]} · </b>}
               {CATEGORY[t.statusCategory] ? `${t.status}` : t.status}
@@ -228,6 +242,7 @@ export default function Work({ groups, ticketGroups = [], loadTickets, ticketPan
         {" · "}
         {row?.sessionId ? tr`s 세션 열기` + " · " : ""}
         {row?.ask ? tr`⌘Enter 세션에 리뷰 맡기기` + " · " : ""}
+        {ticket && works.get(ticket.key)?.session ? tr`s 이어진 세션으로` + " · " : ""}
         {ticket ? tr`⌘Enter 이 티켓으로 시작` + " · " : ""}
         {tr`o 브라우저에서 열기 · r 새로 읽기 · Esc 닫기`}
       </div>
