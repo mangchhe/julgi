@@ -249,8 +249,9 @@ export default function Review({ places: given, known, sessions, prefer = [], on
   const versions = useMemo<Ver[]>(
     () => [
       // 맨 위는 하나: 이 세션이 고친 것 전부. 답마다 찍어 둔 상태가 있으면 첫 답 앞에서 지금까지,
-      // 없으면(Julgi가 지켜보기 전의 세션) 작업 브랜치는 기준에서 갈라진 뒤 전부, 기준 브랜치 위라면 커밋 안 한 것
-      { ...NONE, from: turns.length ? turns[0].from : !(moved && placeAt === 0) && git && git.branch !== git.default ? null : "HEAD", title: turns.length ? tr`이 세션의 첫 답 앞에서 지금까지 바뀐 것` : tr`답마다 찍어 둔 기록이 없어, 폴더에 남아 있는 변경을 보여 준다` },
+      // 없으면(Julgi가 지켜보기 전의 세션) 원격의 기본 브랜치에서 갈라진 뒤 전부: 작업 브랜치면 그 브랜치의 것 전부,
+      // 기본 브랜치 위라면 안 올린 커밋과 커밋 안 한 것. 브리핑과 사이드바 숫자가 읽는 범위와 같다
+      { ...NONE, from: turns.length ? turns[0].from : moved && placeAt === 0 ? "HEAD" : null, title: turns.length ? tr`이 세션의 첫 답 앞에서 지금까지 바뀐 것` : tr`답마다 찍어 둔 기록이 없어, 폴더에 남아 있는 변경을 보여 준다` },
       ...[...turns].reverse().map((t, i) => ({ key: "t:" + t.to, from: t.from, to: t.to, label: t.said || (i === 0 ? tr`방금 답` : tr`${i}번 전 답`), title: t.said ? tr`이 말에 한 답 하나에서 바뀐 것만: ${t.said}` : tr`이 답 하나에서 바뀐 것만`, kind: "turn" as const, when: ago(t.at / 1000) + (t.files ? " · " + tr`파일 ${t.files}` : "") })),
       // 커밋은 그 첫 부모와 견준다 (머지 커밋이면 머지로 들어온 것 전부가 보인다)
       ...commits.map(([sha, parents, subject, at]) => ({ key: "c:" + sha, from: parents.split(" ")[0] || null, to: sha, label: subject, title: `${subject} (${sha.slice(0, 8)})`, kind: "commit" as const, when: at ? ago(at) : "" })),
@@ -578,7 +579,7 @@ export default function Review({ places: given, known, sessions, prefer = [], on
                 <span className="rv-node-text">
                   <span>{v.label}</span>
                   {v.when && <small>{v.when}</small>}
-                  {v.kind === "all" && <small>{turns.length ? tr`답 ${turns.length}번에 걸쳐 · 커밋 안 한 파일 ${git?.dirty ?? 0}` : !(moved && placeAt === 0) && git && git.branch !== git.default ? tr`${git.default}에서 갈라진 뒤 전부` : tr`커밋 안 한 파일 ${git?.dirty ?? 0}`}</small>}
+                  {v.kind === "all" && <small>{turns.length ? tr`답 ${turns.length}번에 걸쳐 · 커밋 안 한 파일 ${git?.dirty ?? 0}` : moved && placeAt === 0 ? tr`커밋 안 한 파일 ${git?.dirty ?? 0}` : git && git.branch !== git.default ? tr`${git.default}에서 갈라진 뒤 전부` : tr`안 올린 커밋과 커밋 안 한 파일 ${git?.dirty ?? 0}`}</small>}
                 </span>
               </button>
             ))}

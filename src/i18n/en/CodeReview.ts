@@ -58,4 +58,5 @@ export default {
   "워크트리 · {0}": "Worktree · {0}",
   "이 폴더에는 세션이 일하는 동안 밖에서 다른 커밋이 들어왔다(브랜치를 바꿨거나 pull·merge를 했다). 답마다 찍어 둔 기록과 견주면 남의 변경이 섞여서, 지금 폴더에 남은 변경만 보여 준다.": "Other commits arrived in this folder while the session worked (a branch switch, pull or merge). Comparing against the per-reply snapshots would mix in changes the session did not make, so only what is left in the folder is shown.",
   "세션이 워크트리에서 일했다면 위에서 그 워크트리를 고른다.": "If the session worked in a worktree, pick it above.",
+  "안 올린 커밋과 커밋 안 한 파일 {0}": "unpushed commits and {0} uncommitted files",
 } as Record<string, string>;
