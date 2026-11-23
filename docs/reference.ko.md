@@ -111,6 +111,7 @@
 | `progress.json` | 줄기마다 목표, 한 것, 남은 것, 막힌 것 |
 | `seen.json` | 마지막으로 Julgi를 본 때. 브리핑이 쓴다 |
 | `tickets.json` | 세션과 Jira 티켓의 연결 |
+| `jira-files/` | 열어 본 티켓에 붙은 그림. 세션이 읽을 수 있게 둔다 |
 | `remote-token` | 폰용 화면의 토큰. 지우면 새로 만든다 |
 | `worktrees/` | 일감용 워크트리 |
 

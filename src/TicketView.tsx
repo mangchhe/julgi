@@ -46,6 +46,19 @@ function Md({ text }: { text: string }) {
 }
 
 /** 티켓 화면. 설명·하위 작업·코멘트를 보고, 코멘트를 달고, 상태를 옮기고, 이 티켓으로 일을 시작한다 */
+/** 첨부 그림 하나. 누르면 크게 본다 */
+function Shot({ conn, id, name }: { conn: JiraConn; id: string; name: string }) {
+  const [src, setSrc] = useState("");
+  const [big, setBig] = useState(false);
+  const [why, setWhy] = useState("");
+  useEffect(() => {
+    void invoke<{ data: string }>("jira_image", { conn, id, name }).then((r) => setSrc(r.data), (e) => setWhy(String(e)));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [id]);
+  if (why) return <span className="tk-shot-none" title={why}>{name}</span>;
+  return src ? <img className={"tk-shot" + (big ? " big" : "")} src={src} alt={name} title={name} onClick={() => setBig(!big)} /> : <span className="tk-shot-none">{name}…</span>;
+}
+
 export default function TicketView({ ticketKey, conn, onClose, onStart, sessions, onOpenSession, inline = false, autoFocus = true }: Props) {
   const [t, setT] = useState<TicketFull | null>(null);
   const [error, setError] = useState("");
@@ -164,6 +177,13 @@ export default function TicketView({ ticketKey, conn, onClose, onStart, sessions
           <div className="tk-desc">
             <div className="rv-hist-head">{tr`설명`}</div>
             {t ? t.description ? <Md text={adfToMd(t.description)} /> : <div className="pr-text muted">{tr`(설명 없음)`}</div> : null}
+            {t && (t.images?.length ?? 0) > 0 && (
+              <div className="tk-shots">
+                {t.images!.slice(0, 12).map((im) => (
+                  <Shot key={im.id} conn={conn} id={im.id} name={im.name} />
+                ))}
+              </div>
+            )}
             {t && t.subtasks.length > 0 && (
               <>
                 <div className="rv-hist-head" style={{ marginTop: 16 }}>

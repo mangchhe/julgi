@@ -1835,12 +1835,16 @@ export default function App() {
     setStartTicket(null);
     setTicketShown(null);
     setOverlay(null);
+    setTicketNews(({ [t.key]: _, ...rest }) => rest);
     const name = o.branch.replace(/[^A-Za-z0-9-]/g, "-").slice(0, 60);
     const path = await invoke<string>("worktree_add", { repo: o.cwd, name, branch: o.branch }).catch((e) => (say(tr`워크트리를 따지 못했다: ${String(e).slice(0, 100)}`, 8000), ""));
     if (!path) return;
     const id = crypto.randomUUID();
     const key = "c:" + id;
-    const brief = await invoke<string>("data_write", { name: `outbox/${crypto.randomUUID()}.md`, text: o.prompt });
+    // 티켓에 붙은 그림은 파일로 받아 경로를 알려 준다. 세션이 읽어 본다
+    const shots = (await Promise.all((t.images ?? []).slice(0, 8).map((im) => invoke<{ path: string }>("jira_image", { conn: jiraConn(), id: im.id, name: im.name }).then((r) => r.path, () => "")))).filter(Boolean);
+    const text = shots.length ? `${o.prompt}\n\n${tr`티켓에 붙은 그림이다. 시작하기 전에 읽어 본다:`}\n${shots.map((x) => `- ${x}`).join("\n")}` : o.prompt;
+    const brief = await invoke<string>("data_write", { name: `outbox/${crypto.randomUUID()}.md`, text });
     terms.create({ key, cwd: path, command: withPrompt(newCommand(id), brief) });
     setOpen((list) => [...list, { key, label: `${t.key} ${t.title}`.slice(0, 40), cwd: path, sessionId: id }]);
     show(key);
@@ -2757,7 +2761,6 @@ export default function App() {
           })}
           onTicket={(key) => (setTicketShown(key), setTicketNews(({ [key]: _, ...rest }) => rest))}
           onStartTicket={(key) => {
-            setTicketNews(({ [key]: _, ...rest }) => rest);
             void invoke<TicketFull>("jira_view", { conn: jiraConn(), key }).then(setStartTicket, (e) => say(String(e).slice(0, 100)));
           }}
           onView={(a) => {

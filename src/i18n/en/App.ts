@@ -174,4 +174,5 @@ export default {
   "세션을 재운다. 대화는 남아 있어서 ⌘K로 다시 열면 이어진다.": "This puts the session to sleep. The conversation is kept and continues when reopened with ⌘K.",
   "닫고 다시 묻지 않기": "Close and don't ask again",
   "취소": "Cancel",
+  "티켓에 붙은 그림이다. 시작하기 전에 읽어 본다:": "Images attached to the ticket. Read them before you start:",
 } as Record<string, string>;

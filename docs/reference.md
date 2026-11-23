@@ -109,6 +109,7 @@ Everything is a text file under `~/.julgi/`. Conversations are not here; Claude 
 | `progress.json` | Goal, done, left, blocked per stem |
 | `seen.json` | When you last looked at Julgi, for the briefing |
 | `tickets.json` | Which session belongs to which Jira ticket |
+| `jira-files/` | Images attached to tickets you opened, kept so sessions can read them |
 | `remote-token` | Token for the phone view. Delete it to get a new one |
 | `worktrees/` | Worktrees for tasks and tickets |
 

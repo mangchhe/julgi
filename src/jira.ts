@@ -18,6 +18,8 @@ export type TicketFull = {
   sprint: string;
   parent: string;
   description: unknown;
+  /** 첨부된 그림들. 내용은 jira_image로 받는다 */
+  images?: { id: string; name: string }[];
   subtasks: { key: string; title: string; status: string; statusCategory: string }[];
   comments: { who: string; at: string; body: unknown }[];
   updated: string;

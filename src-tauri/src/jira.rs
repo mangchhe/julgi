@@ -229,6 +229,8 @@ pub fn jira_view(conn: Conn, key: String) -> Result<Value, String> {
     let sprint = sprint_field.and_then(|k| f[&k].as_array().and_then(|a| a.last()).map(|sp| sp["name"].as_str().map(str::to_owned).unwrap_or_else(|| sp.as_str().unwrap_or("").to_owned()))).unwrap_or_default();
     let comments: Vec<Value> = f["comment"]["comments"].as_array().into_iter().flatten().map(|c| json!({ "who": s(c, "/author/displayName"), "at": s(c, "/created"), "body": c["body"] })).collect();
     let subtasks: Vec<Value> = f["subtasks"].as_array().into_iter().flatten().map(|t| json!({ "key": s(t, "/key"), "title": s(t, "/fields/summary"), "status": s(t, "/fields/status/name"), "statusCategory": s(t, "/fields/status/statusCategory/key") })).collect();
+    // 첨부 가운데 그림만. 내용은 jira_image가 따로 받는다
+    let images: Vec<Value> = f["attachment"].as_array().into_iter().flatten().filter(|a| s(a, "/mimeType").starts_with("image/")).map(|a| json!({ "id": s(a, "/id"), "name": s(a, "/filename") })).collect();
     Ok(json!({
         "key": key,
         "url": issue_url(&conn, &key),
@@ -242,10 +244,57 @@ pub fn jira_view(conn: Conn, key: String) -> Result<Value, String> {
         "sprint": sprint,
         "parent": s(f, "/parent/key"),
         "description": f["description"],
+        "images": images,
         "subtasks": subtasks,
         "comments": comments,
         "updated": s(f, "/updated"),
     }))
+}
+
+/// 첨부 그림 하나를 ~/.julgi/jira-files에 받아 둔다. 돌려주는 것: 파일 경로(세션이 읽는다)와 화면에 그릴 data URI.
+/// 토큰은 다른 호출처럼 curl 설정으로 표준 입력에 싣고, 다른 호스트로 넘어가는 리다이렉트에는 curl이 싣지 않는다
+#[tauri::command(async)]
+pub fn jira_image(conn: Conn, id: String, name: String) -> Result<Value, String> {
+    if id.is_empty() || !id.chars().all(|c| c.is_ascii_digit()) {
+        return Err("bad attachment id".into());
+    }
+    let ext = name.rsplit('.').next().unwrap_or("").to_ascii_lowercase();
+    let mime = match ext.as_str() {
+        "png" => "image/png",
+        "jpg" | "jpeg" => "image/jpeg",
+        "gif" => "image/gif",
+        "webp" => "image/webp",
+        _ => return Err(say("그릴 수 없는 그림 형식이다", "Not an image format that can be shown")),
+    };
+    let dir = crate::state_dir().join("jira-files");
+    std::fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
+    let path = dir.join(format!("{id}.{ext}"));
+    if !path.exists() {
+        check_site(&conn.site)?;
+        let t = token(&conn.site).ok_or_else(|| say("Jira에 연결돼 있지 않다", "Jira is not connected"))?;
+        let part = dir.join(format!("{id}.part"));
+        let mut child = Command::new("curl")
+            .args(["-sS", "-L", "-m", "30", "--max-filesize", "10485760", "-K", "-", "-w", "%{http_code}", "-o"])
+            .arg(&part)
+            .stdin(Stdio::piped())
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped())
+            .spawn()
+            .map_err(|e| e.to_string())?;
+        if let Some(mut stdin) = child.stdin.take() {
+            let cfg = format!("url = \"{}/attachment/content/{id}\"\nheader = \"Authorization: {}\"\n", base(&conn), auth(&conn, &t));
+            stdin.write_all(cfg.as_bytes()).map_err(|e| e.to_string())?;
+        }
+        let out = child.wait_with_output().map_err(|e| e.to_string())?;
+        let code = String::from_utf8_lossy(&out.stdout).trim().to_owned();
+        if code != "200" {
+            let _ = std::fs::remove_file(&part);
+            return Err(say(&format!("그림을 받지 못했다 ({code})"), &format!("Could not fetch the image ({code})")));
+        }
+        std::fs::rename(&part, &path).map_err(|e| e.to_string())?;
+    }
+    let bytes = std::fs::read(&path).map_err(|e| e.to_string())?;
+    Ok(json!({ "path": path.to_string_lossy(), "data": format!("data:{mime};base64,{}", b64(&bytes)) }))
 }
 
 /// 지금 고를 수 있는 전환
