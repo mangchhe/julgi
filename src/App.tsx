@@ -9,6 +9,7 @@ import Queue from "./Queue";
 import Status from "./Status";
 import History, { Act } from "./History";
 import Morning from "./Morning";
+import { TRIAGE_SYSTEM, triagePrompt, parseTriage } from "./triageAsk.ts";
 import Pane from "./Pane";
 import Palette, { Pick } from "./Palette";
 import Send, { RouteNote, Target } from "./Send";
@@ -27,7 +28,7 @@ import { firstKey, JiraConn, keyOfUrl, setKnownKeys, Ticket, TicketFull, TicketS
 import { isLab, newsOf, openPr, prOf, PrStatus, PrTarget, prUrl, repoName, ReviewAsk } from "./pr";
 import * as terms from "./terms";
 import { rank } from "./route";
-import { Brief, Change, Job, Progress, MAX_PARALLEL, setMapDirs, setPrefs, markAuto, isAuto, autoList, STATE_LABEL, ago, Item, modelFor, SkillInfo, SkillUse, aboutOf, buildFolders, buildItems, aliveElsewhere, config, elsewhere, enrich, markSlept, setAlive, handoffCommand, Ledger, Merge, mergeCandidates, mergeKey, newCommand, Open, repoOf, resumeCommand, Session, TermState, Thread, waiting, withPrompt } from "./model";
+import { Brief, Change, Job, Progress, MAX_PARALLEL, setMapDirs, setPrefs, markAuto, isAuto, autoList, STATE_LABEL, replied, ago, Item, modelFor, SkillInfo, SkillUse, aboutOf, buildFolders, buildItems, aliveElsewhere, config, elsewhere, enrich, markSlept, setAlive, handoffCommand, Ledger, Merge, mergeCandidates, mergeKey, newCommand, Open, repoOf, resumeCommand, Session, TermState, Thread, waiting, withPrompt } from "./model";
 import { selftest } from "./selftest";
 import { tr } from "./i18n";
 import "./App.css";
@@ -165,6 +166,10 @@ export default function App() {
   const [skillCands, setSkillCands] = useState<SkillCandidate[]>([]);
   const [names, setNames] = useState<Record<string, string>>({}); // 세션 ID → Julgi가 지은 이름
   const [progress, setProgress] = useState<Record<string, Progress>>({}); // 줄기 id(없으면 세션 id) → 어디까지 왔나
+  // 답을 끝낸 세션마다 "내가 할 일이 있나"를 판정해 둔 것. 열쇠는 세션 id, since가 같을 때만 그 답의 판정이다
+  const triaged = useRef<Record<string, { since: number; need: boolean; why: string }>>({});
+  const triaging = useRef(new Map<string, number>()); // 판정하는 중인 세션 → 시작한 때
+  const longRunTold = useRef<Record<string, number>>({}); // 오래 돈다고 이미 알린 차례(since)
   const progressRef = useRef(progress);
   progressRef.current = progress;
   const [finding, setFinding] = useState(false);
@@ -725,6 +730,25 @@ export default function App() {
     void invoke("data_write", { name: "reviews.json", text: JSON.stringify(live.current.reviews, null, 1) });
     record("점검", tr`${next.v}판(${tr(kind)}): 손댄 것 ${did.length}개, 눈에 띈 것 ${next.seen.length}개. ⌘G의 통계에서 본다`); // i18n-ok
   };
+  /** 답을 끝낸 세션의 마지막 답을 읽고, 내가 할 일이 있는지 판정해 둔다. 판정하지 못하면 할 일이 있는 것으로 둔다 */
+  const triage = async (sessionId: string, since: number) => {
+    if (triaging.current.has(sessionId)) return;
+    triaging.current.set(sessionId, Date.now());
+    let verdict = { since, need: true, why: "" };
+    try {
+      const pair = await invoke<[string, string] | null>("last_exchange", { sessionId });
+      if (pair?.[1]) {
+        // 물음은 대개 답의 끝에 있다
+        const raw = (await invoke<string | null>("route_ask", { system: TRIAGE_SYSTEM, prompt: triagePrompt(pair[0], pair[1]), model: modelFor("note") })) ?? "";
+        verdict = { since, ...parseTriage(raw) };
+      }
+    } catch {
+      // 못 읽었으면 내 차례로 둔다. 놓치는 것보다 한 번 더 부르는 편이 낫다
+    }
+    triaged.current = { ...triaged.current, [sessionId]: verdict };
+    triaging.current.delete(sessionId);
+    void invoke("data_write", { name: "triage.json", text: JSON.stringify(Object.fromEntries(Object.entries(triaged.current).slice(-200))) });
+  };
   /** 요약이 새로 나온 세션이 속한 일(줄기, 아니면 그 세션 하나)이 어디까지 왔는지 네 줄로 정리해 둔다 */
   const trackProgress = async (sessionId: string, latest: string) => {
     const thread = live.current.threads.find((t) => t.sessions.includes(sessionId));
@@ -1220,7 +1244,7 @@ export default function App() {
       if (!live.current.open.some((x) => x.key === key)) return stop(tr("세션이 닫혀서 갈아타기를 그만뒀다."));
       // 보낸 뒤에 새로 적힌 "기다림"이어야 끝난 것이다. 중간의 "일하는 중"을 못 봤어도 된다
       // (창이 가려져 타이머가 늦게 돌 수 있다).
-      if (!waiting(state) || state.since < startedAt) {
+      if (!(waiting(state) || replied(state)) || state.since < startedAt) {
         if (Date.now() - startedAt > HANDOFF_TIMEOUT_MS) stop(tr("인계 글이 오지 않아 갈아타기를 그만뒀다."));
         return;
       }
@@ -1452,9 +1476,10 @@ export default function App() {
       const was = lastStates.current[o.key]?.state;
       const is = states[o.key]?.state;
       // 일하다가 내 차례가 됐는데 내가 Julgi를 안 보고 있으면 알린다. 갈아타는 중의 인계 글은 내가 볼 것이 아니라 뺀다
-      if (config.notify && was === "run" && (is === "wait" || is === "ask") && !document.hasFocus() && !handing.includes(o.key))
+      if (config.notify && was === "run" && (is === "wait" || is === "ask" || is === "stuck") && !document.hasFocus() && !handing.includes(o.key))
       {
-        void invoke("notify", { title: nameOf(o.key).slice(0, 60), body: is === "ask" ? tr("확인이 필요하다") : tr("답을 끝냈다. 내 차례다") });
+        const why = (o.sessionId && triaged.current[o.sessionId]?.why) || "";
+        void invoke("notify", { title: nameOf(o.key).slice(0, 60), body: is === "ask" ? tr("확인이 필요하다") : is === "stuck" ? tr("일하다가 멈춰 있다") : why || tr("답을 끝냈다. 내 차례다") });
         notified.current = { key: o.key, at: now };
       }
       // 답이 끝났으면 그 폴더에서 무엇이 바뀌었는지 센다. 변경이 달라졌으면 브리핑도 새로 만든다
@@ -1465,8 +1490,15 @@ export default function App() {
         // 그리고 그 순간을 찍어 둔다. 끝났을 때의 것과 견주면 이번 답에서 바뀐 것만 나온다
         void invoke<string | null>("repo_snapshot", { path: o.cwd, name: `${(o.sessionId ?? "x").slice(0, 8)}-start` }).then((sha) => void (turnFrom.current[key] = sha ?? ""), () => {});
       }
-      if (was === "run" && (is === "wait" || is === "ask") && o.sessionId) void checkChanges(o.cwd, o.sessionId, turnSig.current[o.key], turnFrom.current[o.key]);
-      if (was === "wait" && is === "run") answered.current[o.key] = now;
+      // 한 번 시킨 일이 너무 오래 돌고 있으면 한 번 알린다. 걸려 있는데 화면만 돌고 있을 수 있다
+      const st = states[o.key];
+      if (config.longRunMin > 0 && is === "run" && st && now - st.since > config.longRunMin * 60_000 && longRunTold.current[o.key] !== st.since && !isAuto(o.sessionId ?? "")) {
+        longRunTold.current[o.key] = st.since;
+        record("확인 필요", tr`"${nameOf(o.key).slice(0, 40)}" 세션이 ${config.longRunMin}분 넘게 한 가지 일을 하고 있다`, o.sessionId); // i18n-ok
+        if (config.notify && !document.hasFocus()) void invoke("notify", { title: nameOf(o.key).slice(0, 60), body: tr`${config.longRunMin}분 넘게 일하는 중이다. 걸렸는지 본다` });
+      }
+      if (was === "run" && (is === "wait" || is === "ask" || is === "told" || is === "stuck") && o.sessionId) void checkChanges(o.cwd, o.sessionId, turnSig.current[o.key], turnFrom.current[o.key]);
+      if ((was === "wait" || was === "told" || was === "stuck") && is === "run") answered.current[o.key] = now;
       else if (is !== "run") delete answered.current[o.key];
     }
     lastStates.current = states;
@@ -1588,10 +1620,10 @@ export default function App() {
       if (!o.sessionId) continue;
       const st = states[o.key];
       // 세션이 스스로 갈아타 달라고 했으면 그 답이 끝난 뒤에 한다
-      if (wantHandoff.current.has(o.key) && waiting(st)) {
+      if (wantHandoff.current.has(o.key) && (waiting(st) || replied(st))) {
         wantHandoff.current.delete(o.key);
         handoff(o.key);
-      } else if (st?.state === "wait" && now - st.since > NOTE_AFTER_MS) void summarize(o.sessionId);
+      } else if (replied(st) && now - st!.since > NOTE_AFTER_MS) void summarize(o.sessionId);
     }
     // 메모리가 한도를 넘으면 시간을 기다리지 않고 재운다. 잰 값 하나에 하나씩만: 재운 것이 다음 잰 값에 반영된 뒤 다시 본다
     const mem = loadRef.current;
@@ -1601,7 +1633,7 @@ export default function App() {
       const pick = open
         .filter((o) => o.key.startsWith("c:") && !panes.includes(o.key) && !handing.includes(o.key) && !pinned.includes(o.key))
         // 답까지 본 세션이거나, 켠 뒤로 한 번도 안 띄운 세션만
-        .filter((o) => (states[o.key] ? states[o.key].state === "wait" && seen.current[o.key] === states[o.key].since : true) && idle(o) > 600_000)
+        .filter((o) => (states[o.key] ? states[o.key].state === "told" || (states[o.key].state === "wait" && seen.current[o.key] === states[o.key].since) : true) && idle(o) > 600_000)
         .sort((a, b) => idle(b) - idle(a))[0];
       if (pick) {
         mem.sleptAt = now;
@@ -1619,7 +1651,8 @@ export default function App() {
         const never = !st && last > 0 && now - last > limit && now - startedAt.current > 60_000;
         // 칸에 띄워 본 것도 쓴 것으로 친다. 마지막으로 칸에서 본 때부터 다시 센다
         const looked = now - (shownAt.current[o.key] ?? 0) > limit && terms.idle(o.key) > limit;
-        const rested = looked && (never || (st?.state === "wait" && seen.current[o.key] === st.since && now - st.since > limit));
+        // 보고만 한 세션은 내가 답을 봤는지와 상관없이 쉰 시간만 본다
+        const rested = looked && (never || (st?.state === "told" && now - st.since > limit) || (st?.state === "wait" && seen.current[o.key] === st.since && now - st.since > limit));
         // 고정한 세션은 재우지 않는다. 며칠씩 이어 가는 주 세션을 그렇게 둔다
         if (rested && o.key.startsWith("c:") && !panes.includes(o.key) && !handing.includes(o.key) && !pinned.includes(o.key)) {
           record("재움", tr`"${nameOf(o.key)}" · 답을 본 뒤 ${config.sleepHours}시간 넘게 쉬어서`, o.sessionId); // i18n-ok
@@ -1830,8 +1863,8 @@ export default function App() {
     // i18n-on
     void dispatch({ kind: "new", cwd }, ask, { rank: 0, by: "리뷰 요청" }); // i18n-ok
   };
-  const actions = useRef({ readUsage, publishRemote, say, dispatch, show, close, sleep, requestQuit, handoff, exited, newSession, newShell, nextWaiting, openTerm, resize, split, unsplit, finishThread, move, togglePin, tend, serve, confirmClose, toggleReview, prNotice, askNotice, mineNotice, sleepNotice, wake, ticketNotice, ticketOffer });
-  actions.current = { readUsage, publishRemote, say, dispatch, show, close, sleep, requestQuit, handoff, exited, newSession, newShell, nextWaiting, openTerm, resize, split, unsplit, finishThread, move, togglePin, tend, serve, confirmClose, toggleReview, prNotice, askNotice, mineNotice, sleepNotice, wake, ticketNotice, ticketOffer };
+  const actions = useRef({ readUsage, publishRemote, say, dispatch, show, close, sleep, requestQuit, handoff, exited, newSession, newShell, nextWaiting, openTerm, resize, split, unsplit, finishThread, move, togglePin, tend, triage, serve, confirmClose, toggleReview, prNotice, askNotice, mineNotice, sleepNotice, wake, ticketNotice, ticketOffer });
+  actions.current = { readUsage, publishRemote, say, dispatch, show, close, sleep, requestQuit, handoff, exited, newSession, newShell, nextWaiting, openTerm, resize, split, unsplit, finishThread, move, togglePin, tend, triage, serve, confirmClose, toggleReview, prNotice, askNotice, mineNotice, sleepNotice, wake, ticketNotice, ticketOffer };
 
   /** 세션이 남긴 링크 가운데 마지막 PR */
   const prOfSession = (id?: string) => {
@@ -2063,12 +2096,24 @@ export default function App() {
           // 내가 Esc로 멈추면 Claude Code는 끝났다고 알려 주지 않는다. 일한다면서 화면이 한참 조용하면 멈춘 것으로 본다
           const out = terms.outAt(o.key);
           const stalled = hit[0] === "run" && Date.now() - out > QUIET_MS;
-          const st = stalled ? { state: "wait", since: Math.max(out, hit[1]) } : { state: hit[0], since: hit[1] };
+          const st = stalled ? { state: "stuck", since: Math.max(out, hit[1]) } : { state: hit[0], since: hit[1] };
           // 일감을 맡기고 답을 끝낸 조율 세션은 내가 답할 차례가 아니다. 결과가 오면 Julgi가 넣어 준다
           const holding = st.state === "wait" && tasksRef.current.some((t) => t.lead === o.sessionId && (t.status === "대기" || t.status === "하는 중")); // i18n-ok
           // 일감을 맡은 세션이 답을 끝낸 것도 내 차례가 아니다. 결과는 조율 세션으로 간다
           const worker = st.state === "wait" && tasksRef.current.some((t) => t.session === o.sessionId);
-          next[o.key] = holding ? { state: "hold", since: st.since } : worker ? { state: "idle", since: st.since } : st;
+          // 답을 끝냈으면 그 답을 읽고 내가 할 일이 있는지 본다. 판정이 나올 때까지(몇 초)는 일하는 중으로 두고,
+          // 할 일이 없으면 "보고함"으로 내려 둔다. Julgi가 알아서 띄운 세션과 내가 방금 Esc로 끊은 세션은 판정하지 않는다
+          let shown: TermState = st;
+          if (config.triage && st.state === "wait" && o.sessionId && !holding && !worker && !isAuto(o.sessionId) && !live.current.handing.includes(o.key)) {
+            const known = triaged.current[o.sessionId];
+            if (known?.since === st.since) shown = known.need ? st : { state: "told", since: st.since };
+            else {
+              void actions.current.triage(o.sessionId, st.since);
+              // 열두 초 넘게 답이 없으면 기다리지 않고 내 차례로 올린다
+              if (Date.now() - (triaging.current.get(o.sessionId) ?? Date.now()) < 12_000) shown = { state: "run", since: live.current.states[o.key]?.state === "run" ? live.current.states[o.key].since : st.since };
+            }
+          }
+          next[o.key] = holding ? { state: "hold", since: st.since } : worker ? { state: "idle", since: st.since } : shown;
         }
         setStates((old) => (JSON.stringify(old) === JSON.stringify(next) ? old : next));
         actions.current.tend();
@@ -2317,6 +2362,13 @@ export default function App() {
     });
     const seenTimer = setInterval(markSeen, 60_000);
     window.addEventListener("focus", backFromAway);
+    void invoke<string | null>("data_read", { name: "triage.json" }).then((json) => {
+      try {
+        if (json) triaged.current = { ...JSON.parse(json), ...triaged.current };
+      } catch {
+        // 깨졌으면 다시 판정한다
+      }
+    });
     void invoke<string | null>("data_read", { name: "progress.json" }).then((json) => {
       try {
         if (json) setProgress(JSON.parse(json));
@@ -2850,7 +2902,9 @@ export default function App() {
             .sort((a, b) => (states[a.key]?.since ?? Infinity) - (states[b.key]?.since ?? Infinity))
             .map((o) => {
               const stem = threads.find((t) => o.sessionId && t.sessions.includes(o.sessionId));
-              return { key: o.key, name: nameOf(o.key), repo: repoOf(o.cwd), ask: states[o.key]?.state === "ask", since: states[o.key]?.since ?? 0, blocked: progress[stem?.id ?? o.sessionId ?? ""]?.blocked };
+              // 왜 내 차례인지: 마지막 답을 읽고 판정한 이유가 있으면 그것을, 없으면 줄기의 막힌 것을
+              const why = states[o.key]?.state === "stuck" ? tr("일하다가 멈춰 있다") : (o.sessionId && triaged.current[o.sessionId]?.since === states[o.key]?.since && triaged.current[o.sessionId]?.why) || progress[stem?.id ?? o.sessionId ?? ""]?.blocked;
+              return { key: o.key, name: nameOf(o.key), repo: repoOf(o.cwd), ask: states[o.key]?.state === "ask", since: states[o.key]?.since ?? 0, blocked: why || undefined };
             })}
           news={[
             ...Object.entries(sleepNews).map(([id, { news, pr }]) => ({ key: "s" + id, kind: "PR", title: names[id] || byId.get(id)?.title || tr("세션"), news, open: () => (setOverlay(null), openPr(pr)) })),
@@ -2858,6 +2912,10 @@ export default function App() {
             ...Object.entries(ticketNewsMap).map(([key, news]) => ({ key: "t" + key, kind: tr("티켓"), title: `${key} ${tickets.find((x) => x.key === key)?.title ?? ""}`, news, open: () => (setOverlay(null), setTicketShown(key)) })),
             ...asks.map((a) => ({ key: "a" + a.url, kind: tr("리뷰 요청"), title: `#${a.number} ${a.title}`, news: a.author.login, open: () => (setOverlay(null), openPr({ repo: a.repository.nameWithOwner, number: a.number })) })),
           ]}
+          told={open
+            .filter((o) => states[o.key]?.state === "told")
+            .sort((a, b) => states[b.key].since - states[a.key].since)
+            .map((o) => ({ key: o.key, name: nameOf(o.key), repo: repoOf(o.cwd), why: (o.sessionId && triaged.current[o.sessionId]?.why) || "", since: states[o.key].since }))}
           stems={threads
             .filter((t) => !t.done && progress[t.id])
             .sort((a, b) => progress[b.id].at - progress[a.id].at)

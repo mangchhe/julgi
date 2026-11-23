@@ -17,6 +17,7 @@ Read this before you run it. Everything here can be turned off or narrowed in se
 - **Sessions can read the repos on the map without asking** (a `Read` permission passed through `--settings`). Editing another repo still asks.
 - **Julgi answers the "do you trust this folder" prompt for some folders**: the default folder, folders in `autoTrust`, and repos you named through `mapRoot` or `repos`.
 - **Drawing the map fetches from remotes.** Only clean repos on their default branch are fast-forwarded (`mapFetch`).
+- **Finished replies are read by a small model** (`triage`) to decide whether you are needed. The end of the reply and your last message are sent through `claude -p`.
 - **Judgment calls go out through `claude -p`**, text only, no tools, no transcript kept. Briefings and second reads include the diff; preference extraction includes what you said.
 
 ## Extension points
@@ -55,6 +56,8 @@ Change them in `⌘,`; they apply at once and are saved to `~/.julgi/config.json
 | `usage` | off | Show Claude subscription limits in the status bar |
 | `memoryLimitGb` | 8 | Sleep idle sessions when total memory passes this. 0 disables |
 | `skipPermissions` | `off` | Launch without permission prompts. `mine` (sessions I opened), `all` |
+| `triage` | on | Read each finished reply and bring the session to My turn only when there is something to decide or answer |
+| `longRunMin` | 30 | Notify once when one request has been running this many minutes. 0 disables |
 | `morning`, `morningHours` | on, 6 | Show the briefing when you come back after this many hours away |
 | `autoAllow`, `allowRules` | `off`, none | Commands let through without asking: `look`, `check`, plus your own prefixes or rules |
 | `notify` | on | Notify when it becomes my turn and the window is not focused |
@@ -102,6 +105,7 @@ Everything is a text file under `~/.julgi/`. Conversations are not here; Claude 
 | `activity.jsonl`, `routes.jsonl`, `misroutes.jsonl` | What Julgi did, where it sent things, corrections |
 | `plugin/`, `grown/`, `bin/julgi` | Julgi's skills, skills it grew, the session command |
 | `pr-seen.json`, `jira-seen.json` | Last known state of PRs and tickets, to tell news from old |
+| `triage.json` | For each finished reply, whether it needed you and why |
 | `progress.json` | Goal, done, left, blocked per stem |
 | `seen.json` | When you last looked at Julgi, for the briefing |
 | `tickets.json` | Which session belongs to which Jira ticket |

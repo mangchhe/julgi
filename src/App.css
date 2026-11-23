@@ -1095,3 +1095,5 @@ body.dragging .pane-body { pointer-events: none; }
 .mo-kinds b { color: var(--ink); }
 .mo-act { padding: 3px 8px; font-size: 12.5px; color: color-mix(in srgb, var(--ink) 80%, var(--muted)); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .mo-act i { font-style: normal; color: var(--muted); }
+.dot.stuck { background: var(--wait); }
+.mo-said { font-size: 12px; color: color-mix(in srgb, var(--ink) 75%, var(--muted)); margin-top: 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

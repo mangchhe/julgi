@@ -9,6 +9,8 @@ const ago = (ms: number) => agoSec(Math.floor(ms / 1000));
 import { ProgressLines } from "./Threads";
 
 export type MorningWait = { key: string; name: string; repo: string; ask: boolean; since: number; blocked?: string };
+/** 답을 끝냈지만 보고만 해서 내 차례로 올리지 않은 세션 */
+export type MorningTold = { key: string; name: string; repo: string; why: string; since: number };
 export type MorningNews = { key: string; kind: string; title: string; news: string; open: () => void };
 export type MorningStem = { key: string; name: string; repo: string; progress: Progress; show?: string };
 type Act = { at: number; kind: string; text: string };
@@ -18,6 +20,7 @@ type Props = {
   since: number;
   waits: MorningWait[];
   news: MorningNews[];
+  told: MorningTold[];
   stems: MorningStem[];
   acts: Act[];
   onShow: (key: string) => void;
@@ -26,11 +29,11 @@ type Props = {
   onClose: () => void;
 };
 
-export default function Morning({ since, waits, news, stems, acts, onShow, onQueue, onHistory, onClose }: Props) {
+export default function Morning({ since, waits, news, told, stems, acts, onShow, onQueue, onHistory, onClose }: Props) {
   const box = useRef<HTMLDivElement>(null);
   const [at, setAt] = useState(0);
   // 위아래로 고를 수 있는 줄: 기다리는 세션, 소식, 하던 일 순서
-  const picks: (() => void)[] = [...waits.map((w) => () => onShow(w.key)), ...news.map((n) => n.open), ...stems.map((s) => () => s.show && onShow(s.show))];
+  const picks: (() => void)[] = [...waits.map((w) => () => onShow(w.key)), ...news.map((n) => n.open), ...told.map((w) => () => onShow(w.key)), ...stems.map((s) => () => s.show && onShow(s.show))];
   useEffect(() => box.current?.focus(), []);
   useEffect(() => void box.current?.querySelector(".mo-row.on")?.scrollIntoView({ block: "nearest" }), [at]);
   const onKey = (e: React.KeyboardEvent) => {
@@ -45,7 +48,7 @@ export default function Morning({ since, waits, news, stems, acts, onShow, onQue
   for (const a of acts) kinds.set(a.kind, (kinds.get(a.kind) ?? 0) + 1);
   let n = 0;
   const cls = () => "mo-row" + (n++ === at ? " on" : "");
-  const quiet = !waits.length && !news.length && !stems.length && !acts.length;
+  const quiet = !waits.length && !news.length && !told.length && !stems.length && !acts.length;
   return (
     <div className="pal-back" onMouseDown={(e) => e.target === e.currentTarget && onClose()}>
       <div className="mo" ref={box} tabIndex={-1} onKeyDown={onKey}>
@@ -87,6 +90,23 @@ export default function Morning({ since, waits, news, stems, acts, onShow, onQue
                   <div className="mo-meta">
                     <em>{x.news}</em>
                   </div>
+                </div>
+              ))}
+            </section>
+          )}
+          {told.length > 0 && (
+            <section>
+              <h3>
+                {tr`끝냈다고 보고한 세션`} <i>{told.length}</i>
+              </h3>
+              {told.map((w) => (
+                <div key={w.key} className={cls()} onClick={() => onShow(w.key)}>
+                  <div className="mo-name">{w.name}</div>
+                  <div className="mo-meta">
+                    {w.repo}
+                    {w.since ? ` · ${ago(w.since)}` : ""}
+                  </div>
+                  {w.why && <div className="mo-said">{w.why}</div>}
                 </div>
               ))}
             </section>

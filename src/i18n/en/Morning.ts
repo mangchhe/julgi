@@ -1,4 +1,5 @@
 export default {
+  "끝냈다고 보고한 세션": "Sessions that reported back",
   "브리핑": "Briefing",
   "{0}에 마지막으로 본 뒤": "Since you last looked, {0}",
   "지금 형편": "Where things stand",

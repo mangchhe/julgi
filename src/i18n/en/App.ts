@@ -1,4 +1,7 @@
 export default {
+  "일하다가 멈춰 있다": "Stopped in the middle of work",
+  "\"{0}\" 세션이 {1}분 넘게 한 가지 일을 하고 있다": "\"{0}\" has been on one request for over {1} minutes",
+  "{0}분 넘게 일하는 중이다. 걸렸는지 본다": "Working for over {0} minutes. Check whether it is stuck",
   "내게 배정된 진행 중 티켓": "Tickets assigned to me that are in progress",
   "내게 배정된 아직 시작 안 한 티켓": "Tickets assigned to me that are not started yet",
   "이번 스프린트": "This sprint",

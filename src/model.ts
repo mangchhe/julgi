@@ -186,7 +186,11 @@ export function ago(seconds: number): string {
 
 export const kilo = (tokens: number) => (tokens ? `${Math.round(tokens / 1000)}k` : "");
 
-export const waiting = (s?: TermState) => s?.state === "wait" || s?.state === "ask";
+// stuck: 일한다면서 화면이 멈춰 있다(내가 Esc로 끊었거나 걸렸다). 내가 봐야 하므로 기다리는 것으로 친다.
+// told: 답을 끝냈지만 보고만 했다. 내가 할 일이 없어 내 차례로 올리지 않는다
+export const waiting = (s?: TermState) => s?.state === "wait" || s?.state === "ask" || s?.state === "stuck";
+/** 답을 끝내고 쉬는가. 재우거나 요약할 때는 보고만 한 것도 같이 본다 */
+export const replied = (s?: TermState) => s?.state === "wait" || s?.state === "told";
 
 /** Julgi가 재운 때. 그 뒤로 대화 기록이 또 바뀌면 다른 곳에서 쓰고 있다는 뜻이다 */
 const sleptAt = new Map<string, number>();
@@ -203,7 +207,7 @@ export const setAlive = (ids: string[]) => void (alive = new Set(ids));
 export const elsewhere = (s: Session) => alive.has(s.id) || (Date.now() / 1000 - s.mtime < ELSEWHERE_S && s.mtime > (sleptAt.get(s.id) ?? 0) + 5);
 /** 프로세스가 떠 있는 것을 직접 본 것인가 */
 export const aliveElsewhere = (s: Session) => alive.has(s.id);
-export const STATE_LABEL: Record<string, string> = { run: tr("일하는 중"), wait: tr("답함 · 내 차례"), hold: tr("일감 기다리는 중"), idle: tr("일감 끝냄"), ask: tr("확인이 필요함"), dead: tr("끝남") };
+export const STATE_LABEL: Record<string, string> = { run: tr("일하는 중"), wait: tr("답함 · 내 차례"), hold: tr("일감 기다리는 중"), idle: tr("일감 끝냄"), ask: tr("확인이 필요함"), dead: tr("끝남"), stuck: tr("멈춰 있음 · 확인 필요"), told: tr("보고함 · 할 일 없음") };
 
 // Julgi가 띄운 Claude 세션만 상태를 적게 한다. 전역 설정은 건드리지 않고 실행할 때만 훅을 얹는다.
 // 서브에이전트의 도구 호출도 부모 세션의 훅으로 온다(입력에 agent_id가 붙는다). 메인 답이 끝난 뒤 백그라운드 서브에이전트가
@@ -287,6 +291,10 @@ export const config = {
   repos: [] as string[],
   /** 창을 안 보고 있을 때 세션이 답을 끝내거나 확인을 물으면 macOS 알림을 띄운다 */
   notify: true,
+  /** 세션이 답을 끝내면 마지막 답을 읽고, 내가 정하거나 답할 것이 있을 때만 내 차례로 올린다. 보고만 한 것은 조용히 둔다 */
+  triage: true,
+  /** 한 번 시킨 일이 이만큼(분) 넘게 돌고 있으면 알린다. 0이면 알리지 않는다 */
+  longRunMin: 30,
   /** 오래 자리를 비웠다 돌아오면 브리핑을 띄운다 */
   morning: true,
   /** 몇 시간 넘게 안 봤으면 브리핑을 띄우나 */

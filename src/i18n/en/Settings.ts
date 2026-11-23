@@ -1,4 +1,8 @@
 export default {
+  "할 일이 있을 때만 부르기": "Only call me when there is something to do",
+  "세션이 답을 끝내면 작은 모델이 마지막 답을 읽는다. 내가 정하거나 답할 것이 있으면 내 차례로 올리고 알린다. 끝냈다고 보고만 한 것은 \"보고함\"으로 조용히 두고 브리핑(⌘⇧B)에서 모아 보여 준다. 판정하지 못하면 내 차례로 올린다": "When a session finishes its reply, a small model reads it. If there is something for you to decide or answer, the session goes to My turn and you are notified. A reply that only reports the work is left quietly as \"Reported\" and collected in the briefing (⌘⇧B). If it cannot tell, the session goes to My turn",
+  "오래 도는 일 알리기": "Tell me about long-running work",
+  "한 번 시킨 일이 이만큼 넘게 돌고 있으면 한 번 알린다. 0이면 알리지 않는다": "Notifies once when a single request has been running longer than this. 0 turns it off",
   "화면": "Display",
   "보이는 것과 창": "What you see, and the window",
   "테마": "Theme",

@@ -35,6 +35,8 @@ node scripts/eval-route.mjs --model haiku     # with another model
 - The script asks the model the same questions again and compares with those answers. It prints accuracy, splits the mistakes into "joined a new job to old work", "opened a new stem for a follow-up" and "sent to another stem", and compares with the last run for the same model. Results are kept in `~/.julgi/eval/`.
 - It calls the model once per case, so it uses your Claude usage.
 
+The same goes for deciding whether a finished reply needs you: `node scripts/eval-triage.mjs` runs the cases in `scripts/triage-cases.json` against the prompt in `src/triageAsk.ts`. A miss (you were needed but not called) is worse than a false call, so it counts them separately and fails on any miss.
+
 Change the prompt in `src/routeAsk.ts`, run it before and after, and add a case to `route-cases.json` for every mistake you see in real use.
 
 ## Commit messages
