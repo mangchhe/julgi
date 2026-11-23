@@ -7,6 +7,7 @@
 #   scripts/install.sh --open     also (re)start Julgi afterwards
 #
 # Locally built apps are not quarantined, so macOS opens them without signing.
+# If a code signing identity is in the keychain the app is signed with it (see below).
 set -euo pipefail
 
 cd "$(dirname "$0")/.."
@@ -65,6 +66,25 @@ rm -rf "$DEST/Julgi.app.new"
 cp -R "$APP" "$DEST/Julgi.app.new"
 rm -rf "$DEST/Julgi.app"
 mv "$DEST/Julgi.app.new" "$DEST/Julgi.app"
+
+# Sign with a stable identity when one exists. macOS ties folder permissions (Documents, Desktop,
+# Full Disk Access, ...) to the app's signature. An unsigned build gets a new ad-hoc signature every
+# time, so every update made macOS forget what you allowed and ask again.
+# JULGI_SIGN=off skips this; JULGI_SIGN="<identity name or hash>" picks one.
+sign="${JULGI_SIGN:-auto}"
+if [ "$sign" = "auto" ]; then
+  sign="$(security find-identity -v -p codesigning 2>/dev/null | awk 'NR==1 && $2 ~ /^[0-9A-F]{40}$/ {print $2}')"
+fi
+if [ -n "$sign" ] && [ "$sign" != "off" ]; then
+  if codesign --force --deep --sign "$sign" --identifier dev.julgi.app "$DEST/Julgi.app" 2>/dev/null; then
+    echo "Signed, so macOS keeps the folder permissions you grant across updates."
+  else
+    echo "Could not sign (the keychain may have refused). macOS may ask for folder permissions again."
+  fi
+else
+  echo "No code signing identity found: macOS will ask for folder permissions again after each update."
+  echo "  To stop that, create one (Keychain Access > Certificate Assistant > Create a Certificate, type Code Signing)."
+fi
 
 if [ "$open_after" -eq 1 ]; then
   # Sessions are reopened on start, but a session that was mid-answer stops there.

@@ -152,6 +152,8 @@ scripts/install.sh --open    # check tools → build → /Applications/Julgi.app
 
 Run the same command to update. `scripts/install.sh --check` only checks the tools. To hack on it: `npm install && npm run tauri dev`.
 
+macOS asks before an app reads Documents, Desktop, Downloads and similar folders, and sessions run inside Julgi. To be asked once instead of folder by folder, add Julgi under System Settings → Privacy & Security → Full Disk Access. The install script signs the app when a code signing identity is in your keychain, so what you allow survives updates; without one macOS forgets it at every update.
+
 Optional, for the integrations: [`gh`](https://cli.github.com) for GitHub, [`glab`](https://gitlab.com/gitlab-org/cli) for GitLab, and a Jira API token. Connect them in `⌘,` → Connections.
 
 ## Quick start
