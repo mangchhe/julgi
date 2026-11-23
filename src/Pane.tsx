@@ -25,6 +25,8 @@ type Props = {
   finding: boolean;
   /** 갈아타는 중인가 */
   handing: boolean;
+  /** 방금 갈아타서 이어받은 세션이다 */
+  handed?: boolean;
   /** 고정한 세션은 Julgi가 다른 세션으로 바꿔 끼우지 않는다 */
   pinned: boolean;
   /** 이 세션의 폴더에서 바뀐 것 */
@@ -36,7 +38,7 @@ type Props = {
   onFocus: () => void;
 };
 
-export default function Pane({ termKey, focused, active, label, cwd, session, thread, memory, state, members, thread_ops, info, finding, handing, pinned, change, review, ticketEnded, onPin, onFindClose, onFocus }: Props) {
+export default function Pane({ termKey, focused, active, label, cwd, session, thread, memory, state, members, thread_ops, info, finding, handing, handed, pinned, change, review, ticketEnded, onPin, onFindClose, onFocus }: Props) {
   const body = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -78,6 +80,7 @@ export default function Pane({ termKey, focused, active, label, cwd, session, th
                 {pinned ? tr`고정됨` : tr`고정`}
               </button>
               {handing && <span className="wait">{tr`갈아타는 중`}</span>}
+              {handed && !handing && <span className="ok" title={tr`세션이 커져서 인계 글만 들고 새 세션으로 옮겼다. 일은 그대로 이어진다`}>{tr`이어받음`}</span>}
               {ticketEnded && (
                 <span className="wait ended" title={tr`세션 끝내기`} onClick={(e) => (e.stopPropagation(), thread_ops.finish())}>
                   {ticketEnded} ✕

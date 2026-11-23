@@ -165,6 +165,23 @@ export function create(spec: TermSpec) {
   pool.set(spec.key, entry);
 }
 
+/**
+ * 갈아탈 때: 이전 터미널에 보이던 글의 끝부분을 새 터미널 맨 위에 흐리게 옮겨 적고 경계선을 긋는다.
+ * 보던 화면이 통째로 사라지지 않고, 한 세션이 이어지는 것처럼 보인다. 새 세션이 띄워지기 전에 부른다
+ */
+export function carry(from: string, to: string, note: string) {
+  const a = pool.get(from);
+  const b = pool.get(to);
+  if (!a || !b) return;
+  const buf = a.term.buffer.active;
+  const lines: string[] = [];
+  for (let y = Math.max(0, buf.length - 400); y < buf.length; y++) lines.push(buf.getLine(y)?.translateToString(true) ?? "");
+  while (lines.length && !lines[lines.length - 1].trim()) lines.pop();
+  // 같은 칸에 들어가니 폭을 맞춰 둔다. 줄이 다시 접히지 않는다
+  b.term.resize(a.term.cols, a.term.rows);
+  b.term.write(`\x1b[2m${lines.join("\r\n")}\x1b[0m\r\n\r\n\x1b[2m── ${note} ──\x1b[0m\r\n\r\n`);
+}
+
 /** 칸에 있던 터미널을 화면 밖으로 내보낸다 */
 export function park(container: HTMLElement) {
   parking().append(...container.children);

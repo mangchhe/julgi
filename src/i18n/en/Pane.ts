@@ -12,4 +12,6 @@ export default {
   "위쪽(이전) 것 · Enter": "Previous (up) · Enter",
   "아래쪽(다음) 것 · Shift+Enter": "Next (down) · Shift+Enter",
   "⏎ 위로 · ⇧⏎ 아래로 · Esc": "⏎ up · ⇧⏎ down · Esc",
+  "이어받음": "Carried over",
+  "세션이 커져서 인계 글만 들고 새 세션으로 옮겼다. 일은 그대로 이어진다": "The session grew large, so it moved to a new one with only a brief. The work continues as it was",
 } as Record<string, string>;

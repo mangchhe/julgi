@@ -1207,3 +1207,4 @@ body.dragging .pane-body { pointer-events: none; }
 .qu-bug { display: flex; align-items: center; gap: 8px; padding: 10px 14px; margin-bottom: 8px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface); font-size: 13px; line-height: 1.45; }
 .qu-bug b { font-family: ui-monospace, Menlo, monospace; font-size: 12px; color: var(--accent); flex: none; }
 .qu-bug > span { margin-left: auto; display: flex; gap: 6px; flex: none; }
+.pane-right .ok { color: var(--ok); font-weight: 600; }

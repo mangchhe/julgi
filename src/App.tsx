@@ -225,6 +225,7 @@ export default function App() {
   progressRef.current = progress;
   const [finding, setFinding] = useState(false);
   const [handing, setHanding] = useState<string[]>([]);
+  const [handed, setHanded] = useState<Record<string, number>>({}); // 방금 갈아타서 이어받은 칸. 잠깐 표시한다
   const [toast, setToast] = useState("");
   const [, setConfigTick] = useState(0);
   const lastCloseTry = useRef(0);
@@ -1321,6 +1322,10 @@ export default function App() {
             void invoke("data_write", { name: "auto-sessions.json", text: JSON.stringify(autoList()) });
           }
           terms.create({ key: next.key, cwd: o.cwd, command: handoffCommand(id, path) });
+          // 보던 화면을 새 세션 위쪽에 옮겨 적는다. 칸이 비었다가 새로 차지 않고 이어지는 것처럼 보인다
+          terms.carry(key, next.key, tr("여기서부터 새 세션 · 위의 대화는 인계 글로 넘겨받았다"));
+          setHanded((old) => ({ ...old, [next.key]: Date.now() }));
+          setTimeout(() => setHanded(({ [next.key]: _, ...rest }) => rest), 90_000);
           setOpen((list) => [...list, next]);
           // 이전 세션이 보이던 칸에 새 세션을 끼운다.
           // 보내기에서 시작한 갈아타기는 화면을 바꾸지 않고 뒤에서 띄운다.
@@ -2864,6 +2869,7 @@ export default function App() {
                 info={info && focus === i}
                 finding={finding && focus === i}
                 handing={!!key && handing.includes(key)}
+                handed={!!key && !!handed[key]}
                 ticketEnded={(() => {
                   const tk = ticketOfSession(o?.sessionId);
                   return tk && ticketDone[tk] && !threadOf(o?.sessionId)?.done ? tr`티켓 끝남 · ${ticketDone[tk]}` : undefined;
