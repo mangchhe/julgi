@@ -1996,6 +1996,12 @@ export default function App() {
     setTicketDone(next);
     void invoke("data_write", { name: "jira-done.json", text: JSON.stringify(next) });
   };
+  /** 이 티켓에 이어진 세션들, 최근에 쓴 것부터. 티켓 목록의 줄(ticketWork)과 같은 판정이다 */
+  const sessionsOfTicket = (key: string) =>
+    [...live.current.byId.values()]
+      .filter((x) => ticketOfSession(x.id) === key)
+      .sort((a, b) => b.mtime - a.mtime)
+      .map((x) => ({ id: x.id, name: live.current.names[x.id] || x.title || tr("세션") }));
   /** "이 티켓으로 시작"을 눌렀다. 이미 이 티켓을 하던 세션이 있으면 그 세션을 보여 주고, 새로 만들지는 한 번 묻는다 */
   const beginTicket = (t: TicketFull) => {
     const had = ticketWork(t as unknown as Ticket);
@@ -3189,9 +3195,7 @@ export default function App() {
               autoFocus={false}
               onClose={() => document.querySelector<HTMLElement>(".wk")?.focus()}
               onStart={beginTicket}
-              sessions={Object.entries(ticketLinks)
-                .filter(([, k]) => k === key)
-                .map(([id]) => ({ id, name: names[id] || byId.get(id)?.title || tr("세션") }))}
+              sessions={sessionsOfTicket(key)}
               onOpenSession={(id) => {
                 setOverlay(null);
                 if (open.some((o) => o.sessionId === id)) show("c:" + id);
@@ -3224,9 +3228,7 @@ export default function App() {
           conn={jiraConn()}
           onClose={() => setTicketShown(null)}
           onStart={beginTicket}
-          sessions={Object.entries(ticketLinks)
-            .filter(([, k]) => k === ticketShown)
-            .map(([id]) => ({ id, name: names[id] || byId.get(id)?.title || tr("세션") }))}
+          sessions={sessionsOfTicket(ticketShown)}
           onOpenSession={(id) => {
             setTicketShown(null);
             if (open.some((o) => o.sessionId === id)) show("c:" + id);

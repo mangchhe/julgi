@@ -39,4 +39,5 @@ export default {
   "실행": "Runs",
   "열려 있거나 최근에 쓴 세션의 레포에서 내가 돌린 CI. 도는 것이 위에 온다": "CI you started in the repos of open or recently used sessions. Running ones come first",
   "내가 돌린 실행이 없다": "No runs started by you",
+  "1–9·Tab 묶음 · ↑↓ 고르기": "1–9·Tab group · ↑↓ pick",
 } as Record<string, string>;

@@ -111,9 +111,11 @@ export default function TicketView({ ticketKey, conn, onClose, onStart, sessions
     if (e.key === "Escape") {
       if (moves) setMoves(null);
       else onClose();
-    } else if (e.key === "s") openMoves();
+    } else if (e.key === "m") openMoves();
     else if (e.key === "c") box.current?.querySelector<HTMLTextAreaElement>(".tk-say textarea")?.focus();
-    else if (e.key === "Enter" && t) onStart(t);
+    // 작업 페이지와 같은 키: ⌘Enter 시작(이어진 세션이 있으면 그 세션), s 이어진 세션으로
+    else if (e.key === "Enter" && e.metaKey && t) (sessions[0] ? onOpenSession(sessions[0].id) : onStart(t));
+    else if (e.key === "s" && sessions[0]) onOpenSession(sessions[0].id);
     else if (e.key === "o" && t) void openUrl(t.url);
     else if (e.key === "r") setLoads(loads + 1);
     else return;
@@ -132,32 +134,37 @@ export default function TicketView({ ticketKey, conn, onClose, onStart, sessions
           </div>
           {error && <div className="pr-error">{/401|연결돼 있지/.test(error) ? tr`Jira에 연결돼 있지 않거나 토큰이 만료됐다. ⌘,의 연결에서 다시 연결한다.` : error}</div>}
           {t && (
-            <div className="rv-git">
-              <button type="button" tabIndex={-1} className={"tk-status c-" + cat} onClick={openMoves} title={tr`상태 옮기기 (s)`}>
+            <div className="tk-meta">
+              <button type="button" tabIndex={-1} className={"tk-status c-" + cat} onClick={openMoves} title={tr`상태 옮기기 (m)`}>
                 {t.status} ▾
               </button>
-              {t.type && <span>{t.type}</span>}
-              {t.priority && <span>{t.priority}</span>}
-              {t.sprint && <span>{t.sprint}</span>}
-              <span>{t.assignee ? tr`담당 ${t.assignee}` : tr`담당 없음`}</span>
-              {t.reporter && <span>{tr`보고 ${t.reporter}`}</span>}
-              {t.parent && (
-                <button type="button" tabIndex={-1} onClick={() => openTicket(t.parent)}>
-                  {tr`상위 ${t.parent}`}
+              {/* 상태만 단추로 두고 나머지는 회색 글 한 줄로 */}
+              <span className="tk-facts">
+                {[t.type, t.priority, t.sprint, t.assignee ? tr`담당 ${t.assignee}` : tr`담당 없음`, t.reporter ? tr`보고 ${t.reporter}` : ""].filter(Boolean).join(" · ")}
+                {t.parent && (
+                  <>
+                    {" · "}
+                    <a onClick={() => openTicket(t.parent)}>{tr`상위 ${t.parent}`}</a>
+                  </>
+                )}
+                {" · "}
+                {when(t.updated)}
+              </span>
+              <span className="tk-acts">
+                {/* 주 동작은 하나: 이어진 세션이 있으면 그 세션을 열고, 없으면 시작한다. 목록의 줄과 같은 판정이다 */}
+                {sessions[0] ? (
+                  <button type="button" tabIndex={-1} className="pr-merge-btn" onClick={() => onOpenSession(sessions[0].id)} title={tr`이 티켓과 이어진 세션 열기 (⌘Enter)` + (sessions.length > 1 ? "\n" + sessions.map((s) => s.name).join("\n") : "")}>
+                    {tr`세션 열기 · ${sessions[0].name.slice(0, 24)}`}
+                  </button>
+                ) : (
+                  <button type="button" tabIndex={-1} className="pr-merge-btn" onClick={() => onStart(t)} title={tr`워크트리를 따고 이 티켓을 첫 지시로 새 세션을 연다 (⌘Enter)`}>
+                    {tr`이 티켓으로 시작`}
+                  </button>
+                )}
+                <button type="button" tabIndex={-1} onClick={() => void openUrl(t.url)}>
+                  {tr`웹에서 열기`}
                 </button>
-              )}
-              <span>{tr`${when(t.updated)} 수정`}</span>
-              {sessions.map((s) => (
-                <button key={s.id} type="button" tabIndex={-1} onClick={() => onOpenSession(s.id)} title={tr`이 티켓과 이어진 세션 열기`}>
-                  {tr`세션 "${s.name.slice(0, 24)}"`}
-                </button>
-              ))}
-              <button type="button" tabIndex={-1} className="pr-merge-btn" onClick={() => onStart(t)} title={tr`워크트리를 따고 이 티켓을 첫 지시로 새 세션을 연다 (Enter)`}>
-                {tr`이 티켓으로 시작`}
-              </button>
-              <button type="button" tabIndex={-1} onClick={() => void openUrl(t.url)}>
-                {tr`웹에서 열기`}
-              </button>
+              </span>
             </div>
           )}
           {moves && (
@@ -199,14 +206,17 @@ export default function TicketView({ ticketKey, conn, onClose, onStart, sessions
           </div>
           <div className="rv-hist pr-talk">
             <div className="rv-hist-head">{tr`코멘트 ${t?.comments.length ?? ""}`}</div>
-            {t?.comments.map((c, i) => (
-              <div key={i} className="pr-item">
-                <div>
-                  <b>{c.who}</b> <small>{when(c.at)}</small>
+            {/* 목록만 밀린다. 입력칸은 아래에 붙어 있고 목록이 그 뒤로 지나가지 않는다 */}
+            <div className="tk-comments">
+              {t?.comments.map((c, i) => (
+                <div key={i} className="pr-item">
+                  <div>
+                    <b>{c.who}</b> <small>{when(c.at)}</small>
+                  </div>
+                  <Md text={adfToMd(c.body)} />
                 </div>
-                <Md text={adfToMd(c.body)} />
-              </div>
-            ))}
+              ))}
+            </div>
             {t && (
               <div className="pr-say tk-say">
                 <textarea rows={3} value={say} placeholder={tr`코멘트 · ⌘Enter로 올린다`} onChange={(e) => setSay(e.target.value)} />
@@ -219,7 +229,7 @@ export default function TicketView({ ticketKey, conn, onClose, onStart, sessions
             )}
           </div>
         </div>
-        <Hint text={tr`s 상태 옮기기 · c 코멘트 · Enter 이 티켓으로 시작 · o 웹에서 열기 · r 새로 읽기 · Esc`} />
+        <Hint text={[tr`m 상태 옮기기 · c 코멘트`, sessions[0] ? tr`⌘Enter·s 이어진 세션으로` : tr`⌘Enter 이 티켓으로 시작`, tr`o 웹에서 열기 · r 새로 읽기 · Esc`].join(" · ")} />
       </div>
     </div>
   );

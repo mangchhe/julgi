@@ -24,4 +24,11 @@ export default {
   "코멘트 {0}": "Comments {0}",
   "코멘트 · ⌘Enter로 올린다": "Comment · ⌘Enter to post",
   "s 상태 옮기기 · c 코멘트 · Enter 이 티켓으로 시작 · o 웹에서 열기 · r 새로 읽기 · Esc": "s change status · c comment · Enter start from this ticket · o open on the web · r reload · Esc",
+  "상태 옮기기 (m)": "Move status (m)",
+  "이 티켓과 이어진 세션 열기 (⌘Enter)": "Open the session tied to this ticket (⌘Enter)",
+  "세션 열기 · {0}": "Open session · {0}",
+  "워크트리를 따고 이 티켓을 첫 지시로 새 세션을 연다 (⌘Enter)": "Create a worktree and open a new session briefed with this ticket (⌘Enter)",
+  "m 상태 옮기기 · c 코멘트": "m move status · c comment",
+  "⌘Enter·s 이어진 세션으로": "⌘Enter·s go to the tied session",
+  "o 웹에서 열기 · r 새로 읽기 · Esc": "o open on the web · r reload · Esc",
 } as Record<string, string>;

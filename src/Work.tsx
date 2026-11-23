@@ -234,11 +234,6 @@ export default function Work({ groups, ticketGroups = [], loadTickets, ticketPan
             </button>
           </>
         )}
-        <div className="wk-navfoot">
-          <button type="button" tabIndex={-1} onClick={onRefresh} title={tr`PR과 리뷰 요청을 바로 다시 읽는다 (r)`}>
-            {tr`새로 읽기`}
-          </button>
-        </div>
       </nav>
       <div className="wk-list" ref={list}>
         <div className="wk-head">
@@ -402,7 +397,7 @@ export default function Work({ groups, ticketGroups = [], loadTickets, ticketPan
       <Hint
         className="wk-foot"
         text={[
-          tgroup ? tr`1–9·Tab 묶음 · ↑↓ 고르기 · Enter·→ 티켓 화면으로 (Esc로 목록에 돌아옴)` : tr`1–9·Tab 묶음 · ↑↓ 고르기 · Enter·→ PR 화면으로 (Esc로 목록에 돌아옴)`,
+          runsOn ? tr`1–9·Tab 묶음 · ↑↓ 고르기` : tgroup ? tr`1–9·Tab 묶음 · ↑↓ 고르기 · Enter·→ 티켓 화면으로 (Esc로 목록에 돌아옴)` : tr`1–9·Tab 묶음 · ↑↓ 고르기 · Enter·→ PR 화면으로 (Esc로 목록에 돌아옴)`,
           row?.sessionId ? tr`s 세션 열기` : "",
           row?.ask ? tr`⌘Enter 세션에 리뷰 맡기기` : "",
           ticket && works.get(ticket.key)?.session ? tr`s 이어진 세션으로` : "",

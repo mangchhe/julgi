@@ -1259,3 +1259,22 @@ body.dragging .pane-body { pointer-events: none; }
 @keyframes ci-pulse { 50% { opacity: 0.35; } }
 .ci-log { margin: 8px 0 4px 18px; display: flex; flex-direction: column; gap: 6px; align-items: flex-start; }
 .ci-log pre { width: 100%; box-sizing: border-box; max-height: 280px; overflow: auto; margin: 0; padding: 10px 12px; border-radius: 8px; background: var(--surface); border: 1px solid var(--line); font-family: ui-monospace, Menlo, monospace; font-size: 12px; line-height: 1.5; white-space: pre-wrap; word-break: break-word; -webkit-user-select: text; user-select: text; }
+
+/* 작업 페이지: 키 안내는 포커스가 있는 쪽 하나만. 오른쪽 화면에 포커스가 있으면 그쪽 안내, 아니면 작업 페이지의 안내 */
+.wk .pr-inline .pal-foot { display: none; }
+.wk .pr-inline:focus-within .pal-foot { display: flex; }
+.wk:has(.pr-inline:focus-within) > .wk-foot { display: none; }
+/* 작업 페이지와 PR·티켓 화면은 창 아래 끝까지 덮는다. 뒤 칸의 터미널이 가장자리로 비치지 않게 바깥으로도 조금 칠한다 */
+.wk, .pr-wrap { inset: 30px 0 0; background: var(--bg); box-shadow: 0 0 0 6px var(--bg); }
+/* 티켓 머리: 상태 단추, 회색 글 한 줄, 오른쪽에 단추 둘 */
+.tk-meta { display: flex; align-items: center; gap: 10px; font-size: 12.5px; color: var(--muted); min-width: 0; }
+.tk-facts { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tk-facts a { color: var(--accent); cursor: pointer; }
+.tk-acts { display: flex; gap: 6px; flex: none; }
+.tk-acts button { font: inherit; font-size: 12px; color: var(--ink); background: var(--surface); border: 1px solid var(--line); border-radius: 6px; padding: 2px 10px; cursor: pointer; }
+.tk-acts button:hover { border-color: var(--accent); }
+.tk-acts button.pr-merge-btn { color: var(--ok); border-color: var(--ok); background: color-mix(in srgb, var(--ok) 10%, transparent); }
+/* 티켓의 코멘트 칸: 목록만 밀리고 입력칸은 아래에 붙는다 */
+.tk .rv-hist.pr-talk { display: flex; flex-direction: column; overflow: hidden; min-height: 0; }
+.tk-comments { flex: 1; min-height: 0; overflow-y: auto; }
+.tk .tk-say { position: static; flex: none; margin-top: 0; background: var(--bg); }
