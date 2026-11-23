@@ -3,7 +3,8 @@ import { ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import { CATEGORY, Ticket } from "./jira";
 import PrView from "./PrView";
 import { ago } from "./model";
-import { prNo, prParts, PrStatus, PrTarget, repoName, ReviewAsk } from "./pr";
+import { openUrl } from "@tauri-apps/plugin-opener";
+import { prNo, prParts, PrStatus, PrTarget, prUrl, repoName, ReviewAsk } from "./pr";
 
 /** 작업 페이지의 한 줄. PR 하나다 */
 export type WorkRow = {
@@ -68,6 +69,16 @@ export default function Work({ groups, ticketGroups = [], loadTickets, ticketPan
     );
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tgroup?.id, ticketLoads]);
+  // 열자마자 티켓 묶음을 전부 읽어 둔다. 눌러야 읽으면 왼쪽에 개수가 안 보이고, 새 소식이 있는 묶음도 알 수 없다
+  useEffect(() => {
+    if (!loadTickets) return;
+    for (const g of ticketGroups)
+      void loadTickets(g.jql).then(
+        (list) => setTicketRows((old) => (old[g.id] ? old : { ...old, [g.id]: list })),
+        (why) => setTicketRows((old) => (old[g.id] ? old : { ...old, [g.id]: String(why) })),
+      );
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ticketGroups.length]);
   const tickets = tgroup ? ticketRows[tgroup.id] : undefined;
   const tlist = Array.isArray(tickets) ? tickets : [];
   const rows = group?.rows ?? [];
@@ -104,6 +115,10 @@ export default function Work({ groups, ticketGroups = [], loadTickets, ticketPan
     else if (e.key === "Enter" && e.metaKey && ticket) onStartTicket?.(ticket.key);
     else if (e.key === "Enter" || e.key === "ArrowRight") enterPr();
     else if (e.key === "s" && row?.sessionId) onOpenSession(row.sessionId);
+    // 숫자: 왼쪽 묶음으로 바로. o: 브라우저에서 열기
+    else if (/^[1-9]$/.test(e.key) && !e.metaKey && Number(e.key) <= allCount) switchGroup(Number(e.key) - 1);
+    else if (e.key === "o" && ticket) void openUrl(ticket.url);
+    else if (e.key === "o" && row) void openUrl(prUrl(row.target));
     else if (e.key === "r") (tgroup ? setTicketLoads((n) => n + 1) : onRefresh());
     else return;
     e.preventDefault();
@@ -117,7 +132,10 @@ export default function Work({ groups, ticketGroups = [], loadTickets, ticketPan
         <div className="wk-sec">PR</div>
         {groups.map((g, n) => (
           <button key={g.id} type="button" tabIndex={-1} className={"wk-grp" + (n === groupAt ? " on" : "") + (g.rows.some((r) => r.news) ? " hot" : "")} onClick={() => switchGroup(n)} title={g.hint}>
-            <span>{g.title}</span>
+            <span>
+              <kbd>{n + 1}</kbd>
+              {g.title}
+            </span>
             <b>{g.rows.length}</b>
           </button>
         ))}
@@ -137,7 +155,10 @@ export default function Work({ groups, ticketGroups = [], loadTickets, ticketPan
           const hot = Array.isArray(list) && list.some((t) => ticketNews[t.key]);
           return (
             <button key={g.id} type="button" tabIndex={-1} className={"wk-grp" + (groups.length + n === groupAt ? " on" : "") + (hot ? " hot" : "")} onClick={() => switchGroup(groups.length + n)} title={g.jql}>
-              <span>{g.title}</span>
+              <span>
+                <kbd>{groups.length + n + 1}</kbd>
+                {g.title}
+              </span>
               <b>{Array.isArray(list) ? list.length : ""}</b>
             </button>
           );
@@ -203,12 +224,12 @@ export default function Work({ groups, ticketGroups = [], loadTickets, ticketPan
         )}
       </div>
       <div className="wk-foot">
-        {tgroup ? tr`Tab 묶음 · ↑↓ 고르기 · Enter·→ 티켓 화면으로 (Esc로 목록에 돌아옴)` : tr`Tab 묶음 · ↑↓ 고르기 · Enter·→ PR 화면으로 (Esc로 목록에 돌아옴)`}
+        {tgroup ? tr`1–9·Tab 묶음 · ↑↓ 고르기 · Enter·→ 티켓 화면으로 (Esc로 목록에 돌아옴)` : tr`1–9·Tab 묶음 · ↑↓ 고르기 · Enter·→ PR 화면으로 (Esc로 목록에 돌아옴)`}
         {" · "}
         {row?.sessionId ? tr`s 세션 열기` + " · " : ""}
         {row?.ask ? tr`⌘Enter 세션에 리뷰 맡기기` + " · " : ""}
         {ticket ? tr`⌘Enter 이 티켓으로 시작` + " · " : ""}
-        {tr`r 새로 읽기 · Esc 닫기`}
+        {tr`o 브라우저에서 열기 · r 새로 읽기 · Esc 닫기`}
       </div>
     </div>
   );

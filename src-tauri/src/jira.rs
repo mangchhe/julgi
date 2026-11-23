@@ -208,6 +208,16 @@ pub fn jira_projects(conn: Conn) -> Result<Vec<String>, String> {
     Ok(v.as_array().into_iter().flatten().filter_map(|p| p["key"].as_str().map(str::to_owned)).collect())
 }
 
+/// 이 Jira에 있는 상태 이름들. 설정에서 "옮길 상태"를 글로 치지 않고 고르게 하려고 읽는다
+#[tauri::command(async)]
+pub fn jira_statuses(conn: Conn) -> Result<Vec<String>, String> {
+    let v = call(&conn, "GET", "/status", None)?;
+    let mut names: Vec<String> = v.as_array().into_iter().flatten().filter_map(|s| s["name"].as_str().map(str::to_owned)).collect();
+    names.sort_by_key(|n| n.to_lowercase());
+    names.dedup_by_key(|n| n.to_lowercase());
+    Ok(names)
+}
+
 /// 티켓 한 건. 설명과 코멘트 본문은 Cloud면 ADF(JSON), Server면 위키 글 그대로 넘긴다(화면에서 마크다운으로 바꾼다)
 #[tauri::command(async)]
 pub fn jira_view(conn: Conn, key: String) -> Result<Value, String> {

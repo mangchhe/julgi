@@ -178,6 +178,8 @@ async function invoke(cmd: string, args: Record<string, unknown> = {}): Promise<
     // Jira 화면 확인용
     case "jira_me":
       return "Me";
+    case "jira_statuses":
+      return ["Done", "In Progress", "In Review", "To Do"];
     case "jira_projects":
       return ["ABC", "OPS"];
     case "jira_mine":

@@ -27,7 +27,7 @@ type Row =
   | { kind: "toggle"; key: Key; label: string; note: string }
   | { kind: "pick"; key: Key; label: string; note: string; options: [string, string][] }
   | { kind: "key"; key: Key; label: string; note: string }
-  | { kind: "text"; key: Key; label: string; note: string; hint: string }
+  | { kind: "text"; key: Key; label: string; note: string; hint: string; /** Jira에서 읽은 상태 이름에서 고르게 한다 */ statuses?: boolean }
   | { kind: "github"; label: string; note: string }
   | { kind: "gitlab"; label: string; note: string }
   | { kind: "jira"; label: string; note: string }
@@ -120,9 +120,9 @@ const SECTIONS: { id: string; title: string; hint: string; rows: Row[] }[] = [
       { kind: "jira", label: "Jira", note: tr("연결하면 티켓을 Julgi 안에서 보고, 티켓으로 일을 시작하고, 상태를 옮긴다. 토큰은 macOS 키체인에만 둔다(Cloud는 id.atlassian.com에서 만든 API 토큰, Server/DC는 개인 액세스 토큰)") },
       { kind: "pick", key: "jiraWatch", label: tr("챙길 티켓"), note: tr("정한 주기마다 내게 배정된 티켓을 보고 새로 배정되거나 상태가 바뀌거나 남이 코멘트를 달면 알리고 ⌘J에 넣는다"), options: [["mine", tr("내게 배정된 것")], ["off", tr("끔")]] },
       { kind: "number", key: "jiraEveryMin", label: tr("티켓 확인 주기"), note: tr("내 티켓을 이만큼마다 본다"), step: 1, min: 1, max: 60, show: (n) => tr`${n}분` },
-      { kind: "text", key: "jiraStartTransition", label: tr("시작할 때 옮길 상태"), note: tr("이 티켓으로 시작할 때 이 상태로 옮길지 묻는다. 비우면 묻지 않는다"), hint: "In Progress" },
-      { kind: "text", key: "jiraPrTransition", label: tr("PR 올리면 옮길 상태"), note: tr("티켓과 이어진 세션이 PR을 올리면 이 상태로 옮길지 묻는다"), hint: "In Review" },
-      { kind: "text", key: "jiraMergeTransition", label: tr("머지되면 옮길 상태"), note: tr("그 PR이 머지되면 이 상태로 옮길지 묻는다"), hint: "Done" },
+      { kind: "text", key: "jiraStartTransition", label: tr("시작할 때 옮길 상태"), note: tr("이 티켓으로 시작할 때 이 상태로 옮길지 묻는다. 비우면 묻지 않는다. Jira가 연결돼 있으면 그 Jira의 상태 이름에서 고른다"), hint: "In Progress", statuses: true },
+      { kind: "text", key: "jiraPrTransition", label: tr("PR 올리면 옮길 상태"), note: tr("티켓과 이어진 세션이 PR을 올리면 이 상태로 옮길지 묻는다"), hint: "In Review", statuses: true },
+      { kind: "text", key: "jiraMergeTransition", label: tr("머지되면 옮길 상태"), note: tr("그 PR이 머지되면 이 상태로 옮길지 묻는다"), hint: "Done", statuses: true },
       { kind: "text", key: "jiraRepos", label: tr("프로젝트 키 → 레포"), note: tr("이 티켓으로 시작할 때 고를 레포. 시작 창에서 고르면 저절로 채운다"), hint: "ABC=acme-api, OPS=acme-infra" },
       { kind: "pick", key: "prWatch", label: tr("챙길 PR"), note: tr("정한 주기마다 PR을 보고 CI가 깨지거나 남이 코멘트를 달거나 리뷰를 받거나 머지되면 알린다. 세션이 올린 PR은 그 세션을 내 차례로 올리고, 나머지 내 PR은 ⌘J의 \"내 PR\"에 넣는다"), options: [["mine", tr("내 PR 전부")], ["session", tr("세션이 올린 PR만")], ["off", tr("끔")]] },
       { kind: "number", key: "prEveryMin", label: tr("PR 확인 주기"), note: tr("세션 줄의 PR과 내 PR을 이만큼마다 본다. 짧을수록 알림이 빨리 온다"), step: 1, min: 1, max: 30, show: (n) => tr`${n}분` },
@@ -168,6 +168,14 @@ const showKey = (combo: string) =>
 /** 설정 (⌘,). 바꾸는 즉시 적용되고 ~/.julgi/config.json에 남는다 */
 export default function Settings({ onChange, onClose, remoteUrl, onConnect, onConnectLab, startAt }: Props) {
   const [at, setAt] = useState(() => Math.max(0, FIRST_OF[SECTIONS.findIndex((s) => s.id === startAt)] ?? 0));
+  // Jira가 연결돼 있으면 그 Jira의 상태 이름을 읽어 "옮길 상태" 칸에서 고르게 한다. 워크플로가 프로젝트마다 달라서
+  // 목록은 전체 상태이고, 실제로 옮길 수 있는지는 그 티켓의 지금 상태에 달려 있다
+  const [statuses, setStatuses] = useState<string[]>([]);
+  useEffect(() => {
+    if (!config.jiraSite) return setStatuses([]);
+    void invoke<string[]>("jira_statuses", { conn: { site: config.jiraSite, email: config.jiraEmail, kind: config.jiraKind } }).then(setStatuses, () => setStatuses([]));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [config.jiraSite]);
   // gh가 있는가, 누구로 로그인했는가. undefined면 아직 보는 중
   const [gh, setGh] = useState<[boolean, string] | undefined>(undefined);
   useEffect(() => void invoke<[boolean, string]>("gh_status").then(setGh, () => setGh([false, ""])), []);
@@ -404,7 +412,10 @@ export default function Settings({ onChange, onClose, remoteUrl, onConnect, onCo
                         )}
                       </span>
                     )}
-                    {row.kind === "text" && <input tabIndex={-1} value={config[row.key] as string} placeholder={row.hint} spellCheck={false} onFocus={() => setAt(i)} onChange={(e) => set(row.key, e.target.value)} />}
+                    {row.kind === "text" && <input tabIndex={-1} list={row.statuses && statuses.length ? "jira-statuses" : undefined} value={config[row.key] as string} placeholder={row.hint} spellCheck={false} onFocus={() => setAt(i)} onChange={(e) => set(row.key, e.target.value)} />}
+                    {row.kind === "text" && row.statuses && statuses.length > 0 && !!(config[row.key] as string).trim() && !statuses.some((name) => name.toLowerCase() === (config[row.key] as string).trim().toLowerCase()) && (
+                      <div className="set-warn">{tr("이 Jira에 없는 상태 이름이다")}</div>
+                    )}
                   </div>
                 </div>
                 ),
@@ -412,6 +423,11 @@ export default function Settings({ onChange, onClose, remoteUrl, onConnect, onCo
             </div>
           </div>
         </div>
+        <datalist id="jira-statuses">
+          {statuses.map((name) => (
+            <option key={name} value={name} />
+          ))}
+        </datalist>
         <div className="pal-foot">{tr("Tab 묶음 넘기기 · ↑↓ 고르기 · ←→ 바꾸기 · Enter 켜고 끄기, 글 고치기 · 바로 적용된다 · Esc · 나머지 값은 ~/.julgi/config.json")}</div>
       </div>
     </div>

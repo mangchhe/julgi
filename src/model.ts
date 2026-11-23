@@ -235,7 +235,9 @@ const settings = () => JSON.stringify({
     UserPromptSubmit: [hook("run")],
     PostToolUse: [hook("run", true)],
     Stop: [hook("wait")],
-    Notification: [hook("ask")],
+    // 허락 물음이 몇 초 기다렸을 때만 "확인이 필요함"으로 적는다. Notification은 답을 끝내고 60초 쉬었을 때(idle_prompt)나
+    // 로그인이 됐을 때도 오는데, 그것까지 받으면 답을 끝낸 세션이 전부 "확인이 필요함"으로 바뀌어 눌러 봐도 안 풀린다
+    Notification: [{ matcher: "permission_prompt|elicitation_dialog|elicitation_url_dialog|agent_needs_input", ...hook("ask") }],
   },
   // Julgi의 스킬은 전부 이 명령 하나를 부른다. 부를 때마다 허락을 물으면 알아서 하는 것이 없어진다
   // 스킬을 만들고 다듬는 세션은 Julgi의 폴더 안에만 쓰고, 근거로 대화 기록을 읽는다. 그것도 묻지 않게 한다

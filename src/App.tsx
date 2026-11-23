@@ -2096,7 +2096,10 @@ export default function App() {
           // 내가 Esc로 멈추면 Claude Code는 끝났다고 알려 주지 않는다. 일한다면서 화면이 한참 조용하면 멈춘 것으로 본다
           const out = terms.outAt(o.key);
           const stalled = hit[0] === "run" && Date.now() - out > QUIET_MS;
-          const st = stalled ? { state: "stuck", since: Math.max(out, hit[1]) } : { state: hit[0], since: hit[1] };
+          // 허락 물음에 내가 키를 눌러 답했는데(거절했거나 Esc로 닫았다) 일이 이어지지 않으면, 더는 "확인이 필요함"이 아니다.
+          // 허락했다면 도구가 돌면서 곧 "일하는 중"으로 바뀐다. 몇 초 지나도 그대로면 내 말을 기다리는 것이다
+          const answered = hit[0] === "ask" && terms.keyAt(o.key) > hit[1] && Date.now() - terms.keyAt(o.key) > 4000;
+          const st = stalled ? { state: "stuck", since: Math.max(out, hit[1]) } : answered ? { state: "wait", since: hit[1] } : { state: hit[0], since: hit[1] };
           // 일감을 맡기고 답을 끝낸 조율 세션은 내가 답할 차례가 아니다. 결과가 오면 Julgi가 넣어 준다
           const holding = st.state === "wait" && tasksRef.current.some((t) => t.lead === o.sessionId && (t.status === "대기" || t.status === "하는 중")); // i18n-ok
           // 일감을 맡은 세션이 답을 끝낸 것도 내 차례가 아니다. 결과는 조율 세션으로 간다

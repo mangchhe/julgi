@@ -13,10 +13,10 @@ export default {
   "잠듦": "asleep",
   "왼쪽에서 티켓을 고른다": "Pick a ticket on the left",
   "왼쪽에서 PR을 고른다": "Pick a PR on the left",
-  "Tab 묶음 · ↑↓ 고르기 · Enter·→ 티켓 화면으로 (Esc로 목록에 돌아옴)": "Tab group · ↑↓ select · Enter/→ into the ticket (Esc returns to the list)",
-  "Tab 묶음 · ↑↓ 고르기 · Enter·→ PR 화면으로 (Esc로 목록에 돌아옴)": "Tab group · ↑↓ select · Enter/→ into the PR (Esc returns to the list)",
+  "1–9·Tab 묶음 · ↑↓ 고르기 · Enter·→ 티켓 화면으로 (Esc로 목록에 돌아옴)": "1–9/Tab group · ↑↓ select · Enter/→ into the ticket (Esc returns to the list)",
+  "1–9·Tab 묶음 · ↑↓ 고르기 · Enter·→ PR 화면으로 (Esc로 목록에 돌아옴)": "1–9/Tab group · ↑↓ select · Enter/→ into the PR (Esc returns to the list)",
   "s 세션 열기": "s open session",
   "⌘Enter 세션에 리뷰 맡기기": "⌘Enter hand the review to a session",
   "⌘Enter 이 티켓으로 시작": "⌘Enter start from this ticket",
-  "r 새로 읽기 · Esc 닫기": "r reload · Esc close",
+  "o 브라우저에서 열기 · r 새로 읽기 · Esc 닫기": "o open in the browser · r reload · Esc close",
 } as Record<string, string>;

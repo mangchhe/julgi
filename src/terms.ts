@@ -29,6 +29,8 @@ type Entry = {
   startedAt: number;
   /** 내가 마지막으로 이 터미널에 친 때 */
   typedAt: number;
+  /** 무슨 키든 마지막으로 누른 때 (화살표와 Esc도 센다) */
+  keyAt: number;
   /** 치고 아직 보내지 않은 글자 수(어림). 남이 보낸 글이 내 글 뒤에 붙지 않게 하는 데 쓴다 */
   draft: number;
   /** 프로그램이 마지막으로 화면에 뭔가 쓴 때 */
@@ -156,7 +158,7 @@ export function create(spec: TermSpec) {
   term.loadAddon(search);
   const el = document.createElement("div");
   el.className = "term";
-  const entry: Entry = { spec, id: nextId++, term, fit, search, el, opened: false, startedAt: 0, typedAt: 0, draft: 0, outAt: Date.now(), observer: new ResizeObserver(() => {}) };
+  const entry: Entry = { spec, id: nextId++, term, fit, search, el, opened: false, startedAt: 0, typedAt: 0, keyAt: 0, draft: 0, outAt: Date.now(), observer: new ResizeObserver(() => {}) };
   entry.observer = new ResizeObserver(() => {
     if (entry.opened && visible(entry)) fit.fit();
   });
@@ -269,6 +271,8 @@ export function onFound(key: string, listener: (at: number, count: number) => vo
 }
 
 /** 마지막으로 친 지 얼마나 됐나. 치는 중인 칸은 바꿔 끼우지 않는다 */
+/** 그 칸에 마지막으로 키를 누른 때 */
+export const keyAt = (key: string) => pool.get(key)?.keyAt ?? 0;
 export const idle = (key: string) => Date.now() - (pool.get(key)?.typedAt ?? 0);
 /** 화면에 마지막으로 뭔가 나온 때. 일하는 세션은 진행 표시가 계속 움직인다 */
 export const outAt = (key: string) => pool.get(key)?.outAt ?? 0;
@@ -410,6 +414,7 @@ function open(entry: Entry) {
   t.onData((data) => {
     // 창 포커스가 오갈 때 터미널이 알아서 보내는 것은 내가 친 게 아니다
     // 내가 친 것만 센다. 터미널이 프로그램의 물음에 알아서 답하는 것(커서 위치, 장치 정보)과 방향키는 \x1b로 시작한다
+    entry.keyAt = Date.now();
     if (!data.startsWith("\x1b")) entry.typedAt = Date.now();
     keySent = { data, at: performance.now() };
     send(data);
