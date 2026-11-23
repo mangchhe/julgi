@@ -8,7 +8,7 @@ export default {
   "테마": "Theme",
   "화면과 터미널의 색": "Colors of the app and the terminal",
   "언어": "Language",
-  "화면 글의 언어. 바꾼 뒤 Julgi를 다시 켜야 적용된다": "Language of the interface. Applies after Julgi is restarted",
+  "화면 글의 언어. 바꾸면 옆에 뜨는 단추로 Julgi를 다시 켜서 적용한다. 열려 있던 세션은 그대로 이어진다": "Language of the interface. After changing it, use the button that appears to restart Julgi and apply it. Open sessions carry on",
   "시스템 따름": "Follow system",
   "목록에 보이는 기간": "Period shown in the list",
   "이보다 오래 안 쓴 잠든 세션은 목록에서 빼고 ⌘K로만 찾는다": "Asleep sessions unused for longer than this are left out of the list and found only with ⌘K",

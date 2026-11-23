@@ -5,7 +5,7 @@ import { openUrl } from "@tauri-apps/plugin-opener";
 import { config, kilo } from "./model";
 import { THEMES } from "./themes";
 import { CORE, MORE } from "./Help";
-import { tr } from "./i18n";
+import { getLang, resolveLang, tr } from "./i18n";
 
 type Key = keyof typeof config;
 type Props = {
@@ -41,7 +41,7 @@ const SECTIONS: { id: string; title: string; hint: string; rows: Row[] }[] = [
     hint: tr("보이는 것과 창"),
     rows: [
     { kind: "theme", label: tr("테마"), note: tr("화면과 터미널의 색") },
-    { kind: "pick", key: "lang", label: tr("언어"), note: tr("화면 글의 언어. 바꾼 뒤 Julgi를 다시 켜야 적용된다"), options: [["auto", tr("시스템 따름")], ["en", "English"], ["ko", "한국어"]] }, // i18n-ok
+    { kind: "pick", key: "lang", label: tr("언어"), note: tr("화면 글의 언어. 바꾸면 옆에 뜨는 단추로 Julgi를 다시 켜서 적용한다. 열려 있던 세션은 그대로 이어진다"), options: [["auto", tr("시스템 따름")], ["en", "English"], ["ko", "한국어"]] }, // i18n-ok
     { kind: "number", key: "recentDays", label: tr("목록에 보이는 기간"), note: tr("이보다 오래 안 쓴 잠든 세션은 목록에서 빼고 ⌘K로만 찾는다"), step: 1, min: 1, max: 90, show: (n) => tr`${n}일` },
     { kind: "toggle", key: "usage", label: tr("Claude 사용량 보기"), note: tr("아래 상태 줄에 5시간 창과 주간 한도를 얼마나 썼는지 보여 준다. 켜면 Claude Code의 로그인 토큰을 키체인에서 읽어 Anthropic의 사용량 주소에만 보낸다(처음에 키체인이 허락을 묻는다). 문서에 없는 주소라 어느 날 안 나올 수 있다") },
       { kind: "toggle", key: "triage", label: tr("할 일이 있을 때만 부르기"), note: tr("세션이 답을 끝내면 작은 모델이 마지막 답을 읽는다. 내가 정하거나 답할 것이 있으면 내 차례로 올리고 알린다. 끝냈다고 보고만 한 것은 \"보고함\"으로 조용히 두고 브리핑(⌘⇧B)에서 모아 보여 준다. 판정하지 못하면 내 차례로 올린다") },
@@ -330,6 +330,12 @@ export default function Settings({ onChange, onClose, remoteUrl, onConnect, onCo
                           +
                         </button>
                       </span>
+                    )}
+                    {row.kind === "pick" && row.key === "lang" && resolveLang(config.lang) !== getLang() && (
+                      // 언어는 켤 때 정해진다. 바꿨으면 그 자리에서 다시 켤 수 있게 한다. 단추의 글은 두 언어로 다 적는다: 방금 고른 언어를 못 읽을 수도 있다
+                      <button type="button" tabIndex={-1} className="set-restart" onClick={() => void invoke("app_restart")}>
+                        {"Restart to apply · 다시 켜서 적용" /* 두 언어로 다 보인다 i18n-ok */}
+                      </button>
                     )}
                     {row.kind === "pick" && (
                       <span className="set-seg">

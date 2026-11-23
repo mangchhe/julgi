@@ -1106,3 +1106,4 @@ body.dragging .pane-body { pointer-events: none; }
 .wk-step.r0 b { color: var(--wait); }
 .wk-step.r1 b { color: var(--accent); }
 .wk-step.r2 b, .wk-step.r3 b { color: color-mix(in srgb, var(--ink) 80%, var(--muted)); }
+.set-restart { font: inherit; font-size: 12px; font-weight: 600; color: var(--bg); background: var(--accent); border: 0; border-radius: 6px; padding: 4px 10px; margin-right: 8px; cursor: pointer; white-space: nowrap; }
