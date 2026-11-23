@@ -228,6 +228,18 @@ export default function Send({ items, openIds, cwd, folders, base, notes, misses
             setTouched(false);
           }}
           onKeyDown={onKey}
+          onPaste={(e) => {
+            // 그림이면 칸에 붙여넣을 때처럼 임시 파일로 받아 그 경로를 넣는다. 세션이 그 파일을 읽는다
+            if (e.clipboardData.getData("text/plain")) return;
+            e.preventDefault();
+            const el = e.currentTarget;
+            void invoke<string>("clipboard_paste")
+              .then((clip) => {
+                el.setRangeText(clip + " ", el.selectionStart, el.selectionEnd, "end");
+                setMessage(el.value);
+              })
+              .catch(() => {});
+          }}
         />
         <div className="send-head">
           <span>{head}</span>
