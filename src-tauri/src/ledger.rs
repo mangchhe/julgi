@@ -385,3 +385,88 @@ pub fn ledger_scan(works_command: Option<String>) -> Ledger {
     }
     Ledger { sessions, works: load_works(works_command) }
 }
+
+/// 글 안에서 이 폴더를 가리키는 곳이 있는가. "/a/repo"가 "/a/repo-t75"에도 걸리지 않게 뒤 글자를 본다
+fn mentions(text: &str, dir: &str) -> bool {
+    let mut from = 0;
+    while let Some(at) = text[from..].find(dir) {
+        let end = from + at + dir.len();
+        let next = text[end..].chars().next();
+        if !next.is_some_and(|c| c.is_alphanumeric() || c == '-' || c == '_' || c == '.') {
+            return true;
+        }
+        from = end;
+    }
+    false
+}
+
+/// 최근 도구 호출들이 가리킨 폴더들(dirs의 번호)에서, 세션이 지금 일하는 폴더를 고른다.
+/// 최근 것 열두 번 가운데 과반이 한 폴더를 가리키면 그 폴더다. 근거가 셋도 안 되면 정하지 않는다
+fn pick_workdir(refs: &[usize], count: usize) -> Option<usize> {
+    let recent = &refs[refs.len().saturating_sub(12)..];
+    if recent.len() < 3 {
+        return None;
+    }
+    (0..count).map(|i| (i, recent.iter().filter(|r| **r == i).count())).max_by_key(|(_, n)| *n).filter(|(_, n)| n * 2 > recent.len()).map(|(i, _)| i)
+}
+
+/// 세션이 실제로 일하는 폴더와 그 브랜치. 세션을 연 폴더(cwd)와 다를 때만 돌려준다.
+/// 세션이 중간에 같은 레포의 다른 워크트리로 옮겨 일하는 일이 있다(메인 폴더의 브랜치가 밖에서 바뀌었을 때 등).
+/// 대화 기록 끝의 도구 호출(파일 경로, 명령)이 어느 워크트리를 가리키는지 세어서 정한다
+#[tauri::command(async)]
+pub fn session_workdir(session_id: String, cwd: String) -> Option<(String, String)> {
+    let listing = std::process::Command::new("git").args(["-C", &cwd, "worktree", "list", "--porcelain"]).output().ok()?;
+    let mut trees: Vec<(String, String)> = Vec::new();
+    let mut at = String::new();
+    for line in String::from_utf8_lossy(&listing.stdout).lines() {
+        if let Some(dir) = line.strip_prefix("worktree ") {
+            at = dir.to_owned();
+        } else if let Some(name) = line.strip_prefix("branch refs/heads/") {
+            trees.push((at.clone(), name.to_owned()));
+        }
+    }
+    if trees.len() < 2 {
+        return None;
+    }
+    let projects = home().join(".claude/projects");
+    let path = fs::read_dir(projects).ok()?.flatten().map(|project| project.path().join(format!("{session_id}.jsonl"))).find(|path| path.is_file())?;
+    let size = fs::metadata(&path).ok()?.len();
+    let tail = read_range(&path, size.saturating_sub(TAIL_BYTES), TAIL_BYTES)?;
+    let mut refs: Vec<usize> = Vec::new();
+    for line in tail.lines() {
+        let Ok(v) = serde_json::from_str::<Value>(line) else { continue };
+        if v["type"] != "assistant" || v["isSidechain"] == true {
+            continue;
+        }
+        for part in v["message"]["content"].as_array().into_iter().flatten().filter(|p| p["type"] == "tool_use") {
+            let input = &part["input"];
+            let text = ["file_path", "path", "notebook_path", "command"].iter().filter_map(|k| input[*k].as_str()).collect::<Vec<_>>().join("\n");
+            // 가장 긴 경로가 맞는 폴더가 그 호출이 가리킨 곳이다
+            if let Some((i, _)) = trees.iter().enumerate().filter(|(_, (dir, _))| mentions(&text, dir)).max_by_key(|(_, (dir, _))| dir.len()) {
+                refs.push(i);
+            }
+        }
+    }
+    let (dir, branch) = &trees[pick_workdir(&refs, trees.len())?];
+    if dir.trim_end_matches('/') == cwd.trim_end_matches('/') { None } else { Some((dir.clone(), branch.clone())) }
+}
+
+#[cfg(test)]
+mod workdir_tests {
+    use super::*;
+
+    #[test]
+    fn mentions_respects_folder_boundaries() {
+        assert!(mentions("git -C /a/repo-t75 status", "/a/repo-t75"));
+        assert!(mentions("/a/repo-t75/src/x.kt", "/a/repo-t75"));
+        assert!(!mentions("/a/repo-t75/src/x.kt", "/a/repo"), "앞부분만 같은 다른 폴더는 아니다");
+        assert!(mentions("cd /a/repo && ls", "/a/repo"));
+    }
+
+    #[test]
+    fn picks_the_folder_most_recent_calls_point_at() {
+        assert_eq!(pick_workdir(&[0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1], 2), Some(1), "최근 호출이 워크트리를 가리킨다");
+        assert_eq!(pick_workdir(&[1, 0, 1, 0], 2), None, "반반이면 정하지 않는다");
+        assert_eq!(pick_workdir(&[1, 1], 2), None, "근거가 적으면 정하지 않는다");
+    }
+}

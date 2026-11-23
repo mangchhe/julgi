@@ -304,6 +304,40 @@ export default function App() {
   const learning = useRef(false);
   const tasksRef = useRef<Job[]>([]);
   const changesRef = useRef<Record<string, Change>>({});
+  // 세션이 실제로 일하는 폴더. 세션을 연 폴더와 다를 때만 든다(같은 레포의 다른 워크트리로 옮겨 일할 때).
+  // 변경을 세는 곳, 칸 머리의 브랜치, 코드 검토가 모두 이 폴더를 본다
+  const [workdirs, setWorkdirs] = useState<Record<string, { dir: string; branch: string }>>({});
+  const workdirsRef = useRef(workdirs);
+  workdirsRef.current = workdirs;
+  const dirOf = (o: Open) => (o.sessionId && workdirsRef.current[o.sessionId]?.dir) || o.cwd;
+  /** 대화 기록의 최근 도구 호출을 보고 세션이 일하는 폴더를 다시 정한다 */
+  const findWorkdir = async (o: Open) => {
+    if (!o.sessionId) return;
+    const id = o.sessionId;
+    const hit = await invoke<[string, string] | null>("session_workdir", { sessionId: id, cwd: o.cwd }).catch(() => null);
+    const old = workdirsRef.current[id];
+    if (hit ? old?.dir === hit[0] && old.branch === hit[1] : !old) return;
+    const next = { ...workdirsRef.current };
+    if (hit) next[id] = { dir: hit[0], branch: hit[1] };
+    else delete next[id];
+    workdirsRef.current = next;
+    setWorkdirs(next);
+    if (hit) record("폴더", tr`"${nameOf(o.key).slice(0, 40)}"이 워크트리 ${hit[0].replace(live.current.home, "~")}(${hit[1]})에서 일한다. 변경과 코드 검토를 그 폴더 기준으로 본다`, id); // i18n-ok
+  };
+  const shownChanges = useMemo(() => {
+    const out = { ...changes };
+    for (const o of open) {
+      const wd = o.sessionId ? workdirs[o.sessionId] : undefined;
+      if (wd && changes[wd.dir]?.by === o.sessionId) out[o.cwd] = changes[wd.dir];
+    }
+    return out;
+  }, [changes, workdirs, open]);
+  // 열려 있는 세션은 켤 때와 새로 열릴 때 한 번씩 본다
+  useEffect(() => {
+    const timer = setTimeout(() => void Promise.all(open.map((o) => findWorkdir(o))), 4000);
+    return () => clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open.length]);
   const turnSig = useRef<Record<string, string>>({});
   const turnAt = useRef<Record<string, number>>({}); // 폴더|세션 → 그 답을 시작한 때
   const turnFrom = useRef<Record<string, string>>({}); // 세션이 일을 시작할 때 찍어 둔 상태 // 세션이 일을 시작할 때의 폴더 변경 상태
@@ -1641,10 +1675,10 @@ export default function App() {
       // 일을 시작할 때 그 폴더의 변경 상태를 적어 둔다. 끝났을 때 달라졌으면 이 세션이 고친 것이다
       if (was !== "run" && is === "run") {
         const key = o.key;
-        void invoke<[number, number, number, string, number] | null>("repo_stat", { path: o.cwd }).then((stat) => void (turnSig.current[key] = stat?.[3] ?? ""), () => {});
-        if (o.sessionId) turnAt.current[`${o.cwd}|${o.sessionId}`] = Date.now();
+        void invoke<[number, number, number, string, number] | null>("repo_stat", { path: dirOf(o) }).then((stat) => void (turnSig.current[key] = stat?.[3] ?? ""), () => {});
+        if (o.sessionId) turnAt.current[`${dirOf(o)}|${o.sessionId}`] = Date.now();
         // 그리고 그 순간을 찍어 둔다. 끝났을 때의 것과 견주면 이번 답에서 바뀐 것만 나온다
-        void invoke<string | null>("repo_snapshot", { path: o.cwd, name: `${(o.sessionId ?? "x").slice(0, 8)}-start` }).then((sha) => void (turnFrom.current[key] = sha ?? ""), () => {});
+        void invoke<string | null>("repo_snapshot", { path: dirOf(o), name: `${(o.sessionId ?? "x").slice(0, 8)}-start` }).then((sha) => void (turnFrom.current[key] = sha ?? ""), () => {});
       }
       // 한 번 시킨 일이 너무 오래 돌고 있으면 한 번 알린다. 걸려 있는데 화면만 돌고 있을 수 있다
       const st = states[o.key];
@@ -1653,7 +1687,12 @@ export default function App() {
         record("확인 필요", tr`"${nameOf(o.key).slice(0, 40)}" 세션이 ${config.longRunMin}분 넘게 한 가지 일을 하고 있다`, o.sessionId); // i18n-ok
         if (config.notify && !document.hasFocus()) void invoke("notify", { title: nameOf(o.key).slice(0, 60), body: tr`${config.longRunMin}분 넘게 일하는 중이다. 걸렸는지 본다` });
       }
-      if (was === "run" && (is === "wait" || is === "ask" || is === "told" || is === "stuck") && o.sessionId) void checkChanges(o.cwd, o.sessionId, turnSig.current[o.key], turnFrom.current[o.key]);
+      if (was === "run" && (is === "wait" || is === "ask" || is === "told" || is === "stuck") && o.sessionId) {
+        // 답하는 동안 다른 워크트리로 옮겨 갔을 수 있다. 일하는 폴더를 다시 정한 뒤에 그 폴더의 변경을 센다.
+        // 폴더가 방금 바뀌었으면 시작할 때 찍은 것은 옛 폴더의 것이라 쓰지 않는다
+        const [was0, sig0, from0] = [dirOf(o), turnSig.current[o.key], turnFrom.current[o.key]];
+        void findWorkdir(o).then(() => (dirOf(o) === was0 ? checkChanges(was0, o.sessionId!, sig0, from0) : checkChanges(dirOf(o), o.sessionId!)));
+      }
       if ((was === "wait" || was === "told" || was === "stuck") && is === "run") answered.current[o.key] = now;
       else if (is !== "run") delete answered.current[o.key];
     }
@@ -2895,7 +2934,7 @@ export default function App() {
           byId={byId}
           states={states}
           tasks={tasks}
-          changes={changes}
+          changes={shownChanges}
           pinned={pinned}
           dead={dead}
           current={current}
@@ -2938,7 +2977,12 @@ export default function App() {
                 active={!overlay && !(finding && focus === i)}
                 label={o?.label ?? ""}
                 cwd={o?.cwd ?? home}
-                session={o?.sessionId ? byId.get(o.sessionId) : undefined}
+                session={(() => {
+                  // 세션이 워크트리로 옮겨 일하면 칸 머리의 브랜치는 그 워크트리의 것이다
+                  const s = o?.sessionId ? byId.get(o.sessionId) : undefined;
+                  const wd = o?.sessionId ? workdirs[o.sessionId] : undefined;
+                  return s && wd ? { ...s, branch: wd.branch } : s;
+                })()}
                 thread={threadOf(o?.sessionId)}
                 memory={[memories[threadOf(o?.sessionId)?.id ?? ""], memories[o?.sessionId ?? ""]].filter(Boolean).join("\n\n")}
                 members={(threadOf(o?.sessionId)?.sessions ?? []).map((id) => ({ id, title: byId.get(id)?.title ?? tr("아직 기록이 없는 세션"), here: id === o?.sessionId }))}
@@ -2962,13 +3006,13 @@ export default function App() {
                   return tk && ticketDone[tk] && !threadOf(o?.sessionId)?.done ? tr`티켓 끝남 · ${ticketDone[tk]}` : undefined;
                 })()}
                 pinned={!!key && pinned.includes(key)}
-                change={o && changes[o.cwd]?.by === o.sessionId ? changes[o.cwd] : undefined}
+                change={o && changes[dirOf(o)]?.by === o.sessionId ? changes[dirOf(o)] : undefined}
                 review={
                   key && o && reviewing.includes(key)
                     ? {
                         // 지금 세션의 폴더와, 이 세션(줄기)이 맡긴 일감들의 워크트리
                         places: [
-                          { label: tr`${repoOf(o.cwd)} · 이 세션`, cwd: o.cwd },
+                          { label: tr`${repoOf(o.cwd)} · 이 세션`, cwd: dirOf(o) },
                           ...tasks.filter((t) => t.work && (threadOf(o.sessionId)?.sessions ?? [o.sessionId]).includes(t.lead)).map((t) => ({ label: tr`${t.repo} · 일감 ${t.id}`, cwd: t.work! })),
                         ],
                         known: changes,

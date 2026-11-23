@@ -192,4 +192,5 @@ export default {
   "고쳐. 위에 정리한 수정안대로 진행하고, 테스트를 돌린 뒤 커밋한다. 정할 것으로 적은 부분은 가장 안전한 쪽으로 하고 무엇을 골랐는지 적는다.": "Fix it. Follow the fix you proposed above, run the tests, then commit. For the points you listed as needing a decision, take the safest option and say which one you took.",
   "{0} 진단을 보고 고치라고 함": "Read the diagnosis of {0} and told the session to fix it",
   "여기서부터 새 세션 · 위의 대화는 인계 글로 넘겨받았다": "New session from here · the conversation above was handed over as a brief",
+  "\"{0}\"이 워크트리 {1}({2})에서 일한다. 변경과 코드 검토를 그 폴더 기준으로 본다": "\"{0}\" works in the worktree {1} ({2}). Changes and code review follow that folder",
 } as Record<string, string>;
