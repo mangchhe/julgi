@@ -1328,4 +1328,8 @@ body.dragging .pane-body { pointer-events: none; }
 .side .row-head { display: flex; align-items: flex-start; gap: 6px; min-width: 0; }
 .side .row-head .row-title { flex: 1; min-width: 0; }
 .side .pin-mark { flex: none; width: 11px; height: 11px; margin: 4px 0 0; vertical-align: 0; fill: var(--accent); opacity: 0.9; }
-.side .row:hover .pin-mark { visibility: hidden; }
+
+/* 재우기(×)는 마우스를 올리면 번호 자리에 나온다. 오른쪽 위에 상자로 뜨면 제목과 핀을 가린다 */
+.side .row-x { position: absolute; left: 3px; top: 5px; right: auto; width: 20px; height: 20px; padding: 0; border: 0; border-radius: 5px; background: none; font-size: 14px; line-height: 20px; text-align: center; color: var(--muted); }
+.side .row-x:hover { color: var(--ink); background: color-mix(in srgb, var(--ink) 12%, transparent); }
+.side .row:hover .slot { visibility: hidden; }
