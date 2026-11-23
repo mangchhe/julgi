@@ -39,4 +39,5 @@ export default {
   "세션 {0}": "{0} sessions",
   "눌러서 깨운다. PR 화면은 ⌘J에서 ⌥Enter": "Click to wake. For the PR, ⌥Enter in ⌘J",
   "외 {0}개 · ⌘K로 찾기": "{0} more · find with ⌘K",
+  "고정됨. 재우지 않고, 이 칸을 다른 세션으로 바꾸지도 않는다 (⌘⇧P)": "Pinned. It is not put to sleep and its pane is not swapped for another session (⌘⇧P)",
 } as Record<string, string>;

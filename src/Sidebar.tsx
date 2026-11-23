@@ -132,6 +132,13 @@ export default function Sidebar({ open, items, threads, byId, states, tasks, cha
                 <div className="row-title">{job ? `${job.repo} · ${job.ask.split("\n")[0].replace(/^배경:\s*/, "").slice(0, 40)}` : (threadOf(o.sessionId)?.name ?? s?.title ?? o.label)}</div>
                 {/* 아래 한 줄에 다 넣는다: 레포, 상태, PR, 티켓, 고친 양. 브랜치와 자세한 것은 칸 머리와 툴팁에 있다 */}
                 <div className={"row-meta" + (!job && st?.state === "ask" ? " wait" : "")}>
+                  {/* 고정한 세션은 줄 맨 앞에 핀을 단다. 뒤에 두면 줄이 길 때 잘려서 안 보인다 */}
+                  {pinned.includes(o.key) && (
+                    <svg className="pin-mark" viewBox="0 0 16 16" aria-label={tr`고정`}>
+                      <title>{tr`고정됨. 재우지 않고, 이 칸을 다른 세션으로 바꾸지도 않는다 (⌘⇧P)`}</title>
+                      <path d="M10 1.5 14.5 6l-2 .6-2.2 2.2.4 3.4-1 1-3-3L3 13.9l-.9.1.1-.9 3.7-3.7-3-3 1-1 3.4.4 2.2-2.2z" />
+                    </svg>
+                  )}
                   {job // 일감의 상태는 저장된 값이다 i18n-ok
                     ? [tr`일감 ${tr(job.status)}`, job.redo ? tr`다시 ${job.redo}번` : ""].filter(Boolean).join(" · ") // i18n-ok
                     : [st?.state === "hold" ? tr`일감 기다리는 중 · ${tasks.filter((t) => t.lead === o.sessionId && (t.status === "대기" || t.status === "하는 중")).length}개` : st?.state === "ask" || st?.state === "dead" ? STATE_LABEL[st.state] : "", s?.repo ?? ""].filter(Boolean).join(" · ") /* i18n-ok */}
@@ -185,7 +192,6 @@ export default function Sidebar({ open, items, threads, byId, states, tasks, cha
                     </span>
                   )}
                   {s && hot(s.tokens) && <span className="hot" title={tr`세션이 크다. 다음에 보낼 때 갈아탄다`}> · {kilo(s.tokens)}</span>}
-                  {pinned.includes(o.key) && <span title={tr`고정`}> · 📌</span>}
                 </div>
               </div>
               <button
