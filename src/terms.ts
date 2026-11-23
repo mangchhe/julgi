@@ -1,6 +1,7 @@
 // 터미널 풀. 터미널은 칸과 따로 산다. 칸에는 보이는 것만 끼우고,
 // 안 보이는 터미널은 화면 밖에 세워 둔 채 계속 돌린다. 그래서 전환이 즉시다.
 import { Channel, invoke } from "@tauri-apps/api/core";
+import { findPaths, resolvePath } from "./paths.ts";
 import { listen } from "@tauri-apps/api/event";
 import { ITheme, Terminal } from "@xterm/xterm";
 import { FitAddon } from "@xterm/addon-fit";
@@ -84,22 +85,9 @@ function openLink(e: MouseEvent, uri: string) {
   }
 }
 
-/** 화면 글에서 파일 경로를 찾는다: /절대/경로, ./상대, 폴더/파일.확장자, 파일.확장자 (뒤에 :줄:칸이 붙을 수 있다) */
-const PATH = /(?:\.{0,2}\/)?(?:[\w.@+-]+\/)*[\w@+-][\w.@+-]*\.[A-Za-z0-9]{1,8}(?::\d+(?::\d+)?)?/g;
-export function findPaths(text: string): { start: number; end: number; path: string }[] {
-  const out: { start: number; end: number; path: string }[] = [];
-  for (const m of text.matchAll(PATH)) {
-    const start = m.index!;
-    // URL의 일부(example.com, //host/a.js)나 단어 중간이면 경로가 아니다
-    if (start > 0 && /[\w:/.~-]/.test(text[start - 1])) continue;
-    if (text[start + m[0].length] === "/") continue;
-    const path = m[0].replace(/:\d+(:\d+)?$/, "");
-    // 폴더 없이 이름만 있으면 이름과 확장자가 두 글자 넘을 때만 파일로 본다 (e.g, v1.2, 2.1.330 같은 것을 거른다)
-    if (!path.includes("/") && !/^[\w@+-][\w.@+-]+\.[A-Za-z][A-Za-z0-9]+$/.test(path)) continue;
-    out.push({ start, end: start + m[0].length, path });
-  }
-  return out;
-}
+// 홈 폴더. ~/로 시작하는 경로를 여는 데 쓴다
+let home = "";
+void invoke<string>("home_dir").then((h) => (home = h), () => {});
 
 export function create(spec: TermSpec) {
   if (pool.has(spec.key)) return;
@@ -146,8 +134,8 @@ export function create(spec: TermSpec) {
         text: path,
         activate: (e: MouseEvent) => {
           if (!e.metaKey) return;
-          const full = path.startsWith("/") ? path : `${(spec.cwd ?? "").replace(/\/$/, "")}/${path.replace(/^\.\//, "")}`;
-          void openPath(full).catch(() => {});
+          // 파일이면 기본 앱으로, 폴더면 Finder로 열린다
+          void openPath(resolvePath(path, spec.cwd ?? "", home)).catch(() => {});
         },
       }));
       const all = [...tickets, ...links];

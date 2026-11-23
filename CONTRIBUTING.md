@@ -17,7 +17,7 @@ Checks to run before a commit:
 ```sh
 npx tsc --noEmit
 node scripts/check-i18n.mjs
-node scripts/check-pr.mjs && node scripts/check-jira.mjs && node scripts/check-md.mjs
+node scripts/check-pr.mjs && node scripts/check-jira.mjs && node scripts/check-md.mjs && node scripts/check-paths.mjs
 (cd src-tauri && cargo test)
 ```
 

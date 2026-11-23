@@ -19,6 +19,18 @@
           "path": "$HOME/**"
         },
         {
+          "path": "$HOME/.*"
+        },
+        {
+          "path": "$HOME/.*/**"
+        },
+        {
+          "path": "$HOME/**/.*"
+        },
+        {
+          "path": "$HOME/**/.*/**"
+        },
+        {
           "path": "/private/tmp/**"
         },
         {
