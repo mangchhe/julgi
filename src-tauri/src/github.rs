@@ -8,7 +8,7 @@ use std::{path::Path, process::Command};
 use crate::gitlab;
 
 /// "gitlab:호스트/경로"면 GitLab 쪽 이름을 준다
-fn gl(repo: &str) -> Option<&str> {
+pub(crate) fn gl(repo: &str) -> Option<&str> {
     repo.strip_prefix("gitlab:")
 }
 
@@ -17,7 +17,7 @@ fn gh_bin() -> &'static str {
     ["/opt/homebrew/bin/gh", "/usr/local/bin/gh"].into_iter().find(|p| Path::new(p).exists()).unwrap_or("gh")
 }
 
-fn run(args: &[&str]) -> Result<String, String> {
+pub(crate) fn run(args: &[&str]) -> Result<String, String> {
     let out = Command::new(gh_bin())
         .args(args)
         .env("GH_PROMPT_DISABLED", "1")
@@ -32,7 +32,7 @@ fn run(args: &[&str]) -> Result<String, String> {
 }
 
 /// "소유자/레포" 모양인가. 그 밖의 글이 gh 인자로 섞여 들지 않게 한다
-fn check_repo(repo: &str) -> Result<(), String> {
+pub(crate) fn check_repo(repo: &str) -> Result<(), String> {
     let ok = |s: &str| !s.is_empty() && s.chars().all(|c| c.is_ascii_alphanumeric() || "._-".contains(c));
     match repo.split_once('/') {
         Some((owner, name)) if ok(owner) && ok(name) => Ok(()),

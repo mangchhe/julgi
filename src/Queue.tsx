@@ -17,6 +17,9 @@ type Props = {
   /** 새 소식이 있는 내 티켓. Enter로 티켓 화면, ⌘Enter로 이 티켓으로 시작 */
   tickets: { key: string; title: string; news: string; url: string }[];
   onTicket: (key: string) => void;
+  /** 깨진 채 끝난 내 CI 실행. Enter로 실행 화면을 연다 */
+  runs?: { url: string; title: string; where: string; news: string }[];
+  onRun?: (url: string) => void;
   onStartTicket: (key: string) => void;
   /** 리뷰 요청을 PR 화면으로 연다 */
   onView: (ask: ReviewAsk) => void;
@@ -45,7 +48,7 @@ const question = (reply: string) => {
  * 내 차례 (⌘J). 답을 기다리는 세션을 오래 기다린 순으로 놓고, 마지막에 무엇을 물었는지 보여 준다.
  * 여기서 바로 답을 쳐서 보내면 세션을 열어 읽고 돌아오는 왕복이 없다. 더 읽어야 하면 빈 채로 Enter를 눌러 연다
  */
-export default function Queue({ rows, asks, mine, tickets, onTicket, onStartTicket, onView, onHand, onAnswer, onFixBug, onHoldBug, onOpen, onPr, onClose }: Props) {
+export default function Queue({ rows, asks, mine, tickets, runs = [], onRun, onTicket, onStartTicket, onView, onHand, onAnswer, onFixBug, onHoldBug, onOpen, onPr, onClose }: Props) {
   // 답을 보낸 세션과 맡긴 리뷰는 상태가 바뀌기를 기다리지 않고 바로 뺀다
   const [gone, setGone] = useState<string[]>([]);
   const list = useMemo(() => rows.filter((r) => !gone.includes(r.key)), [rows, gone]);
@@ -56,9 +59,11 @@ export default function Queue({ rows, asks, mine, tickets, onTicket, onStartTick
         ...mine.map((m) => ({ ...m, kind: "mine" as const })),
         // 티켓은 PR 모양에 맞춰 넣는다: 키를 레포 자리에
         ...tickets.map((t) => ({ number: 0, title: t.title, repository: { nameWithOwner: t.key }, author: { login: "" }, updatedAt: "", url: t.url, isDraft: false, kind: "ticket" as const, news: t.news })),
+        // 실행도 같은 모양으로: 레포·워크플로를 레포 자리에
+        ...runs.map((r) => ({ number: 0, title: r.title, repository: { nameWithOwner: r.where }, author: { login: "" }, updatedAt: "", url: r.url, isDraft: false, kind: "run" as const, news: r.news })),
         ...asks.map((a) => ({ ...a, kind: "review" as const, news: "" })),
       ].filter((a) => !gone.includes(a.url)),
-    [mine, asks, tickets, gone],
+    [mine, asks, tickets, runs, gone],
   );
   const total = list.length + askList.length;
   const [at, setAt] = useState(0);
@@ -83,7 +88,7 @@ export default function Queue({ rows, asks, mine, tickets, onTicket, onStartTick
   }, [row?.key]);
   // 다 답했으면 닫는다
   useEffect(() => {
-    if (rows.length + asks.length + mine.length + tickets.length && !total) onClose();
+    if (rows.length + asks.length + mine.length + tickets.length + runs.length && !total) onClose();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [total]);
 
@@ -108,6 +113,7 @@ export default function Queue({ rows, asks, mine, tickets, onTicket, onStartTick
     } else if (ask && e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) {
       e.preventDefault();
       // 티켓: Enter 티켓 화면, ⌘Enter 이 티켓으로 시작
+      if (ask.kind === "run") return onRun?.(ask.url), onClose();
       if (ask.kind === "ticket") return (e.metaKey ? onStartTicket(ask.repository.nameWithOwner) : onTicket(ask.repository.nameWithOwner)), onClose();
       // 빈 채로 Enter면 PR 화면, 글을 썼거나 ⌘Enter면 세션에 맡긴다. 내 PR은 늘 PR 화면으로 연다
       if (ask.kind === "mine" || (!text.trim() && !e.metaKey)) return onView(ask), onClose();
@@ -147,13 +153,13 @@ export default function Queue({ rows, asks, mine, tickets, onTicket, onStartTick
             <>
             {(i === 0 || askList[i - 1].kind !== a.kind) && (
               <div key={"h-" + a.kind} className="qu-head">
-                {a.kind === "mine" ? tr`내 PR` : a.kind === "ticket" ? tr`티켓` : tr`리뷰 요청`} {askList.filter((x) => x.kind === a.kind).length}
+                {a.kind === "mine" ? tr`내 PR` : a.kind === "ticket" ? tr`티켓` : a.kind === "run" ? "CI" : tr`리뷰 요청`} {askList.filter((x) => x.kind === a.kind).length}
               </div>
             )}
             <button key={a.url} type="button" tabIndex={-1} className={"qu-row" + (a.url === ask?.url ? " on" : "")} onClick={() => (setAt(list.length + i), setText(""))}>
               <b>{a.title}</b>
               <small>
-                {a.kind === "ticket" ? (
+                {a.kind === "ticket" || a.kind === "run" ? (
                   <>
                     {a.repository.nameWithOwner} · <em className="qu-news">{a.news}</em>
                   </>
@@ -172,11 +178,13 @@ export default function Queue({ rows, asks, mine, tickets, onTicket, onStartTick
             <>
               <div className="qu-reply">
                 <pre className="qu-asked">
-                  {ask.kind === "ticket" ? ask.repository.nameWithOwner : `${ask.repository.nameWithOwner} #${ask.number}`}
+                  {ask.kind === "ticket" || ask.kind === "run" ? ask.repository.nameWithOwner : `${ask.repository.nameWithOwner} #${ask.number}`}
                   {"\n"}
                   {ask.title}
                 </pre>
-                {ask.kind === "ticket" ? (
+                {ask.kind === "run" ? (
+                  <small>{tr`내가 돌린 CI가 깨졌다 · Enter로 job과 로그를 본다`}</small>
+                ) : ask.kind === "ticket" ? (
                   <small>{tr`티켓에 일이 생겼다: ${ask.news} · Enter로 티켓 화면, ⌘Enter로 이 티켓으로 시작`}</small>
                 ) : ask.kind === "mine" ? (
                   <small>{tr`내 PR에 일이 생겼다: ${ask.news} · Enter로 PR 화면에서 본다`}</small>

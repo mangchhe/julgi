@@ -327,6 +327,7 @@ export const config = {
   allowRules: "",
   /** 챙길 PR: mine 내가 연 PR 전부, session 세션이 올린 PR만, off 안 챙김 */
   prWatch: "mine",
+  ciWatch: true,
   /** 나한테 온 리뷰 요청을 ⌘J에 넣고 알린다 */
   reviewAsks: true,
   /** PR을 몇 분마다 볼까 (세션 줄의 PR, 내 PR) */

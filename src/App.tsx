@@ -26,6 +26,8 @@ import Usage from "./Usage";
 import TicketView from "./TicketView";
 import StartTicket, { promptOf } from "./StartTicket";
 import { parse as parseDiff } from "./CodeReview";
+import RunView from "./RunView";
+import { CiRun, CiState, ciLabel, ciLive, ciNews, ciOrder } from "./ci";
 import { TicketWork, firstKey, JiraConn, keyOfUrl, setKnownKeys, Ticket, TicketFull, TicketSeen, ticketNews, quietNews, BugJob, slugOf } from "./jira";
 import { prNo, isLab, newsOf, openPr, prOf, PrStatus, PrTarget, prUrl, repoName, ReviewAsk } from "./pr";
 import * as terms from "./terms";
@@ -209,6 +211,52 @@ export default function App() {
   // 세션과 이어지지 않은 내 PR 가운데 봐야 할 일이 생긴 것: "소유자/레포#번호" → { PR, 까닭 }. ⌘J의 "내 PR"이 된다
   // 내가 연 열린 PR 전부 (챙길 PR이 "내 PR 전부"일 때). ⌘K에서 pr을 치면 고를 거리가 된다
   const [minePrs, setMinePrs] = useState<ReviewAsk[]>([]);
+  // 내가 돌린 CI 실행들. runNews: 깨진 채 끝나서 내가 볼 것 (주소 → 소식)
+  const [runs, setRuns] = useState<CiRun[]>([]);
+  const [runNews, setRunNews] = useState<Record<string, string>>({});
+  const [runShown, setRunShown] = useState(""); // ⌘J에서 고른 실행. 작업 페이지를 그 실행으로 연다
+  const runSeen = useRef<Record<string, CiState> | null>(null);
+  const slugs = useRef<Record<string, string | null>>({});
+  const refreshRuns = useRef(() => {});
+  const runsRef = useRef(runs);
+  runsRef.current = runs;
+  useEffect(() => {
+    let timer = 0;
+    let gone = false;
+    const poll = async () => {
+      if (!config.ciWatch) return setRuns([]);
+      if (!runSeen.current) runSeen.current = await invoke<string | null>("data_read", { name: "run-seen.json" }).then((t) => (t ? JSON.parse(t) : {}), () => ({}));
+      // 볼 레포: 열려 있는 세션의 폴더와 최근에 쓴 레포. 지도의 레포를 다 돌면 호출이 너무 많다
+      const dirs = [...new Set([...live.current.open.map((o) => o.cwd), ...live.current.folders.slice(0, 8).map((f) => f.cwd)])];
+      for (const d of dirs) if (!(d in slugs.current)) slugs.current[d] = await invoke<string | null>("repo_slug", { path: d }).catch(() => null);
+      const repos = [...new Set(dirs.map((d) => slugs.current[d]).filter((x): x is string => !!x))].slice(0, 12);
+      const lists = await Promise.all(repos.map((repo) => invoke<CiRun[]>("ci_runs", { repo }).catch(() => [] as CiRun[])));
+      if (gone) return;
+      const all = lists.flat().sort(ciOrder).slice(0, 40);
+      const seen = runSeen.current!;
+      for (const r of all) {
+        const news = ciNews(seen[r.url], r.state);
+        if (!news) continue;
+        const text = `${r.repo.replace(/^.*\//, "")} · ${r.name} · ${r.branch}`;
+        actions.current.record("CI", `${text} · ${ciLabel(news)}: ${r.title.slice(0, 60)}`);
+        if (news === "fail") setRunNews((old) => ({ ...old, [r.url]: ciLabel("fail") }));
+        if (config.notify && !document.hasFocus()) void invoke("notify", { title: `CI ${ciLabel(news)} · ${text}`, body: r.title.slice(0, 80) });
+      }
+      // 지금 목록에 있는 것만 남긴다. 오래된 것은 버린다
+      runSeen.current = Object.fromEntries(all.map((r) => [r.url, r.state]));
+      void invoke("data_write", { name: "run-seen.json", text: JSON.stringify(runSeen.current) });
+      setRuns(all);
+    };
+    // 도는 실행이 있으면 자주, 없으면 PR과 같은 주기로 본다
+    const loop = () =>
+      void poll()
+        .catch(() => {})
+        .finally(() => !gone && (timer = window.setTimeout(loop, runsRef.current.some((r) => ciLive(r.state)) ? 20_000 : config.prEveryMin * 60_000)));
+    timer = window.setTimeout(loop, 15_000);
+    refreshRuns.current = () => void poll().catch(() => {});
+    return () => ((gone = true), clearTimeout(timer));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   const [mineNews, setMineNews] = useState<Record<string, ReviewAsk & { news: string }>>({});
   // 잠든 세션의 PR에 일이 생긴 것: 세션 ID → { 까닭, PR }. ⌘J의 내 차례에 올라오고, 고르면 깨운다
   const [sleepNews, setSleepNews] = useState<Record<string, { news: string; pr: PrTarget }>>({});
@@ -2120,8 +2168,8 @@ export default function App() {
     // i18n-on
     void dispatch({ kind: "new", cwd }, ask, { rank: 0, by: "리뷰 요청" }); // i18n-ok
   };
-  const actions = useRef({ readUsage, publishRemote, say, dispatch, show, close, sleep, requestQuit, handoff, exited, newSession, newShell, nextWaiting, openTerm, resize, split, unsplit, finishThread, move, togglePin, tend, triage, serve, confirmClose, toggleReview, prNotice, askNotice, mineNotice, sleepNotice, wake, ticketNotice, ticketOffer, checkEnded });
-  actions.current = { readUsage, publishRemote, say, dispatch, show, close, sleep, requestQuit, handoff, exited, newSession, newShell, nextWaiting, openTerm, resize, split, unsplit, finishThread, move, togglePin, tend, triage, serve, confirmClose, toggleReview, prNotice, askNotice, mineNotice, sleepNotice, wake, ticketNotice, ticketOffer, checkEnded };
+  const actions = useRef({ readUsage, publishRemote, say, dispatch, show, close, sleep, requestQuit, handoff, exited, newSession, newShell, nextWaiting, openTerm, resize, split, unsplit, finishThread, move, togglePin, tend, triage, serve, record, confirmClose, toggleReview, prNotice, askNotice, mineNotice, sleepNotice, wake, ticketNotice, ticketOffer, checkEnded });
+  actions.current = { readUsage, publishRemote, say, dispatch, show, close, sleep, requestQuit, handoff, exited, newSession, newShell, nextWaiting, openTerm, resize, split, unsplit, finishThread, move, togglePin, tend, triage, serve, record, confirmClose, toggleReview, prNotice, askNotice, mineNotice, sleepNotice, wake, ticketNotice, ticketOffer, checkEnded };
 
   /** 세션이 남긴 링크 가운데 마지막 PR */
   const prOfSession = (id?: string) => {
@@ -2435,7 +2483,7 @@ export default function App() {
       else if (cmd && e.code === "Comma") (setSettingsAt(undefined), setOverlay(overlay === "settings" ? null : "settings"));
       else if (cmd && e.code === "KeyG") setOverlay(overlay === "threads" ? null : "threads");
       else if (cmd && e.shiftKey && e.code === "KeyU") setOverlay(overlay === "usage" ? null : "usage");
-      else if (cmd && e.code === "KeyU") setOverlay(overlay === "work" ? null : "work");
+      else if (cmd && e.code === "KeyU") (setRunShown(""), setOverlay(overlay === "work" ? null : "work"));
       else if (overlay) {
         // 작업 페이지는 Esc를 스스로 다룬다(PR 화면 안이면 목록으로, 목록이면 닫기)
         if (overlay === "work" && e.target instanceof Element && e.target.closest(".wk")) return;
@@ -2976,6 +3024,8 @@ export default function App() {
               }),
             )}
           asks={asks}
+          runs={runs.filter((r) => runNews[r.url]).map((r) => ({ url: r.url, title: r.title || r.name, where: `${r.repo.replace(/^.*\//, "")} · ${r.name} · ${r.branch}`, news: runNews[r.url] }))}
+          onRun={(url) => (setRunNews(({ [url]: _, ...rest }) => rest), setRunShown(url), setOverlay("work"))}
           onFixBug={fixBug}
           onHoldBug={holdBug}
           mine={Object.values(mineNews)}
@@ -3103,6 +3153,23 @@ export default function App() {
           loadTickets={(jql) => invoke<Ticket[]>("jira_search", { conn: jiraConn(), jql, limit: 50 })}
           ticketNews={ticketNewsMap}
           ticketQuiet={ticketQuiet}
+          runs={config.ciWatch ? runs : undefined}
+          runNews={runNews}
+          startRun={runShown || undefined}
+          onRefreshRuns={() => refreshRuns.current()}
+          runPane={(run) => (
+            <RunView
+              key={run.url}
+              run={run}
+              onFix={(r, job, log) => {
+                setRunNews(({ [r.url]: _, ...rest }) => rest);
+                // 세션에 치는 말은 번역하지 않는다. 보낼 곳은 보내기 상자가 정한다 i18n-off
+                setMoving(`[CI 실패] ${r.repo.replace(/^gitlab:/, "")} · ${r.name} · 브랜치 ${r.branch}\n${r.url}\n\n실패한 job: ${job.name}${job.stage ? ` (${job.stage})` : ""}\n\n로그 끝부분:\n${log.slice(-3000)}\n\n원인을 찾아 고쳐줘. 고친 뒤에는 무엇이 문제였는지 한 줄로 알려줘.`);
+                // i18n-on
+                setOverlay("send");
+              }}
+            />
+          )}
           bugJobs={bugJobs}
           bugStopped={bugStopped}
           bugRepos={mapState.current.repos.length ? mapState.current.repos : folders}

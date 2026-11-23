@@ -171,4 +171,6 @@ export default {
   "버그를 한꺼번에 맡길 때 동시에 돌릴 수": "Bugs diagnosed at the same time",
   "작업 페이지에서 버그를 전부 맡기면 이만큼씩 진단 세션을 띄우고, 하나가 답을 끝내면 다음 것을 시작한다": "When you hand over all bugs from the Work page, this many diagnosis sessions run at once, and the next one starts when one finishes its reply",
   "{0}개": "{0}",
+  "내가 돌린 CI 실행 보기": "Watch CI runs I started",
+  "열려 있거나 최근에 쓴 세션의 레포에서 내가 돌린 CI를 읽어 ⌘U의 \"실행\"에 모은다. 끝나면 알리고, 깨진 것은 ⌘J에 올린다. gh와 glab으로 읽는다": "Reads the CI runs you started in the repos of open or recently used sessions and lists them under \"Runs\" in ⌘U. You are notified when one finishes, and failed ones come up in ⌘J. Read through gh and glab",
 } as Record<string, string>;

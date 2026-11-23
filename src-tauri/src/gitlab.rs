@@ -23,7 +23,18 @@ pub fn split(repo: &str) -> Result<(&str, &str), String> {
 }
 
 /// glab api. fields는 문자열 필드(-f)다
-fn api(host: &str, method: &str, endpoint: &str, fields: &[(&str, String)]) -> Result<Value, String> {
+/// glab api의 답을 글 그대로 받는다 (job 로그처럼 JSON이 아닌 것)
+pub(crate) fn raw(host: &str, endpoint: &str) -> Result<String, String> {
+    let mut cmd = Command::new(glab_bin());
+    cmd.arg("api");
+    if !host.is_empty() {
+        cmd.args(["--hostname", host]);
+    }
+    let out = cmd.arg(endpoint).env("NO_COLOR", "1").env("GLAB_NO_PROMPT", "1").output().map_err(|_| say("glab이 없다. brew install glab", "glab is not installed. brew install glab"))?;
+    if out.status.success() { Ok(String::from_utf8_lossy(&out.stdout).into_owned()) } else { Err(String::from_utf8_lossy(&out.stderr).trim().to_owned()) }
+}
+
+pub(crate) fn api(host: &str, method: &str, endpoint: &str, fields: &[(&str, String)]) -> Result<Value, String> {
     let mut cmd = Command::new(glab_bin());
     cmd.arg("api");
     // 호스트를 비우면 glab에 로그인한 기본 호스트로 간다(회사 GitLab만 쓰는 경우)
@@ -45,7 +56,7 @@ fn api(host: &str, method: &str, endpoint: &str, fields: &[(&str, String)]) -> R
     serde_json::from_str(&text).map_err(|e| e.to_string())
 }
 
-fn enc(path: &str) -> String {
+pub(crate) fn enc(path: &str) -> String {
     path.replace('/', "%2F")
 }
 
@@ -62,7 +73,7 @@ pub fn status() -> (bool, String) {
     (true, user)
 }
 
-fn me(host: &str) -> String {
+pub(crate) fn me(host: &str) -> String {
     api(host, "GET", "user", &[]).ok().and_then(|u| u["username"].as_str().map(str::to_owned)).unwrap_or_default()
 }
 

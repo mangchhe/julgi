@@ -72,6 +72,7 @@
 | 값 | 기본 | 뜻 |
 |---|---|---|
 | `prWatch` | `mine` | 챙길 PR. `mine`(내가 연 PR 전부), `session`(세션이 올린 PR만), `off` |
+| `ciWatch` | 켬 | 열려 있거나 최근에 쓴 세션의 레포에서 내가 돌린 CI(GitHub Actions, GitLab 파이프라인)를 읽는다. 끝나면 알리고 깨진 것은 `⌘J`에 올린다 |
 | `prEveryMin`, `askEveryMin` | 2, 5 | PR과 리뷰 요청을 보는 주기(분) |
 | `refreshOnFocus` | 켜짐 | Julgi 창으로 돌아오면 바로 다시 본다 |
 | `prViewRefreshSec` | 30 | PR 화면을 열어 둔 동안 새로 읽는 주기(초). 0이면 끈다 |
@@ -109,6 +110,7 @@
 | `plugin/`, `grown/`, `bin/julgi` | Julgi의 스킬, Julgi가 만든 스킬, 세션이 쓰는 명령 |
 | `skill-history/` | 다듬기 전의 스킬 글 |
 | `pr-seen.json`, `jira-seen.json`, `jira-news.json` | PR과 티켓의 지난 형편. 견줘서 새로 생긴 일만 알린다. 아직 안 본 티켓 소식 |
+| `run-seen.json` | 내 CI 실행의 지난 상태. 끝난 것을 알아채는 데 쓴다 |
 | `triage.json` | 끝난 답마다 내가 필요했는지와 그 이유 |
 | `progress.json` | 줄기마다 목표, 한 것, 남은 것, 막힌 것 |
 | `seen.json` | 마지막으로 Julgi를 본 때. 브리핑이 쓴다 |

@@ -189,6 +189,17 @@ async function invoke(cmd: string, args: Record<string, unknown> = {}): Promise<
       const t = (key: string, title: string, status: string, cat: string, type: string, others = 0) => ({ key, url: `https://example.atlassian.net/browse/${key}`, title, status, statusCategory: cat, type, priority: "High", assignee: "Me", updated: new Date(Date.now() - 3600_000).toISOString(), others });
       return [t("ABC-123", "주문 취소 시 쿠폰 복구", "In Progress", "indeterminate", "Story", 2), t("ABC-130", "결제 실패 재시도 간격 조정", "To Do", "new", "Bug"), t("ABC-131", "관리자 환불 내역 CSV", "To Do", "new", "Task"), t("ABC-132", "알림 종류와 발송 조건 정리", "In Progress", "indeterminate", "Task"), t("ABC-133", "주문 목록 응답 지연", "In Progress", "indeterminate", "Bug"), t("ABC-134", "쿠폰 만료일이 하루 일찍 표시됨", "To Do", "new", "Bug"), t("ABC-135", "CSV 내보내기에서 한글이 깨짐", "To Do", "new", "Bug"), t("ABC-136", "알림이 두 번 발송됨", "To Do", "new", "Bug"), t("ABC-137", "검색 결과 정렬이 뒤집힘", "To Do", "new", "Bug")];
     }
+    case "ci_runs": {
+      if (!flags.has("ci")) return [];
+      const run = (id: string, title: string, name: string, branch: string, state: string, min: number) => ({ repo: args.repo, id, title, name, branch, state, started: new Date(Date.now() - (min + 4) * 60_000).toISOString(), at: new Date(Date.now() - min * 60_000).toISOString(), url: `https://github.com/${args.repo}/actions/runs/${id}` });
+      return String(args.repo).endsWith("acme-api") ? [run("9001", "쿠폰 여러 장일 때 환불액 1원 어긋남 수정", "Deploy", "main", "run", 0), run("9000", "쿠폰 여러 장일 때 환불액 1원 어긋남 수정", "CI", "main", "fail", 6), run("8990", "정산 배치 재시도 간격을 설정으로", "Deploy", "main", "ok", 190)] : [];
+    }
+    case "ci_jobs":
+      return args.id === "9000"
+        ? [{ id: "1", name: "lint", stage: "", state: "ok", started: new Date(Date.now() - 600_000).toISOString(), finished: new Date(Date.now() - 560_000).toISOString() }, { id: "2", name: "test", stage: "Run tests", state: "fail", started: new Date(Date.now() - 560_000).toISOString(), finished: new Date(Date.now() - 380_000).toISOString() }, { id: "3", name: "build", stage: "", state: "skip", started: "", finished: "" }]
+        : [{ id: "1", name: "build", stage: "", state: "ok", started: new Date(Date.now() - 240_000).toISOString(), finished: new Date(Date.now() - 150_000).toISOString() }, { id: "2", name: "deploy-staging", stage: "", state: "run", started: new Date(Date.now() - 140_000).toISOString(), finished: "" }, { id: "3", name: "deploy-production", stage: "", state: "queued", started: "", finished: "" }];
+    case "ci_log":
+      return "RefundCalculatorTest > 쿠폰 두 개가 겹쳐도 1원이 어긋나지 않는다 FAILED\n    org.opentest4j.AssertionFailedError: expected: <9334> but was: <9333>\n        at RefundCalculatorTest.kt:14\n\n42 tests completed, 1 failed\n\nFAILURE: Build failed with an exception.\n* What went wrong:\nExecution failed for task ':test'.\n##[error]Process completed with exit code 1.";
     case "worktree_add":
       return `/Users/me/.julgi/worktrees/${args.name}`;
     case "jira_image":

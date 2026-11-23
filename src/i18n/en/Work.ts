@@ -35,4 +35,8 @@ export default {
   "고른다": "Choose",
   "{0}건 맡기기": "Hand over {0}",
   "맡기지 못했다": "Could not hand over",
+  "내가 돌린 CI 실행. 머지 뒤의 배포처럼 PR 없이 도는 것도 여기 온다": "CI runs you started, including ones without a PR such as a deploy after a merge",
+  "실행": "Runs",
+  "열려 있거나 최근에 쓴 세션의 레포에서 내가 돌린 CI. 도는 것이 위에 온다": "CI you started in the repos of open or recently used sessions. Running ones come first",
+  "내가 돌린 실행이 없다": "No runs started by you",
 } as Record<string, string>;

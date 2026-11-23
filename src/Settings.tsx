@@ -127,6 +127,7 @@ const SECTIONS: { id: string; title: string; hint: string; rows: Row[] }[] = [
       { kind: "number", key: "bugParallel", label: tr("버그를 한꺼번에 맡길 때 동시에 돌릴 수"), note: tr("작업 페이지에서 버그를 전부 맡기면 이만큼씩 진단 세션을 띄우고, 하나가 답을 끝내면 다음 것을 시작한다"), step: 1, min: 1, max: 8, show: (n) => tr`${n}개` },
       { kind: "text", key: "jiraQuiet", label: tr("조용히 받을 Jira 작성자"), note: tr("이 사람들의 댓글만 달렸으면 알리지 않고 ⌘J에도 올리지 않는다. 봇 계정은 적지 않아도 조용히 받는다"), hint: "Automation for Jira, deploy-bot" },
       { kind: "text", key: "jiraRepos", label: tr("프로젝트 키 → 레포"), note: tr("이 티켓으로 시작할 때 고를 레포. 시작 창에서 고르면 저절로 채운다"), hint: "ABC=acme-api, OPS=acme-infra" },
+      { kind: "toggle", key: "ciWatch", label: tr("내가 돌린 CI 실행 보기"), note: tr("열려 있거나 최근에 쓴 세션의 레포에서 내가 돌린 CI를 읽어 ⌘U의 \"실행\"에 모은다. 끝나면 알리고, 깨진 것은 ⌘J에 올린다. gh와 glab으로 읽는다") },
       { kind: "pick", key: "prWatch", label: tr("챙길 PR"), note: tr("정한 주기마다 PR을 보고 CI가 깨지거나 남이 코멘트를 달거나 리뷰를 받거나 머지되면 알린다. 세션이 올린 PR은 그 세션을 내 차례로 올리고, 나머지 내 PR은 ⌘J의 \"내 PR\"에 넣는다"), options: [["mine", tr("내 PR 전부")], ["session", tr("세션이 올린 PR만")], ["off", tr("끔")]] },
       { kind: "number", key: "prEveryMin", label: tr("PR 확인 주기"), note: tr("세션 줄의 PR과 내 PR을 이만큼마다 본다. 짧을수록 알림이 빨리 온다"), step: 1, min: 1, max: 30, show: (n) => tr`${n}분` },
       { kind: "number", key: "askEveryMin", label: tr("리뷰 요청 확인 주기"), note: tr("나한테 온 리뷰 요청을 이만큼마다 본다"), step: 1, min: 1, max: 60, show: (n) => tr`${n}분` },

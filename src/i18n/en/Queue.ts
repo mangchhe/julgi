@@ -25,4 +25,5 @@ export default {
   "결론 줄을 찾지 못했다. 아래 진단을 읽는다": "No conclusion line found. Read the diagnosis below",
   "고쳐": "Fix it",
   "보류": "Hold",
+  "내가 돌린 CI가 깨졌다 · Enter로 job과 로그를 본다": "A CI run you started failed · Enter to see the jobs and the log",
 } as Record<string, string>;

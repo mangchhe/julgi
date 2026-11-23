@@ -71,6 +71,7 @@ Change them in `⌘,`; they apply at once and are saved to `~/.julgi/config.json
 | Key | Default | Meaning |
 |---|---|---|
 | `prWatch` | `mine` | Which PRs to watch. `mine` (all I opened), `session` (only those sessions opened), `off` |
+| `ciWatch` | on | Read the CI runs I started (GitHub Actions, GitLab pipelines) in the repos of open or recently used sessions; notify when one finishes and put failed ones in `⌘J` |
 | `prEveryMin`, `askEveryMin` | 2, 5 | Minutes between PR checks and review request checks |
 | `refreshOnFocus` | on | Check again as soon as the window regains focus |
 | `prViewRefreshSec` | 30 | Seconds between reloads of an open PR view. 0 disables |
@@ -107,6 +108,7 @@ Everything is a text file under `~/.julgi/`. Conversations are not here; Claude 
 | `activity.jsonl`, `routes.jsonl`, `misroutes.jsonl` | What Julgi did, where it sent things, corrections |
 | `plugin/`, `grown/`, `bin/julgi` | Julgi's skills, skills it grew, the session command |
 | `pr-seen.json`, `jira-seen.json`, `jira-news.json` | Last known state of PRs and tickets, to tell news from old; ticket news not yet looked at |
+| `run-seen.json` | Last known state of my CI runs, to notice when one finishes |
 | `triage.json` | For each finished reply, whether it needed you and why |
 | `progress.json` | Goal, done, left, blocked per stem |
 | `seen.json` | When you last looked at Julgi, for the briefing |

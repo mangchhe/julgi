@@ -2,6 +2,7 @@ import Hint from "./Hint";
 import { tr } from "./i18n";
 import { Fragment, ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import { BugJob, CATEGORY, Ticket, TicketWork } from "./jira";
+import { CiRun, ciLabel, ciLive } from "./ci";
 import PrView from "./PrView";
 import { ago } from "./model";
 import { openUrl } from "@tauri-apps/plugin-opener";
@@ -42,6 +43,13 @@ type Props = {
   /** 소식이 봇 댓글뿐이라 흐리게 보일 티켓 */
   ticketQuiet?: Set<string>;
   onStartTicket?: (key: string) => void;
+  /** 내가 돌린 CI 실행들(도는 것이 앞). 고르면 오른쪽에 runPane을 편다. runNews: 방금 끝난 실행의 소식 */
+  runs?: CiRun[];
+  runPane?: (run: CiRun) => ReactNode;
+  runNews?: Record<string, string>;
+  /** 열자마자 이 실행을 고른다 (⌘J에서 넘어왔을 때) */
+  startRun?: string;
+  onRefreshRuns?: () => void;
   /** 한꺼번에 맡긴 버그들과 그 진행. 버그 머리글에서 맡기고, 멈추고, 비운다 */
   bugJobs?: BugJob[];
   bugStopped?: boolean;
@@ -68,10 +76,15 @@ const idOf = (t: PrTarget) => `${t.repo}#${t.number}`;
  * 작업 (⌘U). PR을 묶음별로 한 화면에서 둘러본다: 왼쪽 묶음, 가운데 목록, 오른쪽 PR 화면.
  * ⌘J가 "지금 손댈 것"만 모은다면, 여기는 "전부 둘러보기"다. Jira를 붙이면 티켓 묶음이 같은 자리에 들어온다
  */
-export default function Work({ groups, ticketGroups = [], loadTickets, ticketPane, ticketNews = {}, ticketQuiet, ticketWork, bugJobs = [], bugStopped, bugRepos = [], bugRepoOf, onHandBugs, onStopBugs, onClearBugs, onStartTicket, onShowSession, onConnectJira, onClose, onRefresh, onOpenSession, onHand }: Props) {
+export default function Work({ groups, ticketGroups = [], loadTickets, ticketPane, ticketNews = {}, ticketQuiet, ticketWork, bugJobs = [], bugStopped, bugRepos = [], bugRepoOf, onHandBugs, onStopBugs, onClearBugs, runs, runPane, runNews = {}, startRun, onRefreshRuns, onStartTicket, onShowSession, onConnectJira, onClose, onRefresh, onOpenSession, onHand }: Props) {
   const allCount = groups.length + ticketGroups.length;
   // 새 소식이 있는 묶음부터 연다
-  const [groupAt, setGroupAt] = useState(() => Math.max(0, groups.findIndex((g) => g.rows.some((r) => r.news))));
+  const [groupAt, setGroupAt] = useState(() => (startRun && runs ? allCount : Math.max(0, groups.findIndex((g) => g.rows.some((r) => r.news)))));
+  // 실행 묶음은 맨 끝 자리다 (PR 묶음들, 티켓 묶음들 다음)
+  const runsOn = !!runs && groupAt === allCount;
+  const navCount = allCount + (runs ? 1 : 0);
+  const [runAt, setRunAt] = useState(startRun ?? "");
+  const run = runsOn ? (runs!.find((r) => r.url === runAt) ?? runs![0]) : undefined;
   const tgroup = groupAt >= groups.length ? ticketGroups[groupAt - groups.length] : undefined;
   const group = tgroup ? undefined : groups[Math.min(groupAt, groups.length - 1)];
   const [picked, setPicked] = useState<string | null>(null);
@@ -115,13 +128,15 @@ export default function Work({ groups, ticketGroups = [], loadTickets, ticketPan
   const chosen = targets.filter((t) => !bugPick?.off.includes(t.key));
   const jobs = (state: BugJob["state"]) => bugJobs.filter((j) => j.state === state).length;
   const JOB_STEP: Record<string, string> = { queued: tr`맡김 · 차례를 기다리는 중`, diag: tr`맡김 · 진단 중`, decide: tr`진단 끝남 · ⌘J에서 고쳐 또는 보류를 고른다` };
-  const rows = group?.rows ?? [];
+  const rows = runsOn ? [] : (group?.rows ?? []);
   const at = tgroup ? Math.max(0, tlist.findIndex((t) => t.key === picked)) : Math.max(0, rows.findIndex((r) => idOf(r.target) === picked));
   const row = tgroup ? undefined : rows[at];
   const ticket = tgroup ? tlist[at] : undefined;
   const box = useRef<HTMLDivElement>(null);
   const list = useRef<HTMLDivElement>(null);
   useEffect(() => box.current?.focus(), []);
+  // 열 때 실행을 바로 다시 읽는다
+  useEffect(() => onRefreshRuns?.(), []); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => void list.current?.querySelector(".wk-row.on")?.scrollIntoView({ block: "nearest" }), [at, groupAt]);
   const total = useMemo(() => groups.reduce((n, g) => n + g.rows.length, 0), [groups]);
   const count = tgroup ? tlist.length : rows.length;
@@ -141,17 +156,26 @@ export default function Work({ groups, ticketGroups = [], loadTickets, ticketPan
   const onKey = (e: React.KeyboardEvent) => {
     // 오른쪽 PR 화면 안의 키는 그 화면이 받는다. Esc만 목록으로 돌아오게 PrView가 onClose를 부른다
     if ((e.target as Element).closest(".pr-inline")) return;
+    if (runsOn && ["ArrowDown", "ArrowUp", "j", "k", "o", "r"].includes(e.key)) {
+      const i = runs!.findIndex((r) => r.url === run?.url);
+      if (e.key === "o") run && void openUrl(run.url);
+      else if (e.key === "r") onRefreshRuns?.();
+      else setRunAt(runs![Math.min(runs!.length - 1, Math.max(0, i + (e.key === "ArrowDown" || e.key === "j" ? 1 : -1)))]?.url ?? "");
+      e.preventDefault();
+      e.stopPropagation();
+      return;
+    }
     if (e.key === "Escape") onClose();
     else if (e.key === "ArrowDown" || e.key === "j") pick(Math.min(count - 1, at + 1));
     else if (e.key === "ArrowUp" || e.key === "k") pick(Math.max(0, at - 1));
-    else if (e.key === "Tab") switchGroup((groupAt + (e.shiftKey ? allCount - 1 : 1)) % allCount);
+    else if (e.key === "Tab") switchGroup((groupAt + (e.shiftKey ? navCount - 1 : 1)) % navCount);
     else if (e.key === "Enter" && e.metaKey && row?.ask) onHand(row.ask);
     else if (e.key === "Enter" && e.metaKey && ticket) onStartTicket?.(ticket.key);
     else if (e.key === "Enter" || e.key === "ArrowRight") enterPr();
     else if (e.key === "s" && row?.sessionId) onOpenSession(row.sessionId);
     else if (e.key === "s" && ticket && works.get(ticket.key)?.session) onShowSession?.(works.get(ticket.key)!.session!);
     // 숫자: 왼쪽 묶음으로 바로. o: 브라우저에서 열기
-    else if (/^[1-9]$/.test(e.key) && !e.metaKey && Number(e.key) <= allCount) switchGroup(Number(e.key) - 1);
+    else if (/^[1-9]$/.test(e.key) && !e.metaKey && Number(e.key) <= navCount) switchGroup(Number(e.key) - 1);
     else if (e.key === "o" && ticket) void openUrl(ticket.url);
     else if (e.key === "o" && row) void openUrl(prUrl(row.target));
     else if (e.key === "r") (tgroup ? setTicketLoads((n) => n + 1) : onRefresh());
@@ -198,6 +222,18 @@ export default function Work({ groups, ticketGroups = [], loadTickets, ticketPan
             </button>
           );
         })}
+        {runs && (
+          <>
+            <div className="wk-sec">CI</div>
+            <button type="button" tabIndex={-1} className={"wk-grp" + (runsOn ? " on" : "") + (runs.some((r) => runNews[r.url]) ? " hot" : "")} onClick={() => switchGroup(allCount)} title={tr`내가 돌린 CI 실행. 머지 뒤의 배포처럼 PR 없이 도는 것도 여기 온다`}>
+              <span>
+                {allCount < 9 && <kbd>{allCount + 1}</kbd>}
+                {tr`실행`}
+              </span>
+              <b>{runs.filter((r) => ciLive(r.state)).length || ""}</b>
+            </button>
+          </>
+        )}
         <div className="wk-navfoot">
           <button type="button" tabIndex={-1} onClick={onRefresh} title={tr`PR과 리뷰 요청을 바로 다시 읽는다 (r)`}>
             {tr`새로 읽기`}
@@ -206,8 +242,8 @@ export default function Work({ groups, ticketGroups = [], loadTickets, ticketPan
       </nav>
       <div className="wk-list" ref={list}>
         <div className="wk-head">
-          <b>{(tgroup ?? group)?.title}</b>
-          <small>{(tgroup ?? group)?.hint}</small>
+          <b>{runsOn ? tr`실행` : (tgroup ?? group)?.title}</b>
+          <small>{runsOn ? tr`열려 있거나 최근에 쓴 세션의 레포에서 내가 돌린 CI. 도는 것이 위에 온다` : (tgroup ?? group)?.hint}</small>
         </div>
         {tgroup && tickets === undefined && <div className="side-none">{tr`읽는 중`}</div>}
         {tgroup && typeof tickets === "string" && <div className="side-none">{tickets}</div>}
@@ -316,7 +352,21 @@ export default function Work({ groups, ticketGroups = [], loadTickets, ticketPan
           </button>
           </Fragment>
         ))}
-        {!tgroup && !rows.length && <div className="side-none">{total ? tr`이 묶음은 비었다` : tr`챙기는 PR이 없다. ⌘,의 연결에서 GitHub를 연결하고 챙길 범위를 고른다`}</div>}
+        {runsOn && !runs!.length && <div className="side-none">{tr`내가 돌린 실행이 없다`}</div>}
+        {runsOn &&
+          runs!.map((r) => (
+            <button key={r.url} type="button" tabIndex={-1} className={"wk-row" + (r.url === run?.url ? " on" : "")} onClick={() => setRunAt(r.url)}>
+              <span className="wk-row-title">
+                <span className={"ci-state s-" + r.state}>{ciLabel(r.state)}</span> {r.title || r.name}
+              </span>
+              <span className="wk-row-meta">
+                {runNews[r.url] && <b className="loud">{runNews[r.url]} · </b>}
+                {repoName(r.repo)} · {r.name} · {r.branch}
+                {(r.at || r.started) && ` · ${ago(Date.parse(r.at || r.started) / 1000)}`}
+              </span>
+            </button>
+          ))}
+        {!runsOn && !tgroup && !rows.length && <div className="side-none">{total ? tr`이 묶음은 비었다` : tr`챙기는 PR이 없다. ⌘,의 연결에서 GitHub를 연결하고 챙길 범위를 고른다`}</div>}
         {rows.map((r, i) => (
           <button key={idOf(r.target)} type="button" tabIndex={-1} className={"wk-row" + (i === at ? " on" : "")} onClick={() => pick(i)} onDoubleClick={enterPr}>
             <span className="wk-row-title">
@@ -339,7 +389,9 @@ export default function Work({ groups, ticketGroups = [], loadTickets, ticketPan
         ))}
       </div>
       <div className="wk-main">
-        {row ? (
+        {run && runPane ? (
+          runPane(run)
+        ) : row ? (
           <PrView key={idOf(row.target)} target={row.target} inline autoFocus={false} onClose={() => box.current?.focus()} />
         ) : ticket && ticketPane ? (
           ticketPane(ticket.key)
