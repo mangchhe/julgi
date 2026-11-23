@@ -2973,7 +2973,8 @@ export default function App() {
                         ],
                         known: changes,
                         // 세션이 다른 워크트리로 옮겨 일했을 때 그 워크트리를 먼저 고르게: 티켓 키와 브랜치 이름
-                        prefer: [ticketOfSession(o.sessionId), byId.get(o.sessionId ?? "")?.branch].filter((x): x is string => !!x),
+                        // 세션 이름에 든 키(ABC-12, T-75 같은 것)도 본다. Jira가 아닌 곳의 티켓이면 ticketOfSession이 모른다
+                        prefer: [...new Set([ticketOfSession(o.sessionId), ...(nameOf(key).match(/\b[A-Za-z]+-\d+\b/g) ?? [])].filter((x): x is string => !!x))],
                         sessions: threadOf(o.sessionId)?.sessions ?? (o.sessionId ? [o.sessionId] : []),
                         onSay: (text: string) => {
                           terms.submitWhenClear(key, text);

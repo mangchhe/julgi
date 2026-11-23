@@ -231,7 +231,14 @@ export default function Review({ places: given, known, sessions, prefer = [], on
   useEffect(() => {
     if (!moved || placeAt !== 0) return;
     const at = places.findIndex((p, i) => i >= given.length && prefer.some((w) => p.label.toLowerCase().includes(w.toLowerCase())));
-    if (at > 0) (setPlaceAt(at), setVerKey("all"));
+    if (at > 0) return void (setPlaceAt(at), setVerKey("all"));
+    // 이름으로 못 찾으면 세션의 마지막 답을 본다. 세션이 "…워크트리에서 진행한다"고 경로를 적어 두는 일이 많다
+    const last = sessions?.[sessions.length - 1];
+    if (!last) return;
+    void invoke<string | null>("last_reply", { sessionId: last }).then((reply) => {
+      const said = places.findIndex((p, i) => i >= given.length && !!reply?.includes(p.cwd));
+      if (said > 0) (setPlaceAt(said), setVerKey("all"));
+    }, () => {});
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [moved, places.length]);
   /**
@@ -243,13 +250,13 @@ export default function Review({ places: given, known, sessions, prefer = [], on
     () => [
       // 맨 위는 하나: 이 세션이 고친 것 전부. 답마다 찍어 둔 상태가 있으면 첫 답 앞에서 지금까지,
       // 없으면(Julgi가 지켜보기 전의 세션) 작업 브랜치는 기준에서 갈라진 뒤 전부, 기준 브랜치 위라면 커밋 안 한 것
-      { ...NONE, from: turns.length ? turns[0].from : git && git.branch !== git.default ? null : "HEAD", title: turns.length ? tr`이 세션의 첫 답 앞에서 지금까지 바뀐 것` : tr`답마다 찍어 둔 기록이 없어, 폴더에 남아 있는 변경을 보여 준다` },
+      { ...NONE, from: turns.length ? turns[0].from : !(moved && placeAt === 0) && git && git.branch !== git.default ? null : "HEAD", title: turns.length ? tr`이 세션의 첫 답 앞에서 지금까지 바뀐 것` : tr`답마다 찍어 둔 기록이 없어, 폴더에 남아 있는 변경을 보여 준다` },
       ...[...turns].reverse().map((t, i) => ({ key: "t:" + t.to, from: t.from, to: t.to, label: t.said || (i === 0 ? tr`방금 답` : tr`${i}번 전 답`), title: t.said ? tr`이 말에 한 답 하나에서 바뀐 것만: ${t.said}` : tr`이 답 하나에서 바뀐 것만`, kind: "turn" as const, when: ago(t.at / 1000) + (t.files ? " · " + tr`파일 ${t.files}` : "") })),
       // 커밋은 그 첫 부모와 견준다 (머지 커밋이면 머지로 들어온 것 전부가 보인다)
       ...commits.map(([sha, parents, subject, at]) => ({ key: "c:" + sha, from: parents.split(" ")[0] || null, to: sha, label: subject, title: `${subject} (${sha.slice(0, 8)})`, kind: "commit" as const, when: at ? ago(at) : "" })),
     ],
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [commits, turns.length, git?.branch],
+    [commits, turns.length, git?.branch, moved, placeAt],
   );
   const graph = useMemo(() => lanes(commits), [commits]);
   // 기준에서 갈라진 커밋이 이력의 몇째 줄인가. 목록 밖이면 보이는 커밋 전부가 갈라진 뒤의 것이다
@@ -571,7 +578,7 @@ export default function Review({ places: given, known, sessions, prefer = [], on
                 <span className="rv-node-text">
                   <span>{v.label}</span>
                   {v.when && <small>{v.when}</small>}
-                  {v.kind === "all" && <small>{turns.length ? tr`답 ${turns.length}번에 걸쳐 · 커밋 안 한 파일 ${git?.dirty ?? 0}` : git && git.branch !== git.default ? tr`${git.default}에서 갈라진 뒤 전부` : tr`커밋 안 한 파일 ${git?.dirty ?? 0}`}</small>}
+                  {v.kind === "all" && <small>{turns.length ? tr`답 ${turns.length}번에 걸쳐 · 커밋 안 한 파일 ${git?.dirty ?? 0}` : !(moved && placeAt === 0) && git && git.branch !== git.default ? tr`${git.default}에서 갈라진 뒤 전부` : tr`커밋 안 한 파일 ${git?.dirty ?? 0}`}</small>}
                 </span>
               </button>
             ))}
