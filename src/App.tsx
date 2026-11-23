@@ -102,9 +102,11 @@ export default function App() {
   // 왼쪽 목록의 너비. 이 맥에서만 기억하면 되는 것이라 브라우저 저장소에 둔다
   const [sideW, setSideW] = useState(() => {
     try {
-      return Math.min(600, Math.max(180, Number(localStorage.getItem("side-width")) || 284));
+      // 기본 폭을 줄였다. 손대지 않고 예전 기본값(284)으로 남아 있던 것도 새 기본값으로 맞춘다
+      const saved = Number(localStorage.getItem("side-width"));
+      return Math.min(600, Math.max(180, !saved || saved === 284 ? 236 : saved));
     } catch {
-      return 284;
+      return 236;
     }
   });
   const saveSideW = (w: number) => {

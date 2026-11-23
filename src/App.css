@@ -1278,3 +1278,21 @@ body.dragging .pane-body { pointer-events: none; }
 .tk .rv-hist.pr-talk { display: flex; flex-direction: column; overflow: hidden; min-height: 0; }
 .tk-comments { flex: 1; min-height: 0; overflow-y: auto; }
 .tk .tk-say { position: static; flex: none; margin-top: 0; background: var(--bg); }
+
+/* 사이드바를 가볍게: 열린 세션은 이름 + 한 줄, 잠든 세션은 한 줄. 자세한 것은 툴팁과 칸 머리에 있다 */
+.row { padding: 6px 10px; margin: 1px 0; }
+.row-title { font-size: 13.5px; }
+.row:not(.sleep) .row-title { -webkit-line-clamp: 1; }
+.row-meta { margin-top: 1px; font-size: 11.5px; }
+.row-meta .chip { cursor: pointer; }
+.row-meta .chip:hover { color: var(--ink); }
+.row-meta .delta b { color: var(--ok); font-weight: 500; }
+.row-meta .delta i { color: var(--wait); font-style: normal; }
+.row-meta .delta em { color: var(--wait); font-style: normal; font-weight: 600; }
+.row.sleep { padding: 4px 10px 4px 16px; }
+.row-one { display: flex; align-items: baseline; gap: 6px; min-width: 0; }
+.row-one .row-title { flex: 1; min-width: 0; font-size: 13px; font-weight: 400; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.row-one small { flex: none; font-size: 11px; color: var(--muted); opacity: 0.8; font-variant-numeric: tabular-nums; }
+.row-one .hot { flex: none; font-size: 11px; }
+.away-mark { flex: none; font-size: 11px; color: var(--accent); }
+.grp { padding: 14px 10px 4px 12px; }

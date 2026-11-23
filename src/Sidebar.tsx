@@ -125,71 +125,63 @@ export default function Sidebar({ open, items, threads, byId, states, tasks, cha
               <span className={"dot " + (st?.state ?? "")} />
               <div className="row-body">
                 <div className="row-title">{job ? `${job.repo} · ${job.ask.split("\n")[0].replace(/^배경:\s*/, "").slice(0, 40)}` : (threadOf(o.sessionId)?.name ?? s?.title ?? o.label)}</div>
+                {/* 아래 한 줄에 다 넣는다: 레포, 상태, PR, 티켓, 고친 양. 브랜치와 자세한 것은 칸 머리와 툴팁에 있다 */}
                 <div className={"row-meta" + (!job && st?.state === "ask" ? " wait" : "")}>
                   {job // 일감의 상태는 저장된 값이다 i18n-ok
-                    ? [tr`일감 ${tr(job.status)}`, job.redo ? tr`다시 ${job.redo}번` : "", pane >= 0 ? tr`화면에 있음` : ""] // i18n-ok.filter(Boolean).join(" · ")
-                    : [st?.state === "hold" ? tr`일감 기다리는 중 · ${tasks.filter((t) => t.lead === o.sessionId && (t.status === "대기" || t.status === "하는 중")).length}개` : st?.state === "ask" || st?.state === "dead" ? STATE_LABEL[st.state] : "", s?.repo ?? "", s?.branch ?? "", pinned.includes(o.key) ? tr`고정` : ""].filter(Boolean).join(" · ")}
+                    ? [tr`일감 ${tr(job.status)}`, job.redo ? tr`다시 ${job.redo}번` : ""].filter(Boolean).join(" · ") // i18n-ok
+                    : [st?.state === "hold" ? tr`일감 기다리는 중 · ${tasks.filter((t) => t.lead === o.sessionId && (t.status === "대기" || t.status === "하는 중")).length}개` : st?.state === "ask" || st?.state === "dead" ? STATE_LABEL[st.state] : "", s?.repo ?? ""].filter(Boolean).join(" · ") /* i18n-ok */}
+                  {(() => {
+                    const pr = job ? undefined : prOf(o.key);
+                    if (!pr) return null;
+                    const parts = prParts(pr.status);
+                    // 눈에 띄어야 할 것(CI 실패, 수정 요청 등)이 있으면 그것, 없으면 첫 마디(머지됨, 열림)
+                    const [text, loud] = parts.find(([, l]) => l) ?? parts[0] ?? ["", false];
+                    const comment = pr.news?.startsWith(tr("새 코멘트 {0}", "")) ? pr.news : "";
+                    return (
+                      <span
+                        className={"chip" + (pr.news ? " news" : "")}
+                        title={[`PR #${pr.target.number}`, ...parts.map(([t]) => t), comment].filter(Boolean).join(" · ") + "\n" + tr`PR 화면 열기`}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          openPr(pr.target);
+                        }}
+                      >
+                        {" · "}#{pr.target.number}
+                        {(comment || text) && <span className={comment || loud ? "loud" : ""}> {comment || text}</span>}
+                      </span>
+                    );
+                  })()}
+                  {(() => {
+                    const tk = job ? undefined : ticketOf(o.key);
+                    if (!tk) return null;
+                    return (
+                      <span
+                        className={"chip" + (tk.news && !tk.quiet ? " news" : "")}
+                        title={[tk.key, tk.status, tk.news].filter(Boolean).join(" · ") + "\n" + tr`티켓 화면 열기`}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          openTicket(tk.key);
+                        }}
+                      >
+                        {" · "}
+                        {tk.key}
+                        {tk.news && <span className={tk.quiet ? "faint" : "loud"}> {tk.news}</span>}
+                      </span>
+                    );
+                  })()}
+                  {changes[o.cwd]?.files > 0 && changes[o.cwd].by === o.sessionId && (
+                    <span
+                      className="delta"
+                      title={[changes[o.cwd].brief?.line ?? tr`이 세션이 고친 것`, tr`파일 ${changes[o.cwd].files}`, changes[o.cwd].brief?.watch.length ? tr`볼 곳 ${changes[o.cwd].brief!.watch.length}` : "", changes[o.cwd].brief?.found?.length ? tr`짚은 곳 ${changes[o.cwd].brief!.found!.length}` : ""].filter(Boolean).join(" · ")}
+                    >
+                      {" · "}
+                      <b>+{changes[o.cwd].adds}</b> <i>−{changes[o.cwd].dels}</i>
+                      {(changes[o.cwd].brief?.found?.length ?? 0) > 0 && <em> !{changes[o.cwd].brief!.found!.length}</em>}
+                    </span>
+                  )}
                   {s && hot(s.tokens) && <span className="hot" title={tr`세션이 크다. 다음에 보낼 때 갈아탄다`}> · {kilo(s.tokens)}</span>}
+                  {pinned.includes(o.key) && <span title={tr`고정`}> · 📌</span>}
                 </div>
-                {(() => {
-                  const pr = job ? undefined : prOf(o.key);
-                  if (!pr) return null;
-                  return (
-                    <div
-                      className={"row-meta pr-line" + (pr.news ? " news" : "")}
-                      title={tr`PR 화면 열기`}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        openPr(pr.target);
-                      }}
-                    >
-                      PR #{pr.target.number}
-                      {prParts(pr.status).map(([text, loud]) => (
-                        <span key={text} className={loud ? "loud" : ""}>
-                          {" "}
-                          · {text}
-                        </span>
-                      ))}
-                      {/* 소식 글은 pr.ts가 지금 언어로 만든다. 같은 열쇠로 앞머리를 견준다 */}
-                      {pr.news?.startsWith(tr("새 코멘트 {0}", "")) && <span className="loud"> · {pr.news}</span>}
-                    </div>
-                  );
-                })()}
-                {(() => {
-                  const tk = job ? undefined : ticketOf(o.key);
-                  if (!tk) return null;
-                  return (
-                    <div
-                      className={"row-meta pr-line" + (tk.news && !tk.quiet ? " news" : "")}
-                      title={tr`티켓 화면 열기`}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        openTicket(tk.key);
-                      }}
-                    >
-                      {tk.key}
-                      {tk.status && ` · ${tk.status}`}
-                      {tk.news && <span className={tk.quiet ? "faint" : "loud"}> · {tk.news}</span>}
-                    </div>
-                  );
-                })()}
-                {changes[o.cwd]?.files > 0 && changes[o.cwd].by === o.sessionId && (
-                  <div className="row-meta delta" title={changes[o.cwd].brief?.line ?? tr`이 세션이 고친 것`}>
-                    <span className="lbl">{tr`고침`} · </span>{tr`파일 ${changes[o.cwd].files}`} <b>+{changes[o.cwd].adds}</b> <i>−{changes[o.cwd].dels}</i>
-                    {changes[o.cwd].brief && changes[o.cwd].brief!.watch.length > 0 && (
-                      <em title={tr`브리핑이 눈여겨보라고 한 곳`}>
-                        {" "}
-                        · <span className="lbl">{tr`눈여겨`}</span>{tr`볼 곳 ${changes[o.cwd].brief!.watch.length}`}
-                      </em>
-                    )}
-                    {(changes[o.cwd].brief?.found?.length ?? 0) > 0 && (
-                      <em title={tr`다른 모델이 걸러 읽고 짚은 곳`}>
-                        {" "}
-                        · {tr`짚은 곳 ${changes[o.cwd].brief!.found!.length}`}
-                      </em>
-                    )}
-                  </div>
-                )}
               </div>
               <button
                 type="button"
@@ -216,14 +208,13 @@ export default function Sidebar({ open, items, threads, byId, states, tasks, cha
               <span className="n">{list.length}</span>
             </div>
             {list.slice(0, group === THREADS ? PER_GROUP * 2 : PER_GROUP).map(({ session: s, name, thread }) => (
-              <div key={s.id} className={"row sleep" + (elsewhere(s) ? " away" : "")} onClick={() => onOpenSession(s)} title={s.recap || s.title}>
-                <span className="slot" />
-                <span className="dot" />
+              <div key={s.id} className={"row sleep" + (elsewhere(s) ? " away" : "")} onClick={() => onOpenSession(s)} title={[s.recap || s.title, [s.repo, s.branch, thread && thread.sessions.length > 1 ? tr`세션 ${thread.sessions.length}` : "", ago(s.mtime)].filter(Boolean).join(" · ")].join("\n")}>
                 <div className="row-body">
-                  <div className="row-title">{name}</div>
-                  <div className="row-meta">
-                    {[elsewhere(s) ? tr`다른 곳에서 열림` : "", ago(s.mtime), s.work || thread ? s.repo : "", s.branch, thread && thread.sessions.length > 1 ? tr`세션 ${thread.sessions.length}` : ""].filter(Boolean).join(" · ")}
-                    {hot(s.tokens) && <span className="hot"> · {kilo(s.tokens)}</span>}
+                  <div className="row-one">
+                    <span className="row-title">{name}</span>
+                    {elsewhere(s) && <span className="away-mark" title={tr`다른 곳에서 열림`}>↗</span>}
+                    {hot(s.tokens) && <span className="hot">{kilo(s.tokens)}</span>}
+                    <small>{ago(s.mtime).replace(/ 전$| ago$/, "")}</small>
                   </div>
                   {sleepNews[s.id] && (
                     <div className="row-meta pr-line news" title={tr`눌러서 깨운다. PR 화면은 ⌘J에서 ⌥Enter`}>
