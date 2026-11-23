@@ -1325,3 +1325,7 @@ body.dragging .pane-body { pointer-events: none; }
 .side .side-more, .side .side-none { padding: 3px 8px 0; font-size: 11px; color: var(--muted); opacity: 0.8; }
 .rv-warn { font-size: 12.5px; line-height: 1.5; color: var(--wait); background: color-mix(in srgb, var(--wait) 10%, transparent); border: 1px solid color-mix(in srgb, var(--wait) 35%, transparent); border-radius: 8px; padding: 6px 10px; }
 .side .pin-mark { width: 10px; height: 10px; margin-right: 4px; vertical-align: -1px; fill: var(--accent); }
+.side .row-head { display: flex; align-items: flex-start; gap: 6px; min-width: 0; }
+.side .row-head .row-title { flex: 1; min-width: 0; }
+.side .pin-mark { flex: none; width: 11px; height: 11px; margin: 4px 0 0; vertical-align: 0; fill: var(--accent); opacity: 0.9; }
+.side .row:hover .pin-mark { visibility: hidden; }
