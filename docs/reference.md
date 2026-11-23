@@ -104,7 +104,7 @@ Everything is a text file under `~/.julgi/`. Conversations are not here; Claude 
 | `reviews.json` | Housekeeping records |
 | `activity.jsonl`, `routes.jsonl`, `misroutes.jsonl` | What Julgi did, where it sent things, corrections |
 | `plugin/`, `grown/`, `bin/julgi` | Julgi's skills, skills it grew, the session command |
-| `pr-seen.json`, `jira-seen.json` | Last known state of PRs and tickets, to tell news from old |
+| `pr-seen.json`, `jira-seen.json`, `jira-news.json` | Last known state of PRs and tickets, to tell news from old; ticket news not yet looked at |
 | `triage.json` | For each finished reply, whether it needed you and why |
 | `progress.json` | Goal, done, left, blocked per stem |
 | `seen.json` | When you last looked at Julgi, for the briefing |

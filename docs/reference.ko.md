@@ -106,7 +106,7 @@
 | `activity.jsonl`, `routes.jsonl`, `misroutes.jsonl` | 한 일, 보낸 곳, 틀려서 옮긴 사례 |
 | `plugin/`, `grown/`, `bin/julgi` | Julgi의 스킬, Julgi가 만든 스킬, 세션이 쓰는 명령 |
 | `skill-history/` | 다듬기 전의 스킬 글 |
-| `pr-seen.json`, `jira-seen.json` | PR과 티켓의 지난 형편. 견줘서 새로 생긴 일만 알린다 |
+| `pr-seen.json`, `jira-seen.json`, `jira-news.json` | PR과 티켓의 지난 형편. 견줘서 새로 생긴 일만 알린다. 아직 안 본 티켓 소식 |
 | `triage.json` | 끝난 답마다 내가 필요했는지와 그 이유 |
 | `progress.json` | 줄기마다 목표, 한 것, 남은 것, 막힌 것 |
 | `seen.json` | 마지막으로 Julgi를 본 때. 브리핑이 쓴다 |

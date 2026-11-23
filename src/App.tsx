@@ -148,6 +148,19 @@ export default function App() {
   const [ticketNewsMap, setTicketNews] = useState<Record<string, string>>({}); // 티켓 키 → 새 소식
   const ticketNewsRef = useRef(ticketNewsMap);
   ticketNewsRef.current = ticketNewsMap;
+  // 티켓 소식은 볼 때까지 남는다. 껐다 켜도 ⌘J에서 사라지지 않게 파일에 둔다
+  const newsLoaded = useRef(false);
+  useEffect(() => {
+    void invoke<string | null>("data_read", { name: "jira-news.json" }).then((t) => {
+      try {
+        if (t) setTicketNews((now) => ({ ...JSON.parse(t), ...now }));
+      } catch {}
+      newsLoaded.current = true;
+    });
+  }, []);
+  useEffect(() => {
+    if (newsLoaded.current) void invoke("data_write", { name: "jira-news.json", text: JSON.stringify(ticketNewsMap) });
+  }, [ticketNewsMap]);
   const jiraSeen = useRef<Record<string, TicketSeen>>({});
   const [ticketLinks, setTicketLinks] = useState<Record<string, string>>({}); // 세션 ID → 티켓 키
   const refreshTickets = useRef((_keys = false) => {});
@@ -2074,7 +2087,7 @@ export default function App() {
     };
     refreshTickets.current = (keys = false) => void poll(keys);
     const loop = () => void poll().finally(() => (timer = window.setTimeout(loop, config.jiraEveryMin * 60_000)));
-    timer = window.setTimeout(loop, 10_000);
+    timer = window.setTimeout(loop, 2_000);
     const onFocus = () => {
       if (!config.refreshOnFocus || Date.now() - lastFocus < 20_000) return;
       lastFocus = Date.now();
