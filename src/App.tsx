@@ -98,9 +98,9 @@ export default function App() {
   // 왼쪽 목록의 너비. 이 맥에서만 기억하면 되는 것이라 브라우저 저장소에 둔다
   const [sideW, setSideW] = useState(() => {
     try {
-      return Math.min(600, Math.max(180, Number(localStorage.getItem("side-width")) || 270));
+      return Math.min(600, Math.max(180, Number(localStorage.getItem("side-width")) || 284));
     } catch {
-      return 270;
+      return 284;
     }
   });
   const saveSideW = (w: number) => {

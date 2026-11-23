@@ -294,7 +294,7 @@ export default function Settings({ onChange, onClose, remoteUrl, onConnect, onCo
             <div className="set-card">
               {ROWS.map((row, i) =>
                 SECTION_OF[i] !== SECTION_OF[at] ? null : (
-                <div key={`${row.label}-${i}`} className={"set-row" + (i === at ? " on" : "") + (row.kind === "keys" ? " keys" : "")} onClick={() => setAt(i)}>
+                <div key={`${row.label}-${i}`} className={"set-row" + (i === at ? " on" : "") + (row.kind === "keys" ? " keys" : "") + (row.kind === "theme" ? " stack" : "")} onClick={() => setAt(i)}>
                   {row.kind === "keys" && <kbd className="set-kbd">{row.label}</kbd>}
                   <div className="set-label">
                     {row.kind !== "keys" && row.label}
