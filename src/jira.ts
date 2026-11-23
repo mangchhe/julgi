@@ -3,7 +3,7 @@ import { tr } from "./i18n.ts";
 
 export type JiraConn = { site: string; email: string; kind: string };
 /** 목록 한 줄 (Rust row) */
-export type Ticket = { key: string; url: string; title: string; status: string; statusCategory: string; type: string; priority: string; assignee: string; updated: string; others: number };
+export type Ticket = { key: string; url: string; title: string; status: string; statusCategory: string; type: string; priority: string; assignee: string; updated: string; others: number; by?: { name: string; id: string; app: boolean }[] };
 /** 티켓 한 건 (Rust jira_view). description·comments.body는 Cloud면 ADF, Server면 글 */
 export type TicketFull = {
   key: string;
@@ -131,8 +131,24 @@ export type TicketSeen = { status: string; others: number; assigned: boolean };
 export function ticketNews(before: TicketSeen | undefined, now: Ticket, firstRun: boolean): string {
   if (!before) return firstRun ? "" : tr`새로 배정됨`;
   if (now.status !== before.status) return tr`상태 → ${now.status}`;
-  if (now.others > before.others) return tr`새 코멘트 ${now.others - before.others}`;
+  if (now.others > before.others) {
+    const n = now.others - before.others;
+    const names = [...new Set((now.by ?? []).slice(before.others).map((a) => a.name).filter(Boolean))];
+    if (!names.length) return tr`새 코멘트 ${n}`;
+    return tr`새 코멘트 ${n} · ${names.length > 1 ? tr`${names[0]} 외 ${names.length - 1}명` : names[0]}`;
+  }
   return "";
+}
+
+/**
+ * 이 소식을 조용히 받을 것인가: 새 댓글뿐이고, 그 댓글이 모두 봇(app 계정)이거나 조용히 받기로 한 작성자의 것일 때.
+ * quiet: 쉼표로 나눈 표시 이름이나 accountId. 사람 댓글이 하나라도 섞이면 조용하지 않다
+ */
+export function quietNews(before: TicketSeen | undefined, now: Ticket, quiet: string): boolean {
+  if (!before || now.status !== before.status || now.others <= before.others) return false;
+  const fresh = (now.by ?? []).slice(before.others);
+  const list = quiet.split(",").map((x) => x.trim().toLowerCase()).filter(Boolean);
+  return fresh.length > 0 && fresh.every((a) => a.app || list.includes(a.name.toLowerCase()) || list.includes(a.id.toLowerCase()));
 }
 
 /** "주문 취소 시 쿠폰 복구" → 브랜치에 쓸 영문 꼬리. 한글뿐이면 비운다 */

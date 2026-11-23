@@ -350,6 +350,7 @@ export const config = {
   jiraMergeTransition: "Done",
   /** 프로젝트 키 → 레포 (이 티켓으로 시작에서 고르면 저절로 채운다). "ABC=acme-api, OPS=acme-infra" */
   jiraRepos: "",
+  jiraQuiet: "",
   /** 아래 상태 줄에 Claude 구독 사용량(5시간 창, 주간)을 보여 준다. Claude Code의 로그인 토큰을 읽어 Anthropic의 사용량 주소를 부른다 */
   usage: false,
   /** 세션들이 쓰는 메모리 합계가 이만큼(GB)을 넘으면, 답까지 보고 쉬는 세션을 오래 쉰 것부터 시간을 기다리지 않고 재운다. 0이면 안 한다 */

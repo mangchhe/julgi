@@ -166,4 +166,6 @@ export default {
   "토큰 만들기 ↗": "Create a token ↗",
   "glab이 없다 · 터미널에서 brew install glab": "glab not found · run brew install glab in a terminal",
   "Tab 묶음 넘기기 · ↑↓ 고르기 · ←→ 바꾸기 · Enter 켜고 끄기, 글 고치기 · 바로 적용된다 · Esc · 나머지 값은 ~/.julgi/config.json": "Tab next group · ↑↓ select · ←→ change · Enter toggle, edit text · applies immediately · Esc · other values are in ~/.julgi/config.json",
+  "조용히 받을 Jira 작성자": "Jira authors to receive quietly",
+  "이 사람들의 댓글만 달렸으면 알리지 않고 ⌘J에도 올리지 않는다. 봇 계정은 적지 않아도 조용히 받는다": "When only these people commented, there is no notification and nothing is added to ⌘J. Bot accounts are quiet without being listed",
 } as Record<string, string>;

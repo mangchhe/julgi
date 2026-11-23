@@ -37,7 +37,7 @@ type Props = {
   /** 잠든 세션 가운데 PR에 일이 생긴 것: 세션 ID → 까닭과 PR */
   sleepNews: Record<string, { news: string; pr: PrTarget }>;
   /** 이 세션의 티켓과 그 상태 (Jira가 연결돼 있을 때) */
-  ticketOf: (key: string) => { key: string; status: string; news?: string } | undefined;
+  ticketOf: (key: string) => { key: string; status: string; news?: string; quiet?: boolean } | undefined;
   /** 작업 페이지 줄에 보일 숫자: 내 PR, 리뷰 요청, 새 소식 */
   work: { prs: number; asks: number; news: number };
   onWork: () => void;
@@ -160,7 +160,7 @@ export default function Sidebar({ open, items, threads, byId, states, tasks, cha
                   if (!tk) return null;
                   return (
                     <div
-                      className={"row-meta pr-line" + (tk.news ? " news" : "")}
+                      className={"row-meta pr-line" + (tk.news && !tk.quiet ? " news" : "")}
                       title={tr`티켓 화면 열기`}
                       onClick={(e) => {
                         e.stopPropagation();
@@ -169,7 +169,7 @@ export default function Sidebar({ open, items, threads, byId, states, tasks, cha
                     >
                       {tk.key}
                       {tk.status && ` · ${tk.status}`}
-                      {tk.news && <span className="loud"> · {tk.news}</span>}
+                      {tk.news && <span className={tk.quiet ? "faint" : "loud"}> · {tk.news}</span>}
                     </div>
                   );
                 })()}

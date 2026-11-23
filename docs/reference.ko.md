@@ -81,6 +81,7 @@
 | `jiraWatch`, `jiraEveryMin` | `mine`, 5 | 내게 배정된 티켓을 보는지와 주기(분) |
 | `jiraStartTransition`, `jiraPrTransition`, `jiraMergeTransition` | `In Progress`, `In Review`, `Done` | 시작할 때, PR을 올리면, 머지되면 제안할 상태. 비우면 묻지 않는다 |
 | `jiraRepos` | 없음 | 프로젝트 키 → 레포 (`ABC=acme-api, OPS=acme-infra`). 티켓으로 시작할 때 저절로 채운다 |
+| `jiraQuiet` | 없음 | 조용히 받을 댓글 작성자(표시 이름이나 계정 ID, 쉼표로 구분). 알리지 않고 `⌘J`에도 안 올린다. 봇 계정은 늘 조용히 받는다 |
 
 연결이 쓰는 것:
 

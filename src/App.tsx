@@ -25,7 +25,7 @@ import Work, { WorkGroup, WorkRow } from "./Work";
 import Usage from "./Usage";
 import TicketView from "./TicketView";
 import StartTicket from "./StartTicket";
-import { TicketWork, firstKey, JiraConn, keyOfUrl, setKnownKeys, Ticket, TicketFull, TicketSeen, ticketNews } from "./jira";
+import { TicketWork, firstKey, JiraConn, keyOfUrl, setKnownKeys, Ticket, TicketFull, TicketSeen, ticketNews, quietNews } from "./jira";
 import { prNo, isLab, newsOf, openPr, prOf, PrStatus, PrTarget, prUrl, repoName, ReviewAsk } from "./pr";
 import * as terms from "./terms";
 import { rank } from "./route";
@@ -146,6 +146,8 @@ export default function App() {
   const [startTicket, setStartTicket] = useState<TicketFull | null>(null); // "이 티켓으로 시작" 창
   const [tickets, setTickets] = useState<Ticket[]>([]); // 내게 배정된 안 끝난 티켓
   const [ticketNewsMap, setTicketNews] = useState<Record<string, string>>({}); // 티켓 키 → 새 소식
+  const [ticketQuiet, setTicketQuiet] = useState(new Set<string>()); // 소식이 봇이나 조용히 받기로 한 사람의 댓글뿐인 티켓
+  const quietRef = useRef(new Set<string>());
   const ticketNewsRef = useRef(ticketNewsMap);
   ticketNewsRef.current = ticketNewsMap;
   // 티켓 소식은 볼 때까지 남는다. 껐다 켜도 ⌘J에서 사라지지 않게 파일에 둔다
@@ -159,7 +161,9 @@ export default function App() {
     });
   }, []);
   useEffect(() => {
-    if (newsLoaded.current) void invoke("data_write", { name: "jira-news.json", text: JSON.stringify(ticketNewsMap) });
+    // 조용히 받은 소식은 남기지 않는다. 다시 켜면 흐린 표시는 사라진다
+    if (newsLoaded.current) void invoke("data_write", { name: "jira-news.json", text: JSON.stringify(Object.fromEntries(Object.entries(ticketNewsMap).filter(([k]) => !ticketQuiet.has(k)))) });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ticketNewsMap]);
   const jiraSeen = useRef<Record<string, TicketSeen>>({});
   const [ticketLinks, setTicketLinks] = useState<Record<string, string>>({}); // 세션 ID → 티켓 키
@@ -1800,9 +1804,9 @@ export default function App() {
     const s = live.current.byId.get(id);
     return live.current.ticketLinks[id] ?? (s && firstKey(s.branch)) ?? s?.links.map(keyOfUrl).find(Boolean);
   };
-  const ticketNotice = (t: Ticket, news: string) => {
+  const ticketNotice = (t: Ticket, news: string, hush = false) => {
     record("티켓", `${t.key} ${news}: ${t.title.slice(0, 60)}`); // i18n-ok
-    if (!config.notify || document.hasFocus()) return;
+    if (hush || !config.notify || document.hasFocus()) return;
     void invoke("notify", { title: `${t.key} · ${news}`, body: t.title.slice(0, 80) });
   };
   /** 이름으로 전환한다. 그 이름의 전환이 지금 없으면 알려만 준다 */
@@ -2159,10 +2163,19 @@ export default function App() {
       const next: Record<string, TicketSeen> = {};
       for (const t of list) {
         const news = ticketNews(jiraSeen.current[t.key], t, first);
+        const hush = quietNews(jiraSeen.current[t.key], t, config.jiraQuiet);
         next[t.key] = { status: t.status, others: t.others, assigned: true };
         if (!news) continue;
+        // 봇 댓글뿐이면 흐리게 표시만 한다. 이미 큰 소식이 걸려 있으면 그건 덮지 않는다
+        if (hush && ticketNewsRef.current[t.key] && !quietRef.current.has(t.key)) continue;
+        setTicketQuiet((old) => {
+          const set = new Set(old);
+          if (hush) set.add(t.key);
+          else set.delete(t.key);
+          return (quietRef.current = set);
+        });
         setTicketNews((old) => ({ ...old, [t.key]: news }));
-        actions.current.ticketNotice(t, news);
+        actions.current.ticketNotice(t, news, hush);
       }
       jiraSeen.current = next;
       void invoke("data_write", { name: "jira-seen.json", text: JSON.stringify(next) });
@@ -2712,7 +2725,7 @@ export default function App() {
             const tk = ticketOfSession(open.find((o) => o.key === key)?.sessionId);
             if (!tk) return undefined;
             if (ticketDone[tk]) return { key: tk, status: "", news: tr`티켓 끝남 · ${ticketDone[tk]}` };
-            return { key: tk, status: tickets.find((t) => t.key === tk)?.status ?? "", news: ticketNewsMap[tk] };
+            return { key: tk, status: tickets.find((t) => t.key === tk)?.status ?? "", news: ticketNewsMap[tk], quiet: ticketQuiet.has(tk) };
           }}
           work={{ prs: minePrs.length, asks: asks.length, news: Object.keys(mineNews).length + Object.keys(prNews).length + Object.keys(sleepNews).length }}
           onWork={() => setOverlay("work")}
@@ -2838,7 +2851,7 @@ export default function App() {
             )}
           asks={asks}
           mine={Object.values(mineNews)}
-          tickets={Object.entries(ticketNewsMap).map(([key, news]) => {
+          tickets={Object.entries(ticketNewsMap).filter(([key]) => !ticketQuiet.has(key)).map(([key, news]) => {
             const t = tickets.find((x) => x.key === key);
             return { key, news, title: t?.title ?? key, url: t?.url ?? `${config.jiraSite}/browse/${key}` };
           })}
@@ -2958,6 +2971,7 @@ export default function App() {
           onConnectJira={() => (setSettingsAt("연결"), setOverlay("settings"))} // i18n-ok
           loadTickets={(jql) => invoke<Ticket[]>("jira_search", { conn: jiraConn(), jql, limit: 50 })}
           ticketNews={ticketNewsMap}
+          ticketQuiet={ticketQuiet}
           ticketWork={ticketWork}
           onShowSession={(key) => (setOverlay(null), show(key))}
           onStartTicket={(key) => void invoke<TicketFull>("jira_view", { conn: jiraConn(), key }).then(beginTicket, (e) => say(String(e).slice(0, 100)))}
@@ -3051,7 +3065,7 @@ export default function App() {
           news={[
             ...Object.entries(sleepNews).map(([id, { news, pr }]) => ({ key: "s" + id, kind: "PR", title: names[id] || byId.get(id)?.title || tr("세션"), news, open: () => (setOverlay(null), openPr(pr)) })),
             ...Object.values(mineNews).map((a) => ({ key: "m" + a.url, kind: "PR", title: `#${a.number} ${a.title}`, news: a.news, open: () => (setOverlay(null), openPr({ repo: a.repository.nameWithOwner, number: a.number })) })),
-            ...Object.entries(ticketNewsMap).map(([key, news]) => ({ key: "t" + key, kind: tr("티켓"), title: `${key} ${tickets.find((x) => x.key === key)?.title ?? ""}`, news, open: () => (setOverlay(null), setTicketShown(key)) })),
+            ...Object.entries(ticketNewsMap).filter(([key]) => !ticketQuiet.has(key)).map(([key, news]) => ({ key: "t" + key, kind: tr("티켓"), title: `${key} ${tickets.find((x) => x.key === key)?.title ?? ""}`, news, open: () => (setOverlay(null), setTicketShown(key)) })),
             ...asks.map((a) => ({ key: "a" + a.url, kind: tr("리뷰 요청"), title: `#${a.number} ${a.title}`, news: a.author.login, open: () => (setOverlay(null), openPr({ repo: a.repository.nameWithOwner, number: a.number })) })),
           ]}
           told={open

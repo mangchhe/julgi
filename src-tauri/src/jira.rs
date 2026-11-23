@@ -160,8 +160,11 @@ fn issue_url(conn: &Conn, key: &str) -> String {
 /// 목록 한 줄 모양
 fn row(conn: &Conn, it: &Value, me: &str) -> Value {
     let f = &it["fields"];
-    let others = f["comment"]["comments"].as_array().map_or(0, |c| c.iter().filter(|c| author_id(&c["author"]) != me).count());
+    // 남이 단 댓글들의 작성자(순서대로). 개수가 others다. app은 봇 계정인지
+    let by: Vec<Value> = f["comment"]["comments"].as_array().into_iter().flatten().filter(|c| author_id(&c["author"]) != me).map(|c| json!({ "name": s(c, "/author/displayName"), "id": author_id(&c["author"]), "app": s(c, "/author/accountType") == "app" })).collect();
+    let others = by.len();
     json!({
+        "by": by,
         "key": s(it, "/key"),
         "url": issue_url(conn, &s(it, "/key")),
         "title": s(f, "/summary"),

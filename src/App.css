@@ -1190,3 +1190,4 @@ body.dragging .pane-body { pointer-events: none; }
 .tk-shot.big { max-width: 100%; max-height: none; cursor: zoom-out; }
 .tk-shot-none { font-size: 12px; color: var(--muted); padding: 4px 8px; border: 1px dashed var(--line); border-radius: 6px; }
 .pane-head .ended { cursor: pointer; }
+.row-meta .faint, .wk-row-meta .faint { color: var(--muted); opacity: 0.75; }

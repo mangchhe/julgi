@@ -39,6 +39,8 @@ type Props = {
   ticketWork?: (t: Ticket) => TicketWork;
   ticketPane?: (key: string) => ReactNode;
   ticketNews?: Record<string, string>;
+  /** 소식이 봇 댓글뿐이라 흐리게 보일 티켓 */
+  ticketQuiet?: Set<string>;
   onStartTicket?: (key: string) => void;
   /** 티켓에 이어진 세션으로 간다 (칸의 열쇠) */
   onShowSession?: (key: string) => void;
@@ -57,7 +59,7 @@ const idOf = (t: PrTarget) => `${t.repo}#${t.number}`;
  * 작업 (⌘U). PR을 묶음별로 한 화면에서 둘러본다: 왼쪽 묶음, 가운데 목록, 오른쪽 PR 화면.
  * ⌘J가 "지금 손댈 것"만 모은다면, 여기는 "전부 둘러보기"다. Jira를 붙이면 티켓 묶음이 같은 자리에 들어온다
  */
-export default function Work({ groups, ticketGroups = [], loadTickets, ticketPane, ticketNews = {}, ticketWork, onStartTicket, onShowSession, onConnectJira, onClose, onRefresh, onOpenSession, onHand }: Props) {
+export default function Work({ groups, ticketGroups = [], loadTickets, ticketPane, ticketNews = {}, ticketQuiet, ticketWork, onStartTicket, onShowSession, onConnectJira, onClose, onRefresh, onOpenSession, onHand }: Props) {
   const allCount = groups.length + ticketGroups.length;
   // 새 소식이 있는 묶음부터 연다
   const [groupAt, setGroupAt] = useState(() => Math.max(0, groups.findIndex((g) => g.rows.some((r) => r.news))));
@@ -163,7 +165,7 @@ export default function Work({ groups, ticketGroups = [], loadTickets, ticketPan
         )}
         {ticketGroups.map((g, n) => {
           const list = ticketRows[g.id];
-          const hot = Array.isArray(list) && list.some((t) => ticketNews[t.key]);
+          const hot = Array.isArray(list) && list.some((t) => ticketNews[t.key] && !ticketQuiet?.has(t.key));
           return (
             <button key={g.id} type="button" tabIndex={-1} className={"wk-grp" + (groups.length + n === groupAt ? " on" : "") + (hot ? " hot" : "")} onClick={() => switchGroup(groups.length + n)} title={g.jql}>
               <span>
@@ -205,7 +207,7 @@ export default function Work({ groups, ticketGroups = [], loadTickets, ticketPan
               </span>
             )}
             <span className="wk-row-meta">
-              {ticketNews[t.key] && <b className="loud">{ticketNews[t.key]} · </b>}
+              {ticketNews[t.key] && (ticketQuiet?.has(t.key) ? <span className="faint">{ticketNews[t.key]} · </span> : <b className="loud">{ticketNews[t.key]} · </b>)}
               {CATEGORY[t.statusCategory] ? `${t.status}` : t.status}
               {t.priority && ` · ${t.priority}`}
               {` · ${t.assignee || tr`담당 없음`}`}

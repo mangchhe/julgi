@@ -80,6 +80,7 @@ Change them in `⌘,`; they apply at once and are saved to `~/.julgi/config.json
 | `jiraWatch`, `jiraEveryMin` | `mine`, 5 | Whether to watch tickets assigned to me, and how often |
 | `jiraStartTransition`, `jiraPrTransition`, `jiraMergeTransition` | `In Progress`, `In Review`, `Done` | Status to offer on start, on PR, on merge. Empty means do not ask |
 | `jiraRepos` | none | Project key to repo (`ABC=acme-api, OPS=acme-infra`). Filled in as you start from tickets |
+| `jiraQuiet` | none | Comment authors received quietly (display names or account ids, comma separated): no notification, not in `⌘J`. Bot accounts are always quiet |
 
 What the connections use:
 
