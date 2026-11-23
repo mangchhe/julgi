@@ -79,6 +79,8 @@ GitHub PRs and GitLab MRs open inside Julgi: diff, line comments and replies, CI
 
 Everything in one place: my PRs, review requests, PRs my sessions opened, and Jira tickets by group. The PR or ticket opens in the right pane.
 
+Each ticket says whose move it is, from what Julgi knows about its session and PR: a session waiting on you, CI failed, approved and ready to merge, merged and time to move the ticket, or not started. The ones that need you come first.
+
 </td>
 <td><img src="docs/images/work.png" alt="The Work page with pull request and ticket groups on the left, my pull requests in the middle and the selected one open on the right" /></td>
 </tr>
@@ -117,6 +119,7 @@ Tokens by day, model, project and session, counted from Claude Code's own transc
 - **Coordinator** — work that spans repos gets a lead session that splits it into tasks, each in its own worktree.
 - **Skills that grow** — work you repeat becomes a skill; skills you use are refined from how they were used.
 - **Housekeeping** — idle sessions are put to sleep, and woken when you pick them or their PR has news.
+- **Themes** — eleven of them, including Tokyo Night, Catppuccin Mocha, Dracula and Nord, each with its own terminal colors.
 - **From your phone** — a small web view, reachable only inside your Tailscale network, to answer and send work.
 
 Where judgment is needed (where to send, whether two sessions are the same work, what to keep), a model that read the content decides, not string matching. Everything Julgi did on its own is listed in `⌘Y`, sessions are never deleted, and each automatic behavior can be turned off in `⌘,`.
