@@ -282,6 +282,7 @@ export default function App() {
   const lastCloseTry = useRef(0);
   const [info, setInfo] = useState(false);
   const [zoom, setZoom] = useState(false);
+  const zoomBefore = useRef(false); // 코드 검토를 열기 전에 칸을 크게 펴 두었는가
   const [sidebar, setSidebar] = useState(true);
   const [fontSize, setFontSize] = useState(13);
   const [home, setHome] = useState("/");
@@ -1371,8 +1372,14 @@ export default function App() {
   const toggleReview = (key: string) => {
     const on = !live.current.reviewing.includes(key);
     setReviewing((list) => (on ? [...list, key] : list.filter((k) => k !== key)));
-    if (on) setZoom(true);
-    else terms.focus(key);
+    // 코드 검토는 칸을 크게 펴서 본다. 닫으면 펴기 전의 모양(여러 칸이었으면 여러 칸)으로 돌려놓는다
+    if (on) {
+      if (!live.current.reviewing.length) zoomBefore.current = live.current.zoom;
+      setZoom(true);
+    } else {
+      if (live.current.reviewing.length <= 1) setZoom(zoomBefore.current);
+      terms.focus(key);
+    }
   };
   const confirmClose = (never: boolean) => {
     const key = live.current.closing;
