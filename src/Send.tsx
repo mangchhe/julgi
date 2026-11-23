@@ -43,10 +43,13 @@ type Props = {
 };
 
 const MAX = 6;
+/** 치다가 닫은 글. 다시 열면 그대로 있고, 보내면 비운다 */
+let draft = "";
 
 /** 보내기 상자. 할 말을 먼저 치면 어느 줄기 이야기인지 맞춰서 보여 주고, Enter로 거기에 보낸다. */
 export default function Send({ items, openIds, cwd, folders, base, notes, misses, stats, areas, initial, onSend, onLater, onClose }: Props) {
-  const [message, setMessage] = useState(initial ?? "");
+  const [message, setMessage] = useState(initial ?? draft);
+  useEffect(() => void (draft = message), [message]);
   const [sel, setSel] = useState(0);
   const [asking, setAsking] = useState(false);
   const [asked, setAsked] = useState<{ item?: Item; why: string; cwd?: string; failed?: boolean } | null>(null);
@@ -111,6 +114,7 @@ export default function Send({ items, openIds, cwd, folders, base, notes, misses
     const text = message.trim();
     if (!text) return;
     const note: RouteNote = { top: ranked[0]?.item.session.id, rank: picked ? ranked.indexOf(picked) : -1, asked: asked?.item?.session.id, by: tr`내가 고름`, ask: asked4.current };
+    draft = "";
     if (picked) onSend({ kind: "item", item: picked.item }, text, note, handoff);
     else onSend({ kind: "new", cwd: fresh[at - shown.length].cwd, join: fresh[at - shown.length].join }, text, note, false);
   };
@@ -163,6 +167,7 @@ export default function Send({ items, openIds, cwd, folders, base, notes, misses
     if (!sure && !asked) {
       // 물어보는 몇 초를 기다리게 하지 않는다. 상자를 닫고 뒤에서 정해서 보낸다
       late = true;
+      draft = "";
       onLater(text);
       const answer = await ask();
       // 묻지 못했으면 글자로 맞은 1등에게, 그것도 없으면 새 줄기로
@@ -171,6 +176,7 @@ export default function Send({ items, openIds, cwd, folders, base, notes, misses
       cwd = answer?.cwd;
     }
     const note: RouteNote = { top: ranked[0]?.item.session.id, rank: item ? ranked.findIndex((c) => c.item === item) : -1, asked: viaModel ? item?.session.id : undefined, by: viaModel ? tr`모델이 고름` : item ? tr`글자로 맞음` : tr`이어 갈 줄기가 없어서`, brain: picked4.current, span: span.current, big: big.current, ask: asked4.current };
+    draft = "";
     if (item) return onSend({ kind: "item", item }, text, note, hot(item.session.tokens), late);
     // 새 줄기를 열 곳: 모델이 짚은 레포, 없으면 글자로 맞은 레포, 그것도 없으면 기본 폴더
     const place = fresh.find((row) => !row.join) ?? fresh[0];
