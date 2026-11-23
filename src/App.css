@@ -1296,3 +1296,6 @@ body.dragging .pane-body { pointer-events: none; }
 .row-one .hot { flex: none; font-size: 11px; }
 .away-mark { flex: none; font-size: 11px; color: var(--accent); }
 .grp { padding: 14px 10px 4px 12px; }
+.grp em { font-style: normal; font-weight: 500; }
+.grp em.g0 { color: var(--wait); }
+.grp em.g1 { color: var(--accent); }

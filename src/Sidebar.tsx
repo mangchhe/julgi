@@ -62,7 +62,8 @@ export default function Sidebar({ open, items, threads, byId, states, tasks, cha
   }
   if (!groups.get(THREADS)!.length) groups.delete(THREADS);
 
-  // 열린 세션은 내가 봐야 할 순서로: 내 차례, 일하는 중, 나머지. 묶음 안에서는 연 순서 그대로
+  // 열린 세션은 연 순서(번호 순서) 그대로 둔다. 상태가 바뀔 때마다 줄이 위아래로 옮겨 다니면 찾기 어렵다.
+  // 상태는 점의 색으로 보이고, 묶음 제목에 내 차례와 일하는 중이 몇 개인지 적는다
   // 일감을 맡은 세션은 맡긴 세션(조율 세션)이 열려 있으면 그 아래에 든다. 따로 줄을 세우지 않는다
   const jobOf = new Map<string, Job>();
   for (const t of tasks) if (t.session && open.some((o) => o.sessionId === t.lead)) jobOf.set(t.session, t);
@@ -70,11 +71,11 @@ export default function Sidebar({ open, items, threads, byId, states, tasks, cha
   // PR에 일이 생긴 세션도 일하는 중이 아니면 내 차례로 본다
   const rankOf = (key: string) => (dead.includes(key) ? 2 : waiting(states[key]) || (prNews[key] && states[key]?.state !== "run") ? 0 : states[key]?.state === "run" || states[key]?.state === "hold" ? 1 : 2);
   // 번호(⌘1–⌘9)는 일감을 맡은 세션을 빼고 매긴다
-  const tops = open.filter((o) => !jobOf.has(o.sessionId ?? "")).map((o, i) => ({ o, i, rank: rankOf(o.key) })).sort((a, b) => a.rank - b.rank || a.i - b.i);
+  const tops = open.filter((o) => !jobOf.has(o.sessionId ?? "")).map((o, i) => ({ o, i, rank: rankOf(o.key) }));
   const counts = [0, 1].map((rank) => tops.filter((r) => r.rank === rank).length);
   const ranked: { o: Open; i: number; rank: number; job?: Job; head: boolean }[] = [];
   tops.forEach((top, n) => {
-    ranked.push({ ...top, head: n === 0 || tops[n - 1].rank !== top.rank });
+    ranked.push({ ...top, head: n === 0 });
     open.forEach((o, i) => {
       const job = jobOf.get(o.sessionId ?? "");
       if (job && job.lead === top.o.sessionId) ranked.push({ o, i, rank: top.rank, job, head: false });
@@ -104,16 +105,20 @@ export default function Sidebar({ open, items, threads, byId, states, tasks, cha
             <div className="side-none">{tr`열린 세션이 없다`}</div>
           </>
         )}
-        {ranked.map(({ o, i, rank, job, head }) => {
+        {ranked.map(({ o, i, job, head }) => {
           const s = o.sessionId ? byId.get(o.sessionId) : undefined;
           const st = dead.includes(o.key) ? { state: "dead", since: 0 } : states[o.key];
           const pane = shown.indexOf(o.key);
           return (
             <div key={o.key}>
               {head && (
-                <div className={"grp g" + rank}>
-                  <span>{[tr`내 차례`, tr`일하는 중`, tr`열려 있음`][rank]}</span>
-                  <span className="n">{rank < 2 ? counts[rank] : tops.filter((r) => r.rank === 2).length}</span>
+                <div className="grp">
+                  <span>
+                    {tr`열려 있음`}
+                    {counts[0] > 0 && <em className="g0"> · {tr`내 차례`} {counts[0]}</em>}
+                    {counts[1] > 0 && <em className="g1"> · {tr`일하는 중`} {counts[1]}</em>}
+                  </span>
+                  <span className="n">{tops.length}</span>
                 </div>
               )}
             <div
