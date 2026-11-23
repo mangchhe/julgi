@@ -7,7 +7,7 @@ import { tr } from "./i18n";
 
 /** news: PR에 생긴 일(CI 실패, 새 코멘트 등). 있으면 답을 기다리는 게 아니라 PR 때문에 올라온 것이다 */
 /** pr: 이 세션이 올린 PR. ⌥Enter로 PR 화면을 연다. state가 sleep이면 잠든 세션이다(고르면 깨운다) */
-export type Waiting = { key: string; name: string; repo: string; state: string; since: number; sessionId?: string; news?: string; pr?: PrTarget };
+export type Waiting = { key: string; name: string; repo: string; state: string; since: number; sessionId?: string; news?: string; pr?: PrTarget; /** 한꺼번에 맡긴 버그의 진단이 끝난 세션이면 그 티켓 키 */ bug?: string };
 type Props = {
   rows: Waiting[];
   /** 나한테 온 리뷰 요청. 세션들 아래에 놓는다 */
@@ -24,6 +24,9 @@ type Props = {
   onHand: (ask: ReviewAsk, extra: string) => void;
   /** 그 세션에 답을 보낸다 */
   onAnswer: (key: string, text: string) => void;
+  /** 맡긴 버그의 진단을 보고: 고치라고 하거나, 보류한다 */
+  onFixBug?: (key: string) => void;
+  onHoldBug?: (key: string) => void;
   /** 그 세션을 칸에 올린다. 잠든 세션이면 깨운다 */
   onOpen: (key: string) => void;
   /** 그 세션의 PR을 PR 화면으로 연다 */
@@ -42,7 +45,7 @@ const question = (reply: string) => {
  * 내 차례 (⌘J). 답을 기다리는 세션을 오래 기다린 순으로 놓고, 마지막에 무엇을 물었는지 보여 준다.
  * 여기서 바로 답을 쳐서 보내면 세션을 열어 읽고 돌아오는 왕복이 없다. 더 읽어야 하면 빈 채로 Enter를 눌러 연다
  */
-export default function Queue({ rows, asks, mine, tickets, onTicket, onStartTicket, onView, onHand, onAnswer, onOpen, onPr, onClose }: Props) {
+export default function Queue({ rows, asks, mine, tickets, onTicket, onStartTicket, onView, onHand, onAnswer, onFixBug, onHoldBug, onOpen, onPr, onClose }: Props) {
   // 답을 보낸 세션과 맡긴 리뷰는 상태가 바뀌기를 기다리지 않고 바로 뺀다
   const [gone, setGone] = useState<string[]>([]);
   const list = useMemo(() => rows.filter((r) => !gone.includes(r.key)), [rows, gone]);
@@ -87,6 +90,14 @@ export default function Queue({ rows, asks, mine, tickets, onTicket, onStartTick
   const reply = row ? replies[row.key] : undefined;
   const asked = reply ? question(reply) : "";
   const rest = reply ? (asked ? reply.slice(0, reply.lastIndexOf(asked)).trim() : reply.trim()) : "";
+  // 맡긴 버그의 진단은 "결론: "으로 시작하는 한 줄을 맨 위에 올린다
+  const verdict = row?.bug && reply ? (reply.match(/^[\s>*#-]*(?:결론|Conclusion)\s*[:：]\s*(.+)$/m)?.[1] ?? "").replace(/\*+/g, "").trim() : ""; // i18n-ok
+  const decide = (fix: boolean) => {
+    if (!row) return;
+    (fix ? onFixBug : onHoldBug)?.(row.key);
+    setGone((old) => [...old, row.key]);
+    setText("");
+  };
   const onKey = (e: React.KeyboardEvent) => {
     if (e.key === "Escape") return onClose();
     if (!total) return;
@@ -127,7 +138,7 @@ export default function Queue({ rows, asks, mine, tickets, onTicket, onStartTick
               <b>{r.name}</b>
               <small>
                 {r.repo} · {r.state === "sleep" ? tr`잠듦` + " · " : ""}
-                {r.news ? <em className="qu-news">PR{r.pr ? ` #${r.pr.number}` : ""} · {r.news}</em> : r.state === "ask" ? tr`확인이 필요함` : tr`답함`}
+                {r.news ? <em className="qu-news">PR{r.pr ? ` #${r.pr.number}` : ""} · {r.news}</em> : r.state === "ask" ? tr`확인이 필요함` : r.bug ? <em className="qu-news">{r.bug} · {tr`진단 끝남`}</em> : tr`답함`}
                 {r.since > 0 && ` · ${ago(r.since / 1000)}`}
               </small>
             </button>
@@ -180,6 +191,19 @@ export default function Queue({ rows, asks, mine, tickets, onTicket, onStartTick
           )}
           {row && (
             <>
+              {row.bug && (
+                <div className="qu-bug">
+                  <b>{row.bug}</b> {verdict || (reply === undefined ? tr`읽는 중` : tr`결론 줄을 찾지 못했다. 아래 진단을 읽는다`)}
+                  <span>
+                    <button type="button" tabIndex={-1} className="primary" onClick={() => decide(true)}>
+                      {tr`고쳐`}
+                    </button>
+                    <button type="button" tabIndex={-1} onClick={() => decide(false)}>
+                      {tr`보류`}
+                    </button>
+                  </span>
+                </div>
+              )}
               <div className="qu-reply">
                 {reply === undefined && <small>{tr`읽는 중`}</small>}
                 {reply === "" && <small>{tr`마지막 답을 읽지 못했다. Enter로 세션을 연다.`}</small>}

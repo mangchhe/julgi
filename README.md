@@ -79,6 +79,8 @@ GitHub PRs and GitLab MRs open inside Julgi: diff, line comments and replies, CI
 
 Everything in one place: my PRs, review requests, PRs my sessions opened, and Jira tickets by group. The PR or ticket opens in the right pane.
 
+Bugs are listed apart from the rest, and one button hands them all to sessions that diagnose and stop; you choose "fix it" or "hold" in `⌘J`.
+
 Each ticket says whose move it is, from what Julgi knows about its session and PR: a session waiting on you, CI failed, approved and ready to merge, merged and time to move the ticket, or not started. The ones that need you come first.
 
 </td>

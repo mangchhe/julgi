@@ -187,8 +187,10 @@ async function invoke(cmd: string, args: Record<string, unknown> = {}): Promise<
     case "jira_mine":
     case "jira_search": {
       const t = (key: string, title: string, status: string, cat: string, type: string, others = 0) => ({ key, url: `https://example.atlassian.net/browse/${key}`, title, status, statusCategory: cat, type, priority: "High", assignee: "Me", updated: new Date(Date.now() - 3600_000).toISOString(), others });
-      return [t("ABC-123", "주문 취소 시 쿠폰 복구", "In Progress", "indeterminate", "Story", 2), t("ABC-130", "결제 실패 재시도 간격 조정", "To Do", "new", "Bug"), t("ABC-131", "관리자 환불 내역 CSV", "To Do", "new", "Task"), t("ABC-132", "알림 종류와 발송 조건 정리", "In Progress", "indeterminate", "Task"), t("ABC-133", "주문 목록 응답 지연", "In Progress", "indeterminate", "Bug")];
+      return [t("ABC-123", "주문 취소 시 쿠폰 복구", "In Progress", "indeterminate", "Story", 2), t("ABC-130", "결제 실패 재시도 간격 조정", "To Do", "new", "Bug"), t("ABC-131", "관리자 환불 내역 CSV", "To Do", "new", "Task"), t("ABC-132", "알림 종류와 발송 조건 정리", "In Progress", "indeterminate", "Task"), t("ABC-133", "주문 목록 응답 지연", "In Progress", "indeterminate", "Bug"), t("ABC-134", "쿠폰 만료일이 하루 일찍 표시됨", "To Do", "new", "Bug"), t("ABC-135", "CSV 내보내기에서 한글이 깨짐", "To Do", "new", "Bug"), t("ABC-136", "알림이 두 번 발송됨", "To Do", "new", "Bug"), t("ABC-137", "검색 결과 정렬이 뒤집힘", "To Do", "new", "Bug")];
     }
+    case "worktree_add":
+      return `/Users/me/.julgi/worktrees/${args.name}`;
     case "jira_image":
       return { path: "/tmp/shot.png", data: "data:image/svg+xml," + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="440" height="300"><rect width="440" height="300" fill="#22384c"/><rect x="30" y="40" width="380" height="36" rx="6" fill="#3d5a75"/><rect x="30" y="100" width="240" height="18" rx="4" fill="#567b9c"/><rect x="30" y="134" width="300" height="18" rx="4" fill="#567b9c"/></svg>') };
     case "jira_view":

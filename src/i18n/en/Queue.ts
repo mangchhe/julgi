@@ -21,4 +21,8 @@ export default {
   "⌥Enter PR 보기": "⌥Enter view PR",
   "↑↓ 고르기 · Enter PR 화면 (글이 있으면 세션에 맡기기) · ⌘Enter 세션에 맡기기 · Esc": "↑↓ select · Enter open PR (hand to a session if text is typed) · ⌘Enter hand to a session · Esc",
   "↑↓ 고르기 · Enter 답 보내기 (빈 채면 세션 열기) · ⌘Enter 세션 열기 · ⇧Enter 줄바꿈 · Esc": "↑↓ select · Enter send reply (opens the session if empty) · ⌘Enter open session · ⇧Enter new line · Esc",
+  "진단 끝남": "diagnosis done",
+  "결론 줄을 찾지 못했다. 아래 진단을 읽는다": "No conclusion line found. Read the diagnosis below",
+  "고쳐": "Fix it",
+  "보류": "Hold",
 } as Record<string, string>;

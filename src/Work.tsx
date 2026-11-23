@@ -1,7 +1,7 @@
 import Hint from "./Hint";
 import { tr } from "./i18n";
 import { Fragment, ReactNode, useEffect, useMemo, useRef, useState } from "react";
-import { CATEGORY, Ticket, TicketWork } from "./jira";
+import { BugJob, CATEGORY, Ticket, TicketWork } from "./jira";
 import PrView from "./PrView";
 import { ago } from "./model";
 import { openUrl } from "@tauri-apps/plugin-opener";
@@ -42,6 +42,15 @@ type Props = {
   /** 소식이 봇 댓글뿐이라 흐리게 보일 티켓 */
   ticketQuiet?: Set<string>;
   onStartTicket?: (key: string) => void;
+  /** 한꺼번에 맡긴 버그들과 그 진행. 버그 머리글에서 맡기고, 멈추고, 비운다 */
+  bugJobs?: BugJob[];
+  bugStopped?: boolean;
+  /** 맡길 수 있는 레포들, 그리고 티켓 키의 프로젝트에 기억해 둔 레포 */
+  bugRepos?: { repo: string; cwd: string }[];
+  bugRepoOf?: (key: string) => string | undefined;
+  onHandBugs?: (list: { key: string; title: string; repo: string; cwd: string }[]) => void;
+  onStopBugs?: () => void;
+  onClearBugs?: () => void;
   /** 티켓에 이어진 세션으로 간다 (칸의 열쇠) */
   onShowSession?: (key: string) => void;
   /** Jira가 연결돼 있지 않을 때 설정의 연결 묶음을 연다 */
@@ -59,7 +68,7 @@ const idOf = (t: PrTarget) => `${t.repo}#${t.number}`;
  * 작업 (⌘U). PR을 묶음별로 한 화면에서 둘러본다: 왼쪽 묶음, 가운데 목록, 오른쪽 PR 화면.
  * ⌘J가 "지금 손댈 것"만 모은다면, 여기는 "전부 둘러보기"다. Jira를 붙이면 티켓 묶음이 같은 자리에 들어온다
  */
-export default function Work({ groups, ticketGroups = [], loadTickets, ticketPane, ticketNews = {}, ticketQuiet, ticketWork, onStartTicket, onShowSession, onConnectJira, onClose, onRefresh, onOpenSession, onHand }: Props) {
+export default function Work({ groups, ticketGroups = [], loadTickets, ticketPane, ticketNews = {}, ticketQuiet, ticketWork, bugJobs = [], bugStopped, bugRepos = [], bugRepoOf, onHandBugs, onStopBugs, onClearBugs, onStartTicket, onShowSession, onConnectJira, onClose, onRefresh, onOpenSession, onHand }: Props) {
   const allCount = groups.length + ticketGroups.length;
   // 새 소식이 있는 묶음부터 연다
   const [groupAt, setGroupAt] = useState(() => Math.max(0, groups.findIndex((g) => g.rows.some((r) => r.news))));
@@ -93,6 +102,19 @@ export default function Work({ groups, ticketGroups = [], loadTickets, ticketPan
   const works = useMemo(() => new Map((Array.isArray(tickets) ? tickets : []).map((t) => [t.key, ticketWork?.(t)])), [tickets, ticketWork]);
   const tlist = useMemo(() => (Array.isArray(tickets) ? tickets.map((t, i) => ({ t, i })).sort((a, b) => Number(isBug(b.t)) - Number(isBug(a.t)) || (works.get(a.t.key)?.rank ?? 9) - (works.get(b.t.key)?.rank ?? 9) || a.i - b.i).map((x) => x.t) : []), [tickets, works]);
   const mixed = tlist.some(isBug) && !tlist.every(isBug);
+  // 버그 한꺼번에 맡기기. 대상: 이어진 세션이 없고, 끝나지 않았고, 아직 맡기지 않은 버그
+  const jobOf = (key: string) => bugJobs.find((j) => j.key === key);
+  const active = (key: string) => ["queued", "diag", "decide"].includes(jobOf(key)?.state ?? "");
+  const targets = tlist.filter((t) => isBug(t) && t.statusCategory !== "done" && !works.get(t.key)?.session && !active(t.key));
+  const [bugPick, setBugPick] = useState<{ off: string[]; repo: Record<string, string> } | null>(null);
+  const projects = [...new Set(targets.map((t) => t.key.split("-")[0]))];
+  const repoFor = (key: string) => {
+    const want = bugPick?.repo[key.split("-")[0]] ?? bugRepoOf?.(key);
+    return bugRepos.find((r) => r.repo === want);
+  };
+  const chosen = targets.filter((t) => !bugPick?.off.includes(t.key));
+  const jobs = (state: BugJob["state"]) => bugJobs.filter((j) => j.state === state).length;
+  const JOB_STEP: Record<string, string> = { queued: tr`맡김 · 차례를 기다리는 중`, diag: tr`맡김 · 진단 중`, decide: tr`진단 끝남 · ⌘J에서 고쳐 또는 보류를 고른다` };
   const rows = group?.rows ?? [];
   const at = tgroup ? Math.max(0, tlist.findIndex((t) => t.key === picked)) : Math.max(0, rows.findIndex((r) => idOf(r.target) === picked));
   const row = tgroup ? undefined : rows[at];
@@ -193,13 +215,91 @@ export default function Work({ groups, ticketGroups = [], loadTickets, ticketPan
         {tlist.map((t, i) => (
           <Fragment key={t.key}>
           {/* 버그와 나머지를 나눠 세운다. 둘 다 있을 때만 머리글을 단다 */}
-          {mixed && (i === 0 || isBug(t) !== isBug(tlist[i - 1])) && <div className="wk-sec">{isBug(t) ? tr`버그` : tr`기능·작업`} <small>{tlist.filter((x) => isBug(x) === isBug(t)).length}</small></div>}
+          {(mixed || isBug(t)) && (i === 0 || isBug(t) !== isBug(tlist[i - 1])) && (
+            <div className="wk-sec">
+              {isBug(t) ? tr`버그` : tr`기능·작업`} <small>{tlist.filter((x) => isBug(x) === isBug(t)).length}</small>
+              {isBug(t) && onHandBugs && (
+                <span className="wk-bugs">
+                  {bugJobs.length > 0 && (
+                    <small>
+                      {tr`대기 ${jobs("queued")} · 진단 중 ${jobs("diag")} · 결정 필요 ${jobs("decide")} · 끝남 ${jobs("done") + jobs("held")}`}
+                      {bugStopped && " · " + tr`멈춤`}
+                    </small>
+                  )}
+                  {jobs("queued") > 0 && (
+                    <button type="button" tabIndex={-1} onClick={onStopBugs}>
+                      {bugStopped ? tr`이어 하기` : tr`멈추기`}
+                    </button>
+                  )}
+                  {bugJobs.length > 0 && jobs("queued") === 0 && (
+                    <button type="button" tabIndex={-1} onClick={onClearBugs} title={tr`끝난 것과 보류한 것을 진행 표시에서 지운다`}>
+                      {tr`표시 지우기`}
+                    </button>
+                  )}
+                  {targets.length > 0 && (
+                    <button type="button" tabIndex={-1} className="primary" onClick={() => setBugPick(bugPick ? null : { off: [], repo: {} })}>
+                      {tr`버그 전부 맡기기`}
+                    </button>
+                  )}
+                </span>
+              )}
+            </div>
+          )}
+          {isBug(t) && bugPick && (i === 0 || !isBug(tlist[i - 1])) && (
+            <div className="wk-bugpick">
+              <div>{tr`진단만 맡긴다. 세션마다 워크트리를 따서 원인과 수정안을 정리하고 멈춘다. 코드는 바꾸지 않는다.`}</div>
+              {targets.map((b) => (
+                <label key={b.key}>
+                  <input type="checkbox" checked={!bugPick.off.includes(b.key)} onChange={() => setBugPick({ ...bugPick, off: bugPick.off.includes(b.key) ? bugPick.off.filter((k) => k !== b.key) : [...bugPick.off, b.key] })} />
+                  <em>{b.key}</em> {b.title}
+                </label>
+              ))}
+              {projects.map((p) => (
+                <label key={p} className="wk-bugrepo">
+                  {tr`${p} 티켓을 할 레포`}
+                  <select value={repoFor(p + "-0")?.repo ?? ""} onChange={(e) => setBugPick({ ...bugPick, repo: { ...bugPick.repo, [p]: e.target.value } })}>
+                    <option value="">{tr`고른다`}</option>
+                    {bugRepos.map((r) => (
+                      <option key={r.cwd} value={r.repo}>
+                        {r.repo}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              ))}
+              <span>
+                <button
+                  type="button"
+                  tabIndex={-1}
+                  className="primary"
+                  disabled={!chosen.length || chosen.some((b) => !repoFor(b.key))}
+                  onClick={() => {
+                    onHandBugs?.(chosen.map((b) => ({ key: b.key, title: b.title, repo: repoFor(b.key)!.repo, cwd: repoFor(b.key)!.cwd })));
+                    setBugPick(null);
+                  }}
+                >
+                  {tr`${chosen.length}건 맡기기`}
+                </button>
+                <button type="button" tabIndex={-1} onClick={() => setBugPick(null)}>
+                  {tr`취소`}
+                </button>
+              </span>
+            </div>
+          )}
           <button type="button" tabIndex={-1} className={"wk-row" + (i === at ? " on" : "")} onClick={() => pick(i)} onDoubleClick={enterPr}>
             <span className="wk-row-title">
               {t.type && <span className={"wk-type" + (isBug(t) ? " bug" : "")}>{t.type}</span>}
               <em>{t.key}</em> {t.title}
             </span>
-            {works.get(t.key) && (
+            {jobOf(t.key)?.state === "held" && jobOf(t.key)!.why && !works.get(t.key)?.session ? (
+              <span className="wk-step r0">
+                <b>{tr`맡기지 못했다`}</b> · {jobOf(t.key)!.why}
+              </span>
+            ) : active(t.key) && (jobOf(t.key)!.state !== "diag" || !works.get(t.key)?.session) ? (
+              <span className={"wk-step r" + (jobOf(t.key)!.state === "decide" ? 0 : 1)}>
+                <b>{JOB_STEP[jobOf(t.key)!.state]}</b>
+              </span>
+            ) : works.get(t.key) && (
               <span className={"wk-step r" + works.get(t.key)!.rank}>
                 <b>{works.get(t.key)!.step}</b>
                 {works.get(t.key)!.detail && ` · ${works.get(t.key)!.detail}`}

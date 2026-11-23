@@ -182,4 +182,13 @@ export default {
   "{0}이 끝났다 ({1}). 이어진 세션을 끝낼까?": "{0} is finished ({1}). End its session?",
   "세션 끝내기": "End session",
   "티켓 끝남 · {0}": "Ticket finished · {0}",
+  "맡길 버그가 없다. 이미 세션이 이어져 있다.": "No bugs to hand over. They already have sessions.",
+  "버그 {0}건을 진단 세션에 맡김: {1}": "Handed {0} bugs to diagnosis sessions: {1}",
+  "버그 {0}건을 맡겼다. {1}개씩 진단하고, 정할 것이 생기면 ⌘J에 올린다.": "Handed over {0} bugs. They are diagnosed {1} at a time, and anything you need to decide comes up in ⌘J.",
+  "이 버그를 진단만 한다. 코드 수정, 커밋, 푸시, Jira 상태 변경과 댓글은 하지 않는다. 재현 경로와 코드를 읽고 원인을 찾은 뒤 멈춘다. 답의 첫 줄은 반드시 \"결론: \"으로 시작하는 한 문장으로 쓴다(예: \"결론: 재시도 간격 계산이 초 단위와 밀리초 단위를 섞어 쓴다\", \"결론: 이미 고쳐졌다\", \"결론: 재현되지 않는다\"). 그 아래에 원인, 코드 위치(파일:줄), 수정안, 사람이 정해야 할 것을 차례로 정리한다. 이미 고쳐졌거나 재현되지 않으면 그 근거를 적고 멈춘다. 내가 \"고쳐\"라고 하기 전에는 아무것도 바꾸지 않는다.": "Only diagnose this bug. Do not edit code, commit, push, change the Jira status or comment on the ticket. Read the reproduction path and the code, find the cause, then stop. The first line of your reply must be one sentence starting with \"Conclusion: \" (for example \"Conclusion: the retry interval mixes seconds and milliseconds\", \"Conclusion: already fixed\", \"Conclusion: cannot reproduce\"). Below it, list the cause, the code location (file:line), the proposed fix, and what a person has to decide. If it is already fixed or cannot be reproduced, give the evidence and stop. Change nothing until I say \"fix it\".",
+  "세션이 닫혔다": "The session was closed",
+  "이미 이어진 세션이 있다": "A session is already tied to it",
+  "세션을 띄우지 못했다": "Could not start the session",
+  "고쳐. 위에 정리한 수정안대로 진행하고, 테스트를 돌린 뒤 커밋한다. 정할 것으로 적은 부분은 가장 안전한 쪽으로 하고 무엇을 골랐는지 적는다.": "Fix it. Follow the fix you proposed above, run the tests, then commit. For the points you listed as needing a decision, take the safest option and say which one you took.",
+  "{0} 진단을 보고 고치라고 함": "Read the diagnosis of {0} and told the session to fix it",
 } as Record<string, string>;

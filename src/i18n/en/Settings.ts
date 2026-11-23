@@ -168,4 +168,7 @@ export default {
   "Tab 묶음 넘기기 · ↑↓ 고르기 · ←→ 바꾸기 · Enter 켜고 끄기, 글 고치기 · 바로 적용된다 · Esc · 나머지 값은 ~/.julgi/config.json": "Tab next group · ↑↓ select · ←→ change · Enter toggle, edit text · applies immediately · Esc · other values are in ~/.julgi/config.json",
   "조용히 받을 Jira 작성자": "Jira authors to receive quietly",
   "이 사람들의 댓글만 달렸으면 알리지 않고 ⌘J에도 올리지 않는다. 봇 계정은 적지 않아도 조용히 받는다": "When only these people commented, there is no notification and nothing is added to ⌘J. Bot accounts are quiet without being listed",
+  "버그를 한꺼번에 맡길 때 동시에 돌릴 수": "Bugs diagnosed at the same time",
+  "작업 페이지에서 버그를 전부 맡기면 이만큼씩 진단 세션을 띄우고, 하나가 답을 끝내면 다음 것을 시작한다": "When you hand over all bugs from the Work page, this many diagnosis sessions run at once, and the next one starts when one finishes its reply",
+  "{0}개": "{0}",
 } as Record<string, string>;

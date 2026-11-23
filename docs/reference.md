@@ -81,6 +81,7 @@ Change them in `⌘,`; they apply at once and are saved to `~/.julgi/config.json
 | `jiraStartTransition`, `jiraPrTransition`, `jiraMergeTransition` | `In Progress`, `In Review`, `Done` | Status to offer on start, on PR, on merge. Empty means do not ask |
 | `jiraRepos` | none | Project key to repo (`ABC=acme-api, OPS=acme-infra`). Filled in as you start from tickets |
 | `jiraQuiet` | none | Comment authors received quietly (display names or account ids, comma separated): no notification, not in `⌘J`. Bot accounts are always quiet |
+| `bugParallel` | 3 | How many bugs are diagnosed at once when you hand over all bugs from the Work page |
 
 What the connections use:
 
@@ -111,6 +112,7 @@ Everything is a text file under `~/.julgi/`. Conversations are not here; Claude 
 | `seen.json` | When you last looked at Julgi, for the briefing |
 | `tickets.json` | Which session belongs to which Jira ticket |
 | `jira-files/` | Images attached to tickets you opened, kept so sessions can read them |
+| `bugs.json` | Bugs handed over in bulk and where each one stands |
 | `remote-token` | Token for the phone view. Delete it to get a new one |
 | `worktrees/` | Worktrees for tasks and tickets |
 

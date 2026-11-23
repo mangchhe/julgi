@@ -124,6 +124,12 @@ function wikiToMd(text: string): string {
     .replace(/\{\{([^}]+)\}\}/g, "`$1`");
 }
 
+/**
+ * 한꺼번에 맡긴 버그 한 건. queued 대기 → diag 진단 중 → decide 내가 정할 차례 → done 고치라고 함 / held 보류.
+ * heldSince: 보류한 순간의 답. 그 답 그대로면 내 차례에 다시 올리지 않는다
+ */
+export type BugJob = { key: string; title: string; repo: string; cwd: string; state: "queued" | "diag" | "decide" | "done" | "held"; sessionId?: string; why?: string; heldSince?: number };
+
 /** 지난번 감시 기록 한 건 */
 export type TicketSeen = { status: string; others: number; assigned: boolean };
 

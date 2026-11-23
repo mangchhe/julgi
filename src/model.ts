@@ -297,6 +297,7 @@ export const config = {
   triage: true,
   /** 한 번 시킨 일이 이만큼(분) 넘게 돌고 있으면 알린다. 0이면 알리지 않는다 */
   longRunMin: 30,
+  bugParallel: 3,
   /** 오래 자리를 비웠다 돌아오면 브리핑을 띄운다 */
   morning: true,
   /** 몇 시간 넘게 안 봤으면 브리핑을 띄우나 */

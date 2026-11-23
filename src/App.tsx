@@ -24,8 +24,8 @@ import PrView from "./PrView";
 import Work, { WorkGroup, WorkRow } from "./Work";
 import Usage from "./Usage";
 import TicketView from "./TicketView";
-import StartTicket from "./StartTicket";
-import { TicketWork, firstKey, JiraConn, keyOfUrl, setKnownKeys, Ticket, TicketFull, TicketSeen, ticketNews, quietNews } from "./jira";
+import StartTicket, { promptOf } from "./StartTicket";
+import { TicketWork, firstKey, JiraConn, keyOfUrl, setKnownKeys, Ticket, TicketFull, TicketSeen, ticketNews, quietNews, BugJob, slugOf } from "./jira";
 import { prNo, isLab, newsOf, openPr, prOf, PrStatus, PrTarget, prUrl, repoName, ReviewAsk } from "./pr";
 import * as terms from "./terms";
 import { rank } from "./route";
@@ -169,6 +169,29 @@ export default function App() {
   const [ticketLinks, setTicketLinks] = useState<Record<string, string>>({}); // 세션 ID → 티켓 키
   const [ticketDone, setTicketDone] = useState<Record<string, string>>({}); // 끝난(완료·거부) 티켓 키 → 상태 이름. 한 번 알린 것은 다시 알리지 않는다
   const doneRef = useRef<Record<string, string>>({});
+  // 한꺼번에 맡긴 버그들. 다시 켜도 이어지게 bugs.json에 둔다
+  const [bugJobs, setBugJobsState] = useState<BugJob[]>([]);
+  const [bugStopped, setBugStopped] = useState(false);
+  const bugs = useRef<{ jobs: BugJob[]; stopped: boolean; starting: boolean; loadedAt: number }>({ jobs: [], stopped: false, starting: false, loadedAt: 0 });
+  const saveBugs = (jobs: BugJob[], stopped = bugs.current.stopped) => {
+    bugs.current.jobs = jobs;
+    bugs.current.stopped = stopped;
+    setBugJobsState(jobs);
+    setBugStopped(stopped);
+    void invoke("data_write", { name: "bugs.json", text: JSON.stringify({ jobs, stopped }) });
+  };
+  useEffect(() => {
+    void invoke<string | null>("data_read", { name: "bugs.json" }).then((t) => {
+      try {
+        const v = t ? (JSON.parse(t) as { jobs: BugJob[]; stopped: boolean }) : { jobs: [], stopped: false };
+        bugs.current = { jobs: v.jobs ?? [], stopped: !!v.stopped, starting: false, loadedAt: Date.now() };
+        setBugJobsState(bugs.current.jobs);
+        setBugStopped(bugs.current.stopped);
+      } catch {
+        bugs.current.loadedAt = Date.now();
+      }
+    });
+  }, []);
   useEffect(() => {
     void invoke<string | null>("data_read", { name: "jira-done.json" }).then((t) => {
       try {
@@ -1512,6 +1535,7 @@ export default function App() {
   const tend = () => {
     const { open, panes, states, pinned, handing, overlay } = live.current;
     const now = Date.now();
+    tendBugs();
     for (const key of panes) if (key && waiting(states[key])) seen.current[key] = states[key].since;
     for (const key of panes) if (key) shownAt.current[key] = now;
     for (const o of open) {
@@ -1912,10 +1936,13 @@ export default function App() {
     setOffer({ text: tr`${t.key}을 하던 세션이 있어 그 세션을 열었다 (${had.sessionName ?? ""}). 그래도 새로 시작할까?`, yes: tr`새 세션으로 시작`, run: () => setStartTicket(t) });
   };
   /** 이 티켓으로 시작: 워크트리 + 브랜치를 따고, 첫 지시를 들려 새 세션을 띄우고, 세션과 티켓을 잇는다 */
-  const startFromTicket = async (t: TicketFull, o: { cwd: string; repo: string; branch: string; prompt: string; transition: boolean }) => {
-    setStartTicket(null);
-    setTicketShown(null);
-    setOverlay(null);
+  const startFromTicket = async (t: TicketFull, o: { cwd: string; repo: string; branch: string; prompt: string; transition: boolean }, quiet = false): Promise<string | undefined> => {
+    // quiet: 한꺼번에 맡긴 것이다. 열어 둔 화면을 닫지 않고 칸도 바꾸지 않는다
+    if (!quiet) {
+      setStartTicket(null);
+      setTicketShown(null);
+      setOverlay(null);
+    }
     setTicketNews(({ [t.key]: _, ...rest }) => rest);
     const name = o.branch.replace(/[^A-Za-z0-9-]/g, "-").slice(0, 60);
     const path = await invoke<string>("worktree_add", { repo: o.cwd, name, branch: o.branch }).catch((e) => (say(tr`워크트리를 따지 못했다: ${String(e).slice(0, 100)}`, 8000), ""));
@@ -1928,7 +1955,7 @@ export default function App() {
     const brief = await invoke<string>("data_write", { name: `outbox/${crypto.randomUUID()}.md`, text });
     terms.create({ key, cwd: path, command: withPrompt(newCommand(id), brief) });
     setOpen((list) => [...list, { key, label: `${t.key} ${t.title}`.slice(0, 40), cwd: path, sessionId: id }]);
-    show(key);
+    if (!quiet) show(key);
     const links = { ...live.current.ticketLinks, [id]: t.key };
     setTicketLinks(links);
     void invoke("data_write", { name: "tickets.json", text: JSON.stringify(links) });
@@ -1938,6 +1965,74 @@ export default function App() {
     setConfig("jiraRepos", [...pairs, `${project}=${o.repo}`].join(", "));
     record("시작", tr`${t.key} "${t.title.slice(0, 40)}"을 ${o.repo}의 ${o.branch}에서 새 세션으로 시작`, id); // i18n-ok
     if (o.transition && config.jiraStartTransition.trim()) void moveTicket(t.key, config.jiraStartTransition);
+    return id;
+  };
+  // ── 버그 한꺼번에 맡기기 ──
+  /** 고른 버그들을 대기열에 넣는다. 이미 맡긴 것과 이어진 세션이 있는 것은 넣지 않는다 */
+  const handBugs = (list: { key: string; title: string; repo: string; cwd: string }[]) => {
+    const have = new Set(bugs.current.jobs.filter((j) => j.state !== "done" && j.state !== "held").map((j) => j.key));
+    const fresh = list.filter((b) => !have.has(b.key) && !ticketWork({ key: b.key, statusCategory: "" } as Ticket).session);
+    if (!fresh.length) return say(tr("맡길 버그가 없다. 이미 세션이 이어져 있다."));
+    const keys = new Set(fresh.map((b) => b.key));
+    saveBugs([...bugs.current.jobs.filter((j) => !keys.has(j.key)), ...fresh.map((b) => ({ ...b, state: "queued" as const }))], false);
+    record("버그 맡김", tr`버그 ${fresh.length}건을 진단 세션에 맡김: ${fresh.map((b) => b.key).join(", ").slice(0, 80)}`); // i18n-ok
+    say(tr`버그 ${fresh.length}건을 맡겼다. ${config.bugParallel}개씩 진단하고, 정할 것이 생기면 ⌘J에 올린다.`, 6000);
+  };
+  const setBug = (key: string, patch: Partial<BugJob>) => saveBugs(bugs.current.jobs.map((j) => (j.key === key ? { ...j, ...patch } : j)));
+  /** 세션 ID로 맡긴 버그를 찾는다 */
+  const bugOf = (sessionId?: string) => (sessionId ? bugs.current.jobs.find((j) => j.sessionId === sessionId) : undefined);
+  /** 진단 전용 첫 지시. 고치지 않고 정리만 하고 멈춘다 */
+  const bugPrompt = (t: TicketFull) =>
+    `${promptOf(t).split("\n").slice(0, -1).join("\n")}\n${tr`이 버그를 진단만 한다. 코드 수정, 커밋, 푸시, Jira 상태 변경과 댓글은 하지 않는다. 재현 경로와 코드를 읽고 원인을 찾은 뒤 멈춘다. 답의 첫 줄은 반드시 "결론: "으로 시작하는 한 문장으로 쓴다(예: "결론: 재시도 간격 계산이 초 단위와 밀리초 단위를 섞어 쓴다", "결론: 이미 고쳐졌다", "결론: 재현되지 않는다"). 그 아래에 원인, 코드 위치(파일:줄), 수정안, 사람이 정해야 할 것을 차례로 정리한다. 이미 고쳐졌거나 재현되지 않으면 그 근거를 적고 멈춘다. 내가 "고쳐"라고 하기 전에는 아무것도 바꾸지 않는다.`}`;
+  /** 1.5초마다: 진단이 끝난 것을 "정할 차례"로 올리고, 자리가 나면 다음 버그를 시작한다 */
+  const tendBugs = () => {
+    const b = bugs.current;
+    if (!b.loadedAt || !b.jobs.length) return;
+    const { open, states } = live.current;
+    // 다시 켠 직후에는 칸이 아직 안 돌아왔을 수 있다. 조금 기다렸다가 본다
+    const settled = Date.now() - b.loadedAt > 15_000;
+    let jobs = b.jobs;
+    for (const j of jobs) {
+      if (j.state !== "diag") continue;
+      const o = open.find((x) => x.sessionId === j.sessionId);
+      if (!o) {
+        if (settled) jobs = jobs.map((x) => (x === j ? { ...x, state: "held" as const, why: tr("세션이 닫혔다") } : x));
+        continue;
+      }
+      if (replied(states[o.key])) jobs = jobs.map((x) => (x === j ? { ...x, state: "decide" as const } : x));
+    }
+    if (jobs !== b.jobs) saveBugs(jobs);
+    const next = jobs.find((j) => j.state === "queued");
+    if (b.stopped || b.starting || !next || jobs.filter((j) => j.state === "diag").length >= Math.max(1, config.bugParallel)) return;
+    b.starting = true;
+    void (async () => {
+      try {
+        // 그 사이 이어진 세션이 생겼으면 또 만들지 않는다
+        const had = ticketWork({ key: next.key, statusCategory: "" } as Ticket);
+        if (had.session) return setBug(next.key, { state: "held", why: tr("이미 이어진 세션이 있다") });
+        const t = await invoke<TicketFull>("jira_view", { conn: jiraConn(), key: next.key });
+        const slug = slugOf(t.title);
+        const id = await startFromTicket(t, { cwd: next.cwd, repo: next.repo, branch: slug ? `${t.key}-${slug}` : t.key, prompt: bugPrompt(t), transition: false }, true);
+        setBug(next.key, id ? { state: "diag", sessionId: id } : { state: "held", why: tr("세션을 띄우지 못했다") });
+      } catch (e) {
+        setBug(next.key, { state: "held", why: String(e).slice(0, 100) });
+      } finally {
+        b.starting = false;
+      }
+    })();
+  };
+  /** ⌘J에서 "고쳐": 그 세션에 수정을 진행하라고 보낸다 */
+  const fixBug = (key: string) => {
+    const j = bugOf(live.current.open.find((o) => o.key === key)?.sessionId);
+    if (!j) return;
+    terms.submitWhenClear(key, tr("고쳐. 위에 정리한 수정안대로 진행하고, 테스트를 돌린 뒤 커밋한다. 정할 것으로 적은 부분은 가장 안전한 쪽으로 하고 무엇을 골랐는지 적는다."));
+    setBug(j.key, { state: "done" });
+    record("버그", tr`${j.key} 진단을 보고 고치라고 함`, j.sessionId); // i18n-ok
+  };
+  /** ⌘J에서 "보류": 세션은 열어 두고 대기열에서만 내린다. 그 답으로는 내 차례에 다시 올리지 않는다 */
+  const holdBug = (key: string) => {
+    const j = bugOf(live.current.open.find((o) => o.key === key)?.sessionId);
+    if (j) setBug(j.key, { state: "held", heldSince: live.current.states[key]?.since });
   };
   /** 세션과 이어지지 않은 내 PR에 일이 생겼다 */
   const mineNotice = (pr: ReviewAsk, news: string) => {
@@ -2253,7 +2348,11 @@ export default function App() {
           // 답을 끝냈으면 그 답을 읽고 내가 할 일이 있는지 본다. 판정이 나올 때까지(몇 초)는 일하는 중으로 두고,
           // 할 일이 없으면 "보고함"으로 내려 둔다. Julgi가 알아서 띄운 세션과 내가 방금 Esc로 끊은 세션은 판정하지 않는다
           let shown: TermState = st;
-          if (config.triage && st.state === "wait" && o.sessionId && !holding && !worker && !isAuto(o.sessionId) && !live.current.handing.includes(o.key)) {
+          // 맡긴 버그의 진단은 늘 내가 정할 것이다. 판정에 넘기지 않는다. 보류한 것은 그 답 그대로인 동안 조용히 둔다
+          const bug = bugs.current.jobs.find((j) => j.sessionId === o.sessionId && (j.state === "diag" || j.state === "decide" || j.state === "held"));
+          if (bug) {
+            if (bug.state === "held" && st.state === "wait" && bug.heldSince === st.since) shown = { state: "told", since: st.since };
+          } else if (config.triage && st.state === "wait" && o.sessionId && !holding && !worker && !isAuto(o.sessionId) && !live.current.handing.includes(o.key)) {
             const known = triaged.current[o.sessionId];
             if (known?.since === st.since) shown = known.need ? st : { state: "told", since: st.since };
             else {
@@ -2841,15 +2940,17 @@ export default function App() {
           rows={open
             .filter((o) => waiting(states[o.key]) || (prNews[o.key] && states[o.key]?.state !== "run"))
             .sort((a, b) => (states[a.key]?.since ?? Infinity) - (states[b.key]?.since ?? Infinity))
-            .map((o) => ({ key: o.key, name: nameOf(o.key), repo: repoOf(o.cwd), state: states[o.key]?.state ?? "", since: states[o.key]?.since ?? 0, sessionId: o.sessionId, news: prNews[o.key], pr: prOfSession(o.sessionId) ?? undefined }))
+            .map((o) => ({ key: o.key, name: nameOf(o.key), repo: repoOf(o.cwd), state: states[o.key]?.state ?? "", since: states[o.key]?.since ?? 0, sessionId: o.sessionId, news: prNews[o.key], pr: prOfSession(o.sessionId) ?? undefined, bug: bugJobs.find((j) => j.sessionId === o.sessionId && j.state === "decide")?.key }))
             // 잠든 세션도 PR에 일이 생겼으면 내 차례다. 고르면 깨운다
             .concat(
               Object.entries(sleepNews).map(([id, { news, pr }]) => {
                 const s = byId.get(id);
-                return { key: "c:" + id, name: names[id] || s?.title || tr("세션"), repo: s?.repo ?? "", state: "sleep", since: 0, sessionId: id, news, pr };
+                return { key: "c:" + id, name: names[id] || s?.title || tr("세션"), repo: s?.repo ?? "", state: "sleep", since: 0, sessionId: id, news, pr, bug: undefined };
               }),
             )}
           asks={asks}
+          onFixBug={fixBug}
+          onHoldBug={holdBug}
           mine={Object.values(mineNews)}
           tickets={Object.entries(ticketNewsMap).filter(([key]) => !ticketQuiet.has(key)).map(([key, news]) => {
             const t = tickets.find((x) => x.key === key);
@@ -2879,6 +2980,9 @@ export default function App() {
               return;
             }
             terms.submitWhenClear(key, text);
+            // 맡긴 버그에 내가 직접 답했으면 정한 것이다
+            const job = bugOf(open.find((o) => o.key === key)?.sessionId);
+            if (job?.state === "decide") setBug(job.key, { state: "done" });
             record("답함", tr`"${nameOf(key)}"에 내 차례 목록에서 답함: ${text.slice(0, 80)}`, open.find((o) => o.key === key)?.sessionId); // i18n-ok
           }}
           onOpen={(key) => (open.some((o) => o.key === key) ? show(key) : wake(key.slice(2)))}
@@ -2972,6 +3076,13 @@ export default function App() {
           loadTickets={(jql) => invoke<Ticket[]>("jira_search", { conn: jiraConn(), jql, limit: 50 })}
           ticketNews={ticketNewsMap}
           ticketQuiet={ticketQuiet}
+          bugJobs={bugJobs}
+          bugStopped={bugStopped}
+          bugRepos={mapState.current.repos.length ? mapState.current.repos : folders}
+          bugRepoOf={(key) => config.jiraRepos.split(",").map((p) => p.trim().split("=")).find(([k]) => k === key.split("-")[0])?.[1]}
+          onHandBugs={handBugs}
+          onStopBugs={() => saveBugs(bugs.current.jobs, !bugs.current.stopped)}
+          onClearBugs={() => saveBugs(bugs.current.jobs.filter((j) => j.state === "diag" || j.state === "decide"), false)}
           ticketWork={ticketWork}
           onShowSession={(key) => (setOverlay(null), show(key))}
           onStartTicket={(key) => void invoke<TicketFull>("jira_view", { conn: jiraConn(), key }).then(beginTicket, (e) => say(String(e).slice(0, 100)))}

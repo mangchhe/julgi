@@ -82,6 +82,7 @@
 | `jiraStartTransition`, `jiraPrTransition`, `jiraMergeTransition` | `In Progress`, `In Review`, `Done` | 시작할 때, PR을 올리면, 머지되면 제안할 상태. 비우면 묻지 않는다 |
 | `jiraRepos` | 없음 | 프로젝트 키 → 레포 (`ABC=acme-api, OPS=acme-infra`). 티켓으로 시작할 때 저절로 채운다 |
 | `jiraQuiet` | 없음 | 조용히 받을 댓글 작성자(표시 이름이나 계정 ID, 쉼표로 구분). 알리지 않고 `⌘J`에도 안 올린다. 봇 계정은 늘 조용히 받는다 |
+| `bugParallel` | 3 | 작업 페이지에서 버그를 한꺼번에 맡길 때 동시에 진단할 수 |
 
 연결이 쓰는 것:
 
@@ -113,6 +114,7 @@
 | `seen.json` | 마지막으로 Julgi를 본 때. 브리핑이 쓴다 |
 | `tickets.json` | 세션과 Jira 티켓의 연결 |
 | `jira-files/` | 열어 본 티켓에 붙은 그림. 세션이 읽을 수 있게 둔다 |
+| `bugs.json` | 한꺼번에 맡긴 버그들과 각각의 진행 |
 | `remote-token` | 폰용 화면의 토큰. 지우면 새로 만든다 |
 | `worktrees/` | 일감용 워크트리 |
 

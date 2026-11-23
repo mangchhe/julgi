@@ -1191,3 +1191,19 @@ body.dragging .pane-body { pointer-events: none; }
 .tk-shot-none { font-size: 12px; color: var(--muted); padding: 4px 8px; border: 1px dashed var(--line); border-radius: 6px; }
 .pane-head .ended { cursor: pointer; }
 .row-meta .faint, .wk-row-meta .faint { color: var(--muted); opacity: 0.75; }
+
+/* 버그 한꺼번에 맡기기 */
+.wk-bugs { float: right; display: inline-flex; align-items: center; gap: 6px; letter-spacing: 0; }
+.wk-bugs small { font-weight: 400; }
+.wk-bugs button, .wk-bugpick button, .qu-bug button { font: inherit; font-size: 12px; color: var(--ink); background: var(--surface); border: 1px solid var(--line); border-radius: 6px; padding: 2px 9px; cursor: pointer; }
+.wk-bugs button.primary, .wk-bugpick button.primary, .qu-bug button.primary { color: var(--accent); background: var(--accent-soft); border-color: var(--accent); }
+.wk-bugpick button:disabled { opacity: 0.45; cursor: default; }
+.wk-bugpick { display: flex; flex-direction: column; gap: 6px; margin: 4px 8px 8px; padding: 10px 12px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface); font-size: 12.5px; }
+.wk-bugpick > div { color: var(--muted); }
+.wk-bugpick label { display: flex; align-items: center; gap: 6px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.wk-bugpick label em { font-style: normal; font-family: ui-monospace, Menlo, monospace; font-size: 12px; color: var(--accent); }
+.wk-bugpick select { font: inherit; font-size: 12px; color: var(--ink); background: var(--bg); border: 1px solid var(--line); border-radius: 6px; padding: 2px 6px; }
+.wk-bugpick > span { display: flex; gap: 6px; margin-top: 2px; }
+.qu-bug { display: flex; align-items: center; gap: 8px; padding: 10px 14px; margin-bottom: 8px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface); font-size: 13px; line-height: 1.45; }
+.qu-bug b { font-family: ui-monospace, Menlo, monospace; font-size: 12px; color: var(--accent); flex: none; }
+.qu-bug > span { margin-left: auto; display: flex; gap: 6px; flex: none; }
