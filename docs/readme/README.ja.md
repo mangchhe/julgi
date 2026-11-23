@@ -152,6 +152,8 @@ scripts/install.sh --open    # ツール確認 → ビルド → /Applications/J
 
 更新するときも同じコマンドを実行します。`scripts/install.sh --check` はツールの確認だけを行います。開発するなら `npm install && npm run tauri dev`。
 
+macOS は、アプリが書類・デスクトップ・ダウンロードなどのフォルダを読む前に確認します。セッションは Julgi の中で動くので、確認は Julgi に対して出ます。フォルダごとではなく一度で済ませるには、システム設定 → プライバシーとセキュリティ → フルディスクアクセスに Julgi を追加します。キーチェーンにコード署名用の証明書があればインストールスクリプトがアプリに署名するので、許可した内容は更新後も残ります。なければ更新のたびに macOS が忘れます。
+
 連携には別途必要なものがあります。GitHub は [`gh`](https://cli.github.com)、GitLab は [`glab`](https://gitlab.com/gitlab-org/cli)、Jira は API トークン。`⌘,` → Connections でつなぎます。
 
 ## はじめかた

@@ -152,6 +152,8 @@ scripts/install.sh --open    # 检查工具 → 构建 → /Applications/Julgi.a
 
 更新时运行同一条命令。`scripts/install.sh --check` 只检查工具。想改代码：`npm install && npm run tauri dev`。
 
+macOS 在应用读取“文稿”“桌面”“下载”等文件夹前会询问。会话运行在 Julgi 里，所以询问针对的是 Julgi。想一次授权而不是逐个文件夹确认，请在 系统设置 → 隐私与安全性 → 完全磁盘访问权限 中加入 Julgi。钥匙串里有代码签名证书时，安装脚本会为应用签名，你的授权在更新后仍然保留；没有的话，每次更新 macOS 都会忘记。
+
 集成需要额外的东西：GitHub 用 [`gh`](https://cli.github.com)，GitLab 用 [`glab`](https://gitlab.com/gitlab-org/cli)，Jira 需要一个 API token。在 `⌘,` → Connections 里接入。
 
 ## 快速上手

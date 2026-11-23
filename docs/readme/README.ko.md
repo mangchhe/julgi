@@ -152,6 +152,8 @@ scripts/install.sh --open    # 도구 확인 → 빌드 → /Applications/Julgi.
 
 새 판으로 올릴 때도 같은 명령을 돌린다. `scripts/install.sh --check`는 도구만 확인한다. 고쳐 보려면 `npm install && npm run tauri dev`.
 
+macOS는 앱이 문서, 데스크탑, 다운로드 같은 폴더를 읽기 전에 묻는다. 세션은 Julgi 안에서 도니 Julgi가 물음을 받는다. 폴더마다 묻지 않고 한 번에 끝내려면 시스템 설정 → 개인정보 보호 및 보안 → 전체 디스크 접근 권한에 Julgi를 넣는다. 키체인에 코드 서명 인증서가 있으면 설치 스크립트가 앱에 서명해서, 허락한 것이 업데이트 뒤에도 남는다. 없으면 업데이트할 때마다 macOS가 잊는다.
+
 연동에는 따로 필요한 것이 있다. GitHub은 [`gh`](https://cli.github.com), GitLab은 [`glab`](https://gitlab.com/gitlab-org/cli), Jira는 API 토큰. `⌘,` → 연결에서 붙인다.
 
 ## 처음 쓰기
