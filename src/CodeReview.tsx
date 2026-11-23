@@ -46,6 +46,9 @@ export const paint = (text: string, lang?: string) => {
   }
 };
 
+/** 저장된 수준 이름 → 색을 고르는 이름 */
+const levelClass = (level: string) => (level === "버그" ? "bug" : level === "위험" ? "risk" : level ? "ask" : "see"); // i18n-ok
+
 /** 살펴볼 작업 폴더. 지금 세션의 폴더이거나, 이 세션이 맡긴 일감의 워크트리다 */
 export type Place = { label: string; cwd: string };
 type Props = {
@@ -209,7 +212,7 @@ export default function Review({ places, known, sessions, onSay, onClose }: Prop
       // 맨 위는 하나: 이 세션이 고친 것 전부. 답마다 찍어 둔 상태가 있으면 첫 답 앞에서 지금까지,
       // 없으면(Julgi가 지켜보기 전의 세션) 작업 브랜치는 기준에서 갈라진 뒤 전부, 기준 브랜치 위라면 커밋 안 한 것
       { ...NONE, from: turns.length ? turns[0].from : git && git.branch !== git.default ? null : "HEAD", title: turns.length ? tr`이 세션의 첫 답 앞에서 지금까지 바뀐 것` : tr`답마다 찍어 둔 기록이 없어, 폴더에 남아 있는 변경을 보여 준다` },
-      ...[...turns].reverse().map((t, i) => ({ key: "t:" + t.to, from: t.from, to: t.to, label: i === 0 ? tr`방금 답` : tr`${i}번 전 답`, title: tr`이 답 하나에서 바뀐 것만`, kind: "turn" as const, when: ago(t.at / 1000) })),
+      ...[...turns].reverse().map((t, i) => ({ key: "t:" + t.to, from: t.from, to: t.to, label: t.said || (i === 0 ? tr`방금 답` : tr`${i}번 전 답`), title: t.said ? tr`이 말에 한 답 하나에서 바뀐 것만: ${t.said}` : tr`이 답 하나에서 바뀐 것만`, kind: "turn" as const, when: ago(t.at / 1000) + (t.files ? " · " + tr`파일 ${t.files}` : "") })),
       // 커밋은 그 첫 부모와 견준다 (머지 커밋이면 머지로 들어온 것 전부가 보인다)
       ...commits.map(([sha, parents, subject, at]) => ({ key: "c:" + sha, from: parents.split(" ")[0] || null, to: sha, label: subject, title: `${subject} (${sha.slice(0, 8)})`, kind: "commit" as const, when: at ? ago(at) : "" })),
     ],
@@ -255,6 +258,15 @@ export default function Review({ places, known, sessions, onSay, onClose }: Prop
   };
   histToggle.current = toggleHist;
   const [whole, setWhole] = useState(false); // 바뀐 곳만이 아니라 파일 전체를 본다
+  const [wrap, setWrap] = useState(false); // 긴 줄을 접어서 본다
+  // 작업 폴더에 남아 있지만 이 세션이 만든 것이 아닌 변경. 파일 목록에는 섞지 않고 한 줄로만 알린다
+  const [dirty, setDirty] = useState<string[]>([]);
+  useEffect(() => {
+    setDirty([]);
+    if (!place) return;
+    void invoke<{ files: string[] } | null>("repo_changes", { path: place.cwd }).then((c) => setDirty((c?.files ?? []).filter((l) => !l.startsWith("??")).map((l) => l.slice(3).replace(/^.* -> /, "").replace(/^"|"$/g, ""))), () => {});
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [place?.cwd]);
   const [full, setFull] = useState<FileDiff | undefined>(undefined);
   const box = useRef<HTMLDivElement>(null);
   const body = useRef<HTMLDivElement>(null);
@@ -329,6 +341,7 @@ export default function Review({ places, known, sessions, onSay, onClose }: Prop
       setVerKey(versions[Math.min(versions.length - 1, Math.max(0, i + (e.key === "ArrowRight" ? -1 : 1)))].key);
     }
     else if (e.key === "f") setWhole(!whole);
+    else if (e.key === "w") setWrap(!wrap);
     else if (e.key === "h") toggleHist();
     else if (e.key === "n" || e.key === "p") {
       // 파일 전체를 볼 때 바뀐 곳 사이를 건너다닌다: 바뀐 줄 묶음의 첫 줄들 가운데 화면 아래(위)의 것으로
@@ -344,7 +357,20 @@ export default function Review({ places, known, sessions, onSay, onClose }: Prop
     e.stopPropagation();
   };
 
-  const brief = change?.brief;
+  // 브리핑은 "이 세션이 고친 것"을 읽고 쓴 것이다. 다른 판(답 하나, 커밋 하나)에는 붙이지 않는다.
+  // 다른 세션의 범위로 쓴 브리핑(같은 폴더를 여럿이 쓸 때)도 보여 주지 않는다
+  const brief = change?.brief && (placeAt !== 0 || !change.briefBy || !sessions || sessions.includes(change.briefBy)) ? change.brief : undefined;
+  // 짚은 곳과 눈여겨볼 곳을 한 목록으로. 같은 파일의 같은 이야기는 한 번만: 수준이 붙은 쪽(검토)을 남긴다
+  const spots = useMemo(() => {
+    const fileOf = (where: string) => where.replace(/:\d+.*$/, "").trim();
+    const out: { level: string; where: string; text: string }[] = [];
+    for (const f of brief?.found ?? []) if (!out.some((o) => o.where === f.where && o.text === f.what)) out.push({ level: f.level, where: f.where, text: f.what });
+    for (const w of brief?.watch ?? []) if (!out.some((o) => fileOf(o.where) === fileOf(w.where))) out.push({ level: "", where: w.where, text: w.why });
+    return out;
+  }, [brief]);
+  const [briefOpen, setBriefOpen] = useState<boolean | null>(null); // null: 짚은 곳이 있으면 펴고 없으면 접는다
+  const opened = briefOpen ?? spots.length > 0;
+  const others = ver.key === "all" ? dirty.filter((p) => !files.some((f) => f.path === p)) : [];
   // 커밋을 골랐으면 그 커밋의 메시지 전체를 위에 편다
   const [message, setMessage] = useState<[string, string] | null>(null);
   useEffect(() => {
@@ -397,30 +423,38 @@ export default function Review({ places, known, sessions, onSay, onClose }: Prop
             {message && message[1].includes("\n") && <div className="rv-msg-body">{message[1].split("\n").slice(1).join("\n").trim()}</div>}
           </div>
         )}
-        {brief && (ver.key === "all" || ver.key === (turns.length ? "t:" + turns[turns.length - 1].to : "")) && (
-          <div className="rv-brief">
-            <b>{brief.line}</b>
-            {brief.found?.map((f, i) => ( // level은 저장된 값이다 i18n-ok
-              <button key={"f" + i} type="button" tabIndex={-1} className={"rv-found l-" + (f.level === "버그" ? "bug" : f.level === "위험" ? "risk" : "ask")} onClick={() => jump(f.where)}>
-                <i>
-                  <em>{tr(f.level)}</em> {f.where}
-                </i>
-                {f.what}
-              </button>
-            ))}
-            {brief.found && brief.found.length > 0 && ( // 세션에 치는 말은 번역하지 않는다 i18n-ok
-              <button type="button" tabIndex={-1} className="rv-hand" onClick={() => (onSay(`[코드 검토] 다른 모델이 변경을 읽고 짚은 곳이다. 하나씩 맞는지 확인하고, 맞으면 고치고 틀리면 왜 틀린지 말해줘.\n\n${brief.found!.map((f) => `- ${f.level} · ${f.where}: ${f.what}`).join("\n")}`), setSent((n) => n + 1))}>
-                {tr`짚은 ${brief.found.length}곳을 세션에 넘겨 확인시키기`}
-              </button>
+        {brief && ver.key === "all" && (
+          <div className={"rv-brief2" + (opened ? " open" : "")}>
+            <button type="button" tabIndex={-1} className="rv-b-line" onClick={() => setBriefOpen(!opened)} title={opened ? tr`접기` : tr`펴기`}>
+              <i aria-hidden="true">{opened ? "▾" : "▸"}</i>
+              <span>{brief.line}</span>
+              {!opened && spots.length > 0 && <small>{tr`짚은 곳 ${spots.length}`}</small>}
+            </button>
+            {opened && (
+              <>
+                {spots.map((s, i) => ( // level은 저장된 값이다 i18n-ok
+                  <button key={i} type="button" tabIndex={-1} className="rv-spot" onClick={() => jump(s.where)} title={s.where}>
+                    <em className={"l-" + levelClass(s.level)}>{s.level ? tr(s.level) : tr`볼 곳`}</em>
+                    <b>{s.where.replace(/^.*\//, "")}</b>
+                    <span>{s.text}</span>
+                  </button>
+                ))}
+                {brief.found && brief.found.length === 0 && <span className="rv-b-note">{tr`검토 · 다른 모델이 읽었고 짚은 곳이 없다`}</span>}
+                {spots.length > 0 && ( // 세션에 치는 말은 번역하지 않는다 i18n-ok
+                  <button type="button" tabIndex={-1} className="rv-hand2" onClick={() => (onSay(`[코드 검토] 다른 모델이 변경을 읽고 짚은 곳이다. 하나씩 맞는지 확인하고, 맞으면 고치고 틀리면 왜 틀린지 말해줘.\n\n${spots.map((s) => `- ${s.level || "볼 곳"} · ${s.where}: ${s.text}`).join("\n")}`), setSent((n) => n + 1))}>
+                    {tr`짚은 ${spots.length}곳을 세션에 넘겨 확인시키기`}
+                  </button>
+                )}
+                {brief.unverified && <span className="rv-b-note">{tr`확인 안 된 것`} · {brief.unverified}</span>}
+              </>
             )}
-            {brief.found && brief.found.length === 0 && <span className="rv-clear">{tr`검토 · 다른 모델이 읽었고 짚은 곳이 없다`}</span>}
-            {brief.watch.map((w, i) => (
-              <button key={i} type="button" tabIndex={-1} onClick={() => jump(w.where)}>
-                <i>{w.where}</i>
-                {w.why}
-              </button>
-            ))}
-            {brief.unverified && <span className="rv-unv">{tr`확인 안 된 것`} · {brief.unverified}</span>}
+          </div>
+        )}
+        {ver.key !== "all" && change?.brief && <div className="rv-b-note">{tr`이 판의 브리핑은 없다. 브리핑은 "이 세션이 고친 것" 전체를 읽고 쓴다`}</div>}
+        {others.length > 0 && (
+          <div className="rv-b-note" title={others.join("\n")}>
+            {tr`작업 폴더에 남은 다른 변경 ${others.length}개`} · {others.slice(0, 3).map((p) => p.replace(/^.*\//, "")).join(", ")}
+            {others.length > 3 && " …"} · {tr`이 세션이 고친 것이 아니라 여기에 넣지 않았다`}
           </div>
         )}
       </div>
@@ -442,7 +476,7 @@ export default function Review({ places, known, sessions, onSay, onClose }: Prop
             </button>
           ))}
         </div>
-        <div className="rv-code" ref={body}>
+        <div className={"rv-code" + (wrap ? " wrap" : "")} ref={body}>
           {file && (
             <>
               <div className="rv-path">
@@ -453,6 +487,9 @@ export default function Review({ places, known, sessions, onSay, onClose }: Prop
                 <span className="rv-acts">
                   <button type="button" tabIndex={-1} className={"hs-kind" + (whole ? " on" : "")} title={tr`바뀐 곳만 보기와 파일 전체 보기를 오간다 (f)`} onClick={() => setWhole(!whole)}>
                     {whole ? tr`파일 전체` : tr`바뀐 곳만`}
+                  </button>
+                  <button type="button" tabIndex={-1} className={"hs-kind" + (wrap ? " on" : "")} title={tr`긴 줄을 접어서 보기와 옆으로 밀어 보기를 오간다 (w)`} onClick={() => setWrap(!wrap)}>
+                    {wrap ? tr`줄 접음` : tr`줄 안 접음`}
                   </button>
                 </span>
               </div>
@@ -548,7 +585,7 @@ export default function Review({ places, known, sessions, onSay, onClose }: Prop
         </div>
         )}
       </div>
-      <Hint text={tr`↑↓ 파일 · ←→ 이력에서 위아래로 · f 파일 전체 · h 이력 · n p 다음/이전 바뀐 곳 · 줄을 누르면 세션에게 말한다 · Esc`} />
+      <Hint text={tr`↑↓ 파일 · ←→ 이력에서 위아래로 · f 파일 전체 · w 줄 접기 · h 이력 · n p 다음/이전 바뀐 곳 · 줄을 누르면 세션에게 말한다 · Esc`} />
     </div>
   );
 }

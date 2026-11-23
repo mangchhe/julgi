@@ -85,7 +85,7 @@ export default function Sidebar({ open, items, threads, byId, states, tasks, cha
     <aside className="side">
       <div className="side-head">
         {/* 숫자는 아래 묶음 제목에 있다. 여기는 찾기 하나만 둔다 */}
-        <button type="button" className="side-search" onClick={onSearch} title={tr`세션·줄기·산출물 찾기, 새로 열기`}>
+        <button type="button" className="side-search" onClick={onSearch} aria-label={tr`세션·줄기·산출물 찾기, 새로 열기`}>
           <svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="7" cy="7" r="4.5" /><path d="M10.5 10.5 14 14" /></svg>
           <span>{tr`찾기`}</span>
           <kbd>⌘K</kbd>

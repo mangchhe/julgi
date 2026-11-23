@@ -134,8 +134,9 @@ export type Brief = { line: string; files: { path: string; what: string }[]; wat
 /** untracked0: 이 폴더를 처음 봤을 때 git이 모르던 파일 수. 그보다 늘어난 만큼만 새 파일로 센다 */
 /** by: 이 폴더에서 마지막으로 답을 끝낸 세션. 같은 폴더를 쓰는 세션이 여럿이어도 표시는 그 세션에만 붙인다 */
 /** turns: 답마다 찍어 둔 상태. from은 그 답을 시작할 때, to는 끝냈을 때의 커밋. "이번 답에서 바뀐 것"만 보는 데 쓴다 */
-export type Turn = { at: number; from: string; to: string; session: string };
-export type Change = { files: number; adds: number; dels: number; sig: string; at: number; by?: string; turns?: Turn[]; untracked0?: number; brief?: Brief; briefSig?: string };
+/** said: 그 답을 부른 내 말의 첫 줄. files: 그 답에서 바뀐 파일 수. 이력에서 이름으로 쓴다 */
+export type Turn = { at: number; from: string; to: string; session: string; said?: string; files?: number };
+export type Change = { files: number; adds: number; dels: number; sig: string; at: number; by?: string; turns?: Turn[]; untracked0?: number; brief?: Brief; briefSig?: string; /** briefBy: 브리핑이 다룬 세션. 그 세션의 첫 답 앞에서 지금까지를 읽고 쓴 것이다 */ briefBy?: string };
 
 /** 스킬을 한 번 부른 기록과 깔려 있는 스킬 */
 export type SkillUse = { skill: string; session: string; at: string };

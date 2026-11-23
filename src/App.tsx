@@ -25,6 +25,7 @@ import Work, { WorkGroup, WorkRow } from "./Work";
 import Usage from "./Usage";
 import TicketView from "./TicketView";
 import StartTicket, { promptOf } from "./StartTicket";
+import { parse as parseDiff } from "./CodeReview";
 import { TicketWork, firstKey, JiraConn, keyOfUrl, setKnownKeys, Ticket, TicketFull, TicketSeen, ticketNews, quietNews, BugJob, slugOf } from "./jira";
 import { prNo, isLab, newsOf, openPr, prOf, PrStatus, PrTarget, prUrl, repoName, ReviewAsk } from "./pr";
 import * as terms from "./terms";
@@ -868,11 +869,12 @@ export default function App() {
   const checkChanges = async (cwd: string, sessionId: string, before?: string, from?: string) => {
     const stat = await invoke<[number, number, number, string, number] | null>("repo_stat", { path: cwd }).catch(() => null);
     if (!stat) return;
-    const [tracked, adds, dels, sig, untracked] = stat;
+    const [tracked, adds0, dels0, sig, untracked] = stat;
+    let [adds, dels] = [adds0, dels0];
     const old = changesRef.current[cwd];
     // git이 모르는 파일은 처음 봤을 때 있던 만큼을 빼고 센다. 세션이 오기 전부터 놓여 있던 것까지 "바뀐 것"으로 치지 않으려는 것이다
     const untracked0 = old?.untracked0 ?? untracked;
-    const files = tracked + Math.max(0, untracked - untracked0);
+    let files = tracked + Math.max(0, untracked - untracked0);
     // 이 세션이 일하는 동안 변경이 달라졌을 때만 이 세션의 것으로 친다. 같은 폴더의 다른 세션이 답만 한 경우에는 표시를 옮기지 않는다
     const mine = before !== undefined && before !== sig;
     const by = mine ? sessionId : old?.by;
@@ -885,21 +887,40 @@ export default function App() {
     let turns = old?.turns ?? [];
     if (mine && from) {
       const to = await invoke<string | null>("repo_snapshot", { path: cwd, name: `${sessionId.slice(0, 8)}-${Date.now()}` }).catch(() => null);
-      if (to && to !== from) turns = [...turns, { at: Date.now(), from, to, session: sessionId }].slice(-12);
+      if (to && to !== from) {
+        // 이력에서 "몇 번 전 답" 대신 보여 줄 이름: 이 답을 부른 내 말의 첫 줄과, 이 답에서 바뀐 파일 수
+        const said = (await invoke<[string, string] | null>("last_exchange", { sessionId }).catch(() => null))?.[0]?.trim().split("\n")[0].slice(0, 80);
+        const one = await invoke<string | null>("repo_diff", { path: cwd, from, to, file: null }).catch(() => null);
+        turns = [...turns, { at: Date.now(), from, to, session: sessionId, said, files: one ? parseDiff(one).length : undefined }].slice(-12);
+      }
     }
-    if (old?.sig !== sig || old.files !== files || old.by !== by || turns !== (old?.turns ?? [])) save({ ...old, files, adds, dels, sig, untracked0, by, turns, at: Date.now() });
-    if (!config.brief || !files || changesRef.current[cwd]?.briefSig === sig || briefing.current.has(cwd)) return;
+    // 세는 범위를 코드 검토의 "이 세션이 고친 것"과 맞춘다: 그 세션의 첫 답 앞에서 지금까지.
+    // 기본 브랜치와 견준 값을 그대로 쓰면 세션이 커밋한 것은 빠지고, 세션과 상관없이 남아 있던 변경이 들어간다
+    const first = by ? turns.find((t) => t.session === by)?.from : undefined;
+    const scope = first ? await invoke<string | null>("repo_diff", { path: cwd, from: first, to: null, file: null }).catch(() => null) : null;
+    if (scope !== null) {
+      const parts = parseDiff(scope);
+      files = parts.length + Math.max(0, untracked - untracked0);
+      adds = parts.reduce((n, f) => n + f.adds, 0);
+      dels = parts.reduce((n, f) => n + f.dels, 0);
+    }
+    // 브리핑은 변경이 달라졌거나 답이 하나 더 쌓였을 때 새로 쓴다
+    const briefSig = `${sig}|${turns[turns.length - 1]?.to ?? ""}`;
+    if (old?.sig !== sig || old.files !== files || old.adds !== adds || old.dels !== dels || old.by !== by || turns !== (old?.turns ?? [])) save({ ...old, files, adds, dels, sig, untracked0, by, turns, at: Date.now() });
+    if (!config.brief || !files || changesRef.current[cwd]?.briefSig === briefSig || briefing.current.has(cwd)) return;
     briefing.current.add(cwd);
     try {
-      const found = await invoke<{ diff: string; files: string[]; commits: string[] } | null>("repo_changes", { path: cwd });
+      const all = await invoke<{ diff: string; files: string[]; commits: string[] } | null>("repo_changes", { path: cwd });
+      // 세션의 범위를 알면 그 변경만 읽힌다. 모르면(Julgi가 지켜보기 전의 세션) 전처럼 기본 브랜치와 견준 것을 읽힌다
+      const found = scope !== null && all ? { ...all, diff: scope.slice(0, 120_000), files: parseDiff(scope).map((f) => f.path) } : all;
       if (!found?.diff && !found?.files.length) return;
       const reply = (await invoke<string | null>("last_reply", { sessionId }).catch(() => null)) ?? "";
-      const prompt = `세션의 마지막 답:\n${reply.slice(0, 2500)}\n\n커밋하지 않은 파일:\n${found.files.slice(0, 60).join("\n")}\n\n쌓은 커밋:\n${found.commits.slice(0, 20).join("\n") || "(없음)"}\n\n변경 내용:\n${found.diff.slice(0, 60_000)}\n`; // i18n-ok
+      const prompt = `세션의 마지막 답:\n${reply.slice(0, 2500)}\n\n${scope !== null ? "이 세션이 바꾼 파일" : "커밋하지 않은 파일"}:\n${found.files.slice(0, 60).join("\n")}\n\n쌓은 커밋:\n${found.commits.slice(0, 20).join("\n") || "(없음)"}\n\n변경 내용:\n${found.diff.slice(0, 60_000)}\n`; // i18n-ok
       const raw = (await invoke<string | null>("route_ask", { system: BRIEF_SYSTEM, prompt, model: modelFor("brief") })) ?? "";
       const brief = JSON.parse(raw.slice(raw.indexOf("{"), raw.lastIndexOf("}") + 1)) as Brief;
       if (!brief.line) return;
       const kept = { line: brief.line, files: brief.files ?? [], watch: brief.watch ?? [], unverified: brief.unverified ?? "" };
-      save({ ...changesRef.current[cwd], brief: kept, briefSig: sig });
+      save({ ...changesRef.current[cwd], brief: kept, briefSig, briefBy: scope !== null ? by : undefined });
       // 걸러 읽기: 더 큰 모델이 세션의 설명 없이 변경만 보고 틀린 곳을 짚는다. 몇 줄 안 되는 변경에는 하지 않는다
       if (!config.check || adds + dels < 15 || !found.diff) return;
       const checked = (await invoke<string | null>("route_ask", { system: CHECK_SYSTEM, prompt: `변경 내용:\n${found.diff.slice(0, 60_000)}\n`, model: modelFor("check") })) ?? ""; // i18n-ok
@@ -908,7 +929,7 @@ export default function App() {
         .slice(0, 6)
         .map((f) => ({ where: String(f.where), level: ["버그", "위험", "의문"].includes(f.level ?? "") ? String(f.level) : "의문", what: String(f.what) })); // i18n-ok
       // 그사이 변경이 또 달라졌으면 옛 검토를 붙이지 않는다
-      if (changesRef.current[cwd]?.briefSig !== sig) return;
+      if (changesRef.current[cwd]?.briefSig !== briefSig) return;
       save({ ...changesRef.current[cwd], brief: { ...kept, found: spots } });
       if (spots.length) record("검토", tr`"${nameOf(live.current.open.find((o) => o.sessionId === sessionId)?.key ?? "")}"의 변경에서 ${spots.length}곳을 짚음: ${spots.map((f) => `${f.level} ${f.where}`).join(", ").slice(0, 160)}`, sessionId); // i18n-ok
     } catch {

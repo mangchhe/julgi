@@ -112,8 +112,8 @@ async function invoke(cmd: string, args: Record<string, unknown> = {}): Promise<
           [first.cwd]: {
             files: 2, adds: 14, dels: 2, sig: "s", briefSig: "s", by: first.id, at: now,
             turns: [
-              { at: now - 40 * 60_000, from: "aaaaaaa1", to: "aaaaaaa2", session: first.id },
-              { at: now - 3 * 60_000, from: "aaaaaaa2", to: "aaaaaaa3", session: first.id },
+              { at: now - 40 * 60_000, from: "aaaaaaa1", to: "aaaaaaa2", session: first.id, said: "쿠폰 여러 장일 때 환불액 1원 어긋나는 것 고쳐줘", files: 1 },
+              { at: now - 3 * 60_000, from: "aaaaaaa2", to: "aaaaaaa3", session: first.id, said: "테스트도 추가해 줘", files: 2 },
             ],
             brief: {
               line: "쿠폰이 여러 장일 때 환불액이 1원 어긋나던 것을 쿠폰별 반올림으로 고치고, 환불액이 음수면 예외를 던지게 했다.",
