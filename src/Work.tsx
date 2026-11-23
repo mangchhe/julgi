@@ -1,6 +1,6 @@
 import Hint from "./Hint";
 import { tr } from "./i18n";
-import { ReactNode, useEffect, useMemo, useRef, useState } from "react";
+import { Fragment, ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import { CATEGORY, Ticket, TicketWork } from "./jira";
 import PrView from "./PrView";
 import { ago } from "./model";
@@ -26,6 +26,8 @@ export type WorkRow = {
 export type WorkGroup = { id: string; title: string; hint: string; rows: WorkRow[] };
 
 /** 티켓 묶음: JQL 하나 */
+/** Jira의 종류 이름으로 버그인지 본다. 이름은 Jira 언어를 따른다 */
+const isBug = (t: Ticket) => /bug|defect|버그|결함|오류|バグ|缺陷/i.test(t.type); // i18n-ok
 export type TicketGroup = { id: string; title: string; hint: string; jql: string };
 
 type Props = {
@@ -87,7 +89,8 @@ export default function Work({ groups, ticketGroups = [], loadTickets, ticketPan
   const tickets = tgroup ? ticketRows[tgroup.id] : undefined;
   // 티켓마다 지금 할 일을 붙이고, 내가 손댈 것이 위로 오게 세운다. 같은 차례 안에서는 Jira가 준 순서 그대로
   const works = useMemo(() => new Map((Array.isArray(tickets) ? tickets : []).map((t) => [t.key, ticketWork?.(t)])), [tickets, ticketWork]);
-  const tlist = useMemo(() => (Array.isArray(tickets) ? tickets.map((t, i) => ({ t, i })).sort((a, b) => (works.get(a.t.key)?.rank ?? 9) - (works.get(b.t.key)?.rank ?? 9) || a.i - b.i).map((x) => x.t) : []), [tickets, works]);
+  const tlist = useMemo(() => (Array.isArray(tickets) ? tickets.map((t, i) => ({ t, i })).sort((a, b) => Number(isBug(b.t)) - Number(isBug(a.t)) || (works.get(a.t.key)?.rank ?? 9) - (works.get(b.t.key)?.rank ?? 9) || a.i - b.i).map((x) => x.t) : []), [tickets, works]);
+  const mixed = tlist.some(isBug) && !tlist.every(isBug);
   const rows = group?.rows ?? [];
   const at = tgroup ? Math.max(0, tlist.findIndex((t) => t.key === picked)) : Math.max(0, rows.findIndex((r) => idOf(r.target) === picked));
   const row = tgroup ? undefined : rows[at];
@@ -186,8 +189,12 @@ export default function Work({ groups, ticketGroups = [], loadTickets, ticketPan
         {tgroup && typeof tickets === "string" && <div className="side-none">{tickets}</div>}
         {tgroup && Array.isArray(tickets) && !tickets.length && <div className="side-none">{tr`이 묶음은 비었다`}</div>}
         {tlist.map((t, i) => (
-          <button key={t.key} type="button" tabIndex={-1} className={"wk-row" + (i === at ? " on" : "")} onClick={() => pick(i)} onDoubleClick={enterPr}>
+          <Fragment key={t.key}>
+          {/* 버그와 나머지를 나눠 세운다. 둘 다 있을 때만 머리글을 단다 */}
+          {mixed && (i === 0 || isBug(t) !== isBug(tlist[i - 1])) && <div className="wk-sec">{isBug(t) ? tr`버그` : tr`기능·작업`} <small>{tlist.filter((x) => isBug(x) === isBug(t)).length}</small></div>}
+          <button type="button" tabIndex={-1} className={"wk-row" + (i === at ? " on" : "")} onClick={() => pick(i)} onDoubleClick={enterPr}>
             <span className="wk-row-title">
+              {t.type && <span className={"wk-type" + (isBug(t) ? " bug" : "")}>{t.type}</span>}
               <em>{t.key}</em> {t.title}
             </span>
             {works.get(t.key) && (
@@ -200,12 +207,12 @@ export default function Work({ groups, ticketGroups = [], loadTickets, ticketPan
             <span className="wk-row-meta">
               {ticketNews[t.key] && <b className="loud">{ticketNews[t.key]} · </b>}
               {CATEGORY[t.statusCategory] ? `${t.status}` : t.status}
-              {t.type && ` · ${t.type}`}
               {t.priority && ` · ${t.priority}`}
               {` · ${t.assignee || tr`담당 없음`}`}
               {t.updated && ` · ${ago(Date.parse(t.updated) / 1000)}`}
             </span>
           </button>
+          </Fragment>
         ))}
         {!tgroup && !rows.length && <div className="side-none">{total ? tr`이 묶음은 비었다` : tr`챙기는 PR이 없다. ⌘,의 연결에서 GitHub를 연결하고 챙길 범위를 고른다`}</div>}
         {rows.map((r, i) => (

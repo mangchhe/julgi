@@ -20,4 +20,5 @@ export default {
   "⌘Enter 세션에 리뷰 맡기기": "⌘Enter hand the review to a session",
   "⌘Enter 이 티켓으로 시작": "⌘Enter start from this ticket",
   "o 브라우저에서 열기 · r 새로 읽기 · Esc 닫기": "o open in the browser · r reload · Esc close",
+  "기능·작업": "Features and tasks",
 } as Record<string, string>;

@@ -1177,3 +1177,9 @@ body.dragging .pane-body { pointer-events: none; }
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb { background: color-mix(in srgb, var(--muted) 35%, transparent); border: 3px solid transparent; background-clip: padding-box; border-radius: 999px; }
 ::-webkit-scrollbar-thumb:hover { background: color-mix(in srgb, var(--muted) 60%, transparent); background-clip: padding-box; border: 3px solid transparent; }
+
+/* 티켓 종류: 줄 앞의 꼬리표와 버그/나머지 머리글 */
+.wk-type { display: inline-block; margin-right: 6px; padding: 0 6px; border-radius: 5px; font-size: 11px; font-weight: 600; line-height: 17px; vertical-align: 1px; color: var(--muted); background: var(--surface); }
+.wk-type.bug { color: var(--wait); background: color-mix(in srgb, var(--wait) 14%, transparent); }
+.wk-sec { padding: 10px 11px 4px; font-size: 11.5px; font-weight: 600; color: var(--muted); }
+.wk-sec small { font-weight: 400; opacity: 0.7; }
