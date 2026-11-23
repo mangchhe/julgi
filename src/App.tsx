@@ -1361,6 +1361,13 @@ export default function App() {
       }
       terms.create({ key, cwd: target.cwd, command: withPrompt(newCommand(id), await outbox(text)) });
       setOpen((list) => [...list, { key, label: message.split("\n")[0].slice(0, 40), cwd: target.cwd, sessionId: id }]);
+      // 글에 티켓 키가 있으면 이 세션을 그 티켓에 잇는다. 안 이으면 티켓이 "시작 안 함"으로 남아 세션을 또 만들게 된다
+      const ticket = config.jiraSite ? firstKey(message) : undefined;
+      if (ticket) {
+        const links = { ...live.current.ticketLinks, [id]: ticket };
+        setTicketLinks(links);
+        void invoke("data_write", { name: "tickets.json", text: JSON.stringify(links) });
+      }
       terms.wake(key);
       // 한 번도 안 써 본 폴더면 Claude Code가 폴더를 믿느냐고 물을 것이라, 오래 기다리지 않고 꺼내 보인다
       watch(key, message, live.current.sessions.some((s) => s.cwd === target.cwd) || target.cwd === live.current.base || mapState.current.repos.some((r) => r.cwd === target.cwd) ? 15_000 : 3000);
@@ -1829,6 +1836,19 @@ export default function App() {
     const name = kind === "pr" ? config.jiraPrTransition : config.jiraMergeTransition;
     if (!key || !name.trim()) return;
     setOffer({ text: kind === "pr" ? tr`PR이 올라왔다 (#${pr.number}). ${key}을 ${name}로 옮길까?` : tr`PR이 머지됐다 (#${pr.number}). ${key}을 ${name}로 옮길까?`, yes: tr`${name}로 옮기기`, run: () => void moveTicket(key, name) });
+  };
+  /** "이 티켓으로 시작"을 눌렀다. 이미 이 티켓을 하던 세션이 있으면 그 세션을 보여 주고, 새로 만들지는 한 번 묻는다 */
+  const beginTicket = (t: TicketFull) => {
+    const had = ticketWork(t as unknown as Ticket);
+    if (!had.session) return setStartTicket(t);
+    setStartTicket(null);
+    setTicketShown(null);
+    setOverlay(null);
+    // 칸에 열려 있으면 그 칸으로, 닫혀 있으면 다시 연다
+    const closed = live.current.open.some((o) => o.key === had.session) ? undefined : live.current.byId.get(had.session.replace(/^c:/, ""));
+    if (closed) openSession(closed);
+    else show(had.session);
+    setOffer({ text: tr`${t.key}을 하던 세션이 있어 그 세션을 열었다 (${had.sessionName ?? ""}). 그래도 새로 시작할까?`, yes: tr`새 세션으로 시작`, run: () => setStartTicket(t) });
   };
   /** 이 티켓으로 시작: 워크트리 + 브랜치를 따고, 첫 지시를 들려 새 세션을 띄우고, 세션과 티켓을 잇는다 */
   const startFromTicket = async (t: TicketFull, o: { cwd: string; repo: string; branch: string; prompt: string; transition: boolean }) => {
@@ -2761,7 +2781,7 @@ export default function App() {
           })}
           onTicket={(key) => (setTicketShown(key), setTicketNews(({ [key]: _, ...rest }) => rest))}
           onStartTicket={(key) => {
-            void invoke<TicketFull>("jira_view", { conn: jiraConn(), key }).then(setStartTicket, (e) => say(String(e).slice(0, 100)));
+            void invoke<TicketFull>("jira_view", { conn: jiraConn(), key }).then(beginTicket, (e) => say(String(e).slice(0, 100)));
           }}
           onView={(a) => {
             // 내 PR을 열어 봤으면 그 일은 본 것이다
@@ -2877,7 +2897,7 @@ export default function App() {
           ticketNews={ticketNewsMap}
           ticketWork={ticketWork}
           onShowSession={(key) => (setOverlay(null), show(key))}
-          onStartTicket={(key) => void invoke<TicketFull>("jira_view", { conn: jiraConn(), key }).then(setStartTicket, (e) => say(String(e).slice(0, 100)))}
+          onStartTicket={(key) => void invoke<TicketFull>("jira_view", { conn: jiraConn(), key }).then(beginTicket, (e) => say(String(e).slice(0, 100)))}
           ticketPane={(key) => (
             <TicketView
               key={key}
@@ -2886,7 +2906,7 @@ export default function App() {
               inline
               autoFocus={false}
               onClose={() => document.querySelector<HTMLElement>(".wk")?.focus()}
-              onStart={setStartTicket}
+              onStart={beginTicket}
               sessions={Object.entries(ticketLinks)
                 .filter(([, k]) => k === key)
                 .map(([id]) => ({ id, name: names[id] || byId.get(id)?.title || tr("세션") }))}
@@ -2921,7 +2941,7 @@ export default function App() {
           ticketKey={ticketShown}
           conn={jiraConn()}
           onClose={() => setTicketShown(null)}
-          onStart={setStartTicket}
+          onStart={beginTicket}
           sessions={Object.entries(ticketLinks)
             .filter(([, k]) => k === ticketShown)
             .map(([id]) => ({ id, name: names[id] || byId.get(id)?.title || tr("세션") }))}

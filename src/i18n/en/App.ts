@@ -175,4 +175,6 @@ export default {
   "닫고 다시 묻지 않기": "Close and don't ask again",
   "취소": "Cancel",
   "티켓에 붙은 그림이다. 시작하기 전에 읽어 본다:": "Images attached to the ticket. Read them before you start:",
+  "{0}을 하던 세션이 있어 그 세션을 열었다 ({1}). 그래도 새로 시작할까?": "A session was already working on {0}, so it was opened ({1}). Start a new one anyway?",
+  "새 세션으로 시작": "Start a new session",
 } as Record<string, string>;
