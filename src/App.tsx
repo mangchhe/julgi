@@ -163,6 +163,16 @@ export default function App() {
   }, [ticketNewsMap]);
   const jiraSeen = useRef<Record<string, TicketSeen>>({});
   const [ticketLinks, setTicketLinks] = useState<Record<string, string>>({}); // 세션 ID → 티켓 키
+  const [ticketDone, setTicketDone] = useState<Record<string, string>>({}); // 끝난(완료·거부) 티켓 키 → 상태 이름. 한 번 알린 것은 다시 알리지 않는다
+  const doneRef = useRef<Record<string, string>>({});
+  useEffect(() => {
+    void invoke<string | null>("data_read", { name: "jira-done.json" }).then((t) => {
+      try {
+        if (t) (doneRef.current = JSON.parse(t)), setTicketDone(doneRef.current);
+      } catch {}
+    });
+  }, []);
+  const endWhenIdle = useRef(new Set<string>()); // 끝낸 줄기의 칸 가운데 아직 답하는 중이라 못 닫은 것
   const refreshTickets = useRef((_keys = false) => {});
   // 화면 아래에 뜨는 한 번 묻기 (예: PR이 올라왔으니 티켓을 In Review로 옮길까?)
   const [offer, setOffer] = useState<{ text: string; yes: string; run: () => void } | null>(null);
@@ -1467,9 +1477,16 @@ export default function App() {
       ? { ...mine, done: !mine.done }
       : { id: crypto.randomUUID(), name: live.current.byId.get(sessionId)?.title ?? tr("줄기"), sessions: [sessionId], created: Date.now(), done: true };
     saveThreads([...all.filter((t) => t !== mine), next]);
-    if (!next.done) return say(tr("줄기를 다시 살렸다."));
+    if (!next.done) {
+      for (const o of live.current.open) endWhenIdle.current.delete(o.key);
+      return say(tr("줄기를 다시 살렸다."));
+    }
     for (const o of live.current.open)
-      if (o.sessionId && next.sessions.includes(o.sessionId) && live.current.states[o.key]?.state !== "run") close(o.key);
+      if (o.sessionId && next.sessions.includes(o.sessionId)) {
+        // 답하는 중인 칸(julgi done을 부른 세션 자신)은 답이 끝나면 닫는다
+        if (live.current.states[o.key]?.state === "run") endWhenIdle.current.add(o.key);
+        else close(o.key);
+      }
     if (quiet) return; // 점검이 한 것은 점검 기록에 남긴다
     record("끝냄", tr`"${next.name.slice(0, 40)}" · 목록에서 내림`, sessionId); // i18n-ok
     say(tr("줄기를 끝냈다. 목록에서 내렸고 ⌘K로는 계속 찾는다."));
@@ -1496,6 +1513,11 @@ export default function App() {
     for (const o of open) {
       const was = lastStates.current[o.key]?.state;
       const is = states[o.key]?.state;
+      if (endWhenIdle.current.has(o.key) && is !== "run") {
+        endWhenIdle.current.delete(o.key);
+        close(o.key);
+        continue;
+      }
       // 일하다가 내 차례가 됐는데 내가 Julgi를 안 보고 있으면 알린다. 갈아타는 중의 인계 글은 내가 볼 것이 아니라 뺀다
       if (config.notify && was === "run" && (is === "wait" || is === "ask" || is === "stuck") && !document.hasFocus() && !handing.includes(o.key))
       {
@@ -1837,6 +1859,41 @@ export default function App() {
     if (!key || !name.trim()) return;
     setOffer({ text: kind === "pr" ? tr`PR이 올라왔다 (#${pr.number}). ${key}을 ${name}로 옮길까?` : tr`PR이 머지됐다 (#${pr.number}). ${key}을 ${name}로 옮길까?`, yes: tr`${name}로 옮기기`, run: () => void moveTicket(key, name) });
   };
+  /**
+   * 열려 있는 세션에 이어진 티켓이 끝났는지(완료·거부 등 Done 범주) 본다. 내 티켓 목록은 안 끝난 것만 주므로 따로 묻는다.
+   * 끝났으면 세션에 표시하고, 한 번 알리고, 세션을 끝낼지 묻는다. alive: 방금 받은 안 끝난 티켓들
+   */
+  const checkEnded = async (alive: Set<string>) => {
+    const { open, threads } = live.current;
+    const held = new Map<string, string>(); // 티켓 키 → 세션 ID
+    for (const o of open) {
+      const key = ticketOfSession(o.sessionId);
+      if (!key || !o.sessionId || alive.has(key) || doneRef.current[key] || held.has(key)) continue;
+      if (threads.find((t) => t.sessions.includes(o.sessionId!))?.done) continue;
+      held.set(key, o.sessionId);
+    }
+    if (!held.size) return;
+    const ended = await invoke<Ticket[]>("jira_search", { conn: jiraConn(), jql: `key in (${[...held.keys()].join(", ")}) AND statusCategory = Done`, limit: 50 }).catch(() => []);
+    if (!ended.length) return;
+    const next = { ...doneRef.current };
+    for (const t of ended) {
+      const sessionId = held.get(t.key);
+      if (!sessionId) continue;
+      next[t.key] = t.status;
+      record("티켓", tr`${t.key}이 끝났다 (${t.status}). 이어진 세션이 열려 있다`, sessionId); // i18n-ok
+      if (config.notify && !document.hasFocus()) void invoke("notify", { title: tr`${t.key} · 티켓 끝남 · ${t.status}`, body: t.title.slice(0, 80) });
+      setOffer({
+        text: tr`${t.key}이 끝났다 (${t.status}). 이어진 세션을 끝낼까?`,
+        yes: tr`세션 끝내기`,
+        run: () => {
+          if (!live.current.threads.find((x) => x.sessions.includes(sessionId))?.done) finishThread(sessionId);
+        },
+      });
+    }
+    doneRef.current = next;
+    setTicketDone(next);
+    void invoke("data_write", { name: "jira-done.json", text: JSON.stringify(next) });
+  };
   /** "이 티켓으로 시작"을 눌렀다. 이미 이 티켓을 하던 세션이 있으면 그 세션을 보여 주고, 새로 만들지는 한 번 묻는다 */
   const beginTicket = (t: TicketFull) => {
     const had = ticketWork(t as unknown as Ticket);
@@ -1938,8 +1995,8 @@ export default function App() {
     // i18n-on
     void dispatch({ kind: "new", cwd }, ask, { rank: 0, by: "리뷰 요청" }); // i18n-ok
   };
-  const actions = useRef({ readUsage, publishRemote, say, dispatch, show, close, sleep, requestQuit, handoff, exited, newSession, newShell, nextWaiting, openTerm, resize, split, unsplit, finishThread, move, togglePin, tend, triage, serve, confirmClose, toggleReview, prNotice, askNotice, mineNotice, sleepNotice, wake, ticketNotice, ticketOffer });
-  actions.current = { readUsage, publishRemote, say, dispatch, show, close, sleep, requestQuit, handoff, exited, newSession, newShell, nextWaiting, openTerm, resize, split, unsplit, finishThread, move, togglePin, tend, triage, serve, confirmClose, toggleReview, prNotice, askNotice, mineNotice, sleepNotice, wake, ticketNotice, ticketOffer };
+  const actions = useRef({ readUsage, publishRemote, say, dispatch, show, close, sleep, requestQuit, handoff, exited, newSession, newShell, nextWaiting, openTerm, resize, split, unsplit, finishThread, move, togglePin, tend, triage, serve, confirmClose, toggleReview, prNotice, askNotice, mineNotice, sleepNotice, wake, ticketNotice, ticketOffer, checkEnded });
+  actions.current = { readUsage, publishRemote, say, dispatch, show, close, sleep, requestQuit, handoff, exited, newSession, newShell, nextWaiting, openTerm, resize, split, unsplit, finishThread, move, togglePin, tend, triage, serve, confirmClose, toggleReview, prNotice, askNotice, mineNotice, sleepNotice, wake, ticketNotice, ticketOffer, checkEnded };
 
   /** 세션이 남긴 링크 가운데 마지막 PR */
   const prOfSession = (id?: string) => {
@@ -2097,6 +2154,7 @@ export default function App() {
       const list = await invoke<Ticket[]>("jira_mine", { conn: jiraConn() }).catch(() => null);
       if (!list) return;
       setTickets(list);
+      void actions.current.checkEnded(new Set(list.map((t) => t.key)));
       const first = Object.keys(jiraSeen.current).length === 0;
       const next: Record<string, TicketSeen> = {};
       for (const t of list) {
@@ -2653,6 +2711,7 @@ export default function App() {
           ticketOf={(key) => {
             const tk = ticketOfSession(open.find((o) => o.key === key)?.sessionId);
             if (!tk) return undefined;
+            if (ticketDone[tk]) return { key: tk, status: "", news: tr`티켓 끝남 · ${ticketDone[tk]}` };
             return { key: tk, status: tickets.find((t) => t.key === tk)?.status ?? "", news: ticketNewsMap[tk] };
           }}
           work={{ prs: minePrs.length, asks: asks.length, news: Object.keys(mineNews).length + Object.keys(prNews).length + Object.keys(sleepNews).length }}
@@ -2693,6 +2752,10 @@ export default function App() {
                 info={info && focus === i}
                 finding={finding && focus === i}
                 handing={!!key && handing.includes(key)}
+                ticketEnded={(() => {
+                  const tk = ticketOfSession(o?.sessionId);
+                  return tk && ticketDone[tk] && !threadOf(o?.sessionId)?.done ? tr`티켓 끝남 · ${ticketDone[tk]}` : undefined;
+                })()}
                 pinned={!!key && pinned.includes(key)}
                 change={o && changes[o.cwd]?.by === o.sessionId ? changes[o.cwd] : undefined}
                 review={

@@ -6,6 +6,8 @@ import { Change, hot, kilo, repoOf, Session, STATE_LABEL, Thread } from "./model
 import * as terms from "./terms";
 
 type Props = {
+  /** 이 세션의 티켓이 끝났으면 그 사실("티켓 끝남 · 거부"). 누르면 세션을 끝낸다 */
+  ticketEnded?: string;
   termKey: string | null;
   focused: boolean;
   /** 찾기 상자가 떠 있는 동안은 터미널이 포커스를 가져가지 않는다 */
@@ -34,7 +36,7 @@ type Props = {
   onFocus: () => void;
 };
 
-export default function Pane({ termKey, focused, active, label, cwd, session, thread, memory, state, members, thread_ops, info, finding, handing, pinned, change, review, onPin, onFindClose, onFocus }: Props) {
+export default function Pane({ termKey, focused, active, label, cwd, session, thread, memory, state, members, thread_ops, info, finding, handing, pinned, change, review, ticketEnded, onPin, onFindClose, onFocus }: Props) {
   const body = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -76,6 +78,11 @@ export default function Pane({ termKey, focused, active, label, cwd, session, th
                 {pinned ? tr`고정됨` : tr`고정`}
               </button>
               {handing && <span className="wait">{tr`갈아타는 중`}</span>}
+              {ticketEnded && (
+                <span className="wait ended" title={tr`세션 끝내기`} onClick={(e) => (e.stopPropagation(), thread_ops.finish())}>
+                  {ticketEnded} ✕
+                </span>
+              )}
               {!handing && STATE_LABEL[state] && <span className={state}>{STATE_LABEL[state]}</span>}
               {tokens > 0 && <span className={"tok" + (hot(tokens) ? " hot" : "")}>{kilo(tokens)}</span>}
             </span>

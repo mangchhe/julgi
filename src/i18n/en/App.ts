@@ -177,4 +177,9 @@ export default {
   "티켓에 붙은 그림이다. 시작하기 전에 읽어 본다:": "Images attached to the ticket. Read them before you start:",
   "{0}을 하던 세션이 있어 그 세션을 열었다 ({1}). 그래도 새로 시작할까?": "A session was already working on {0}, so it was opened ({1}). Start a new one anyway?",
   "새 세션으로 시작": "Start a new session",
+  "{0}이 끝났다 ({1}). 이어진 세션이 열려 있다": "{0} is finished ({1}). Its session is still open",
+  "{0} · 티켓 끝남 · {1}": "{0} · ticket finished · {1}",
+  "{0}이 끝났다 ({1}). 이어진 세션을 끝낼까?": "{0} is finished ({1}). End its session?",
+  "세션 끝내기": "End session",
+  "티켓 끝남 · {0}": "Ticket finished · {0}",
 } as Record<string, string>;
