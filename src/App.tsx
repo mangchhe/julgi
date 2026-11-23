@@ -32,7 +32,7 @@ import { TicketWork, firstKey, JiraConn, keyOfUrl, setKnownKeys, Ticket, TicketF
 import { prNo, isLab, newsOf, openPr, prOf, PrStatus, PrTarget, prUrl, repoName, ReviewAsk } from "./pr";
 import * as terms from "./terms";
 import { rank } from "./route";
-import { Brief, Change, Job, Progress, MAX_PARALLEL, setMapDirs, setPrefs, markAuto, isAuto, autoList, STATE_LABEL, replied, ago, Item, modelFor, SkillInfo, SkillUse, aboutOf, buildFolders, buildItems, aliveElsewhere, config, elsewhere, enrich, markSlept, setAlive, handoffCommand, Ledger, Merge, mergeCandidates, mergeKey, newCommand, Open, repoOf, resumeCommand, Session, TermState, Thread, waiting, withPrompt } from "./model";
+import { Brief, Change, Job, Progress, MAX_PARALLEL, turnStart, setMapDirs, setPrefs, markAuto, isAuto, autoList, STATE_LABEL, replied, ago, Item, modelFor, SkillInfo, SkillUse, aboutOf, buildFolders, buildItems, aliveElsewhere, config, elsewhere, enrich, markSlept, setAlive, handoffCommand, Ledger, Merge, mergeCandidates, mergeKey, newCommand, Open, repoOf, resumeCommand, Session, TermState, Thread, waiting, withPrompt } from "./model";
 import { selftest } from "./selftest";
 import { tr } from "./i18n";
 import "./App.css";
@@ -305,6 +305,7 @@ export default function App() {
   const tasksRef = useRef<Job[]>([]);
   const changesRef = useRef<Record<string, Change>>({});
   const turnSig = useRef<Record<string, string>>({});
+  const turnAt = useRef<Record<string, number>>({}); // 폴더|세션 → 그 답을 시작한 때
   const turnFrom = useRef<Record<string, string>>({}); // 세션이 일을 시작할 때 찍어 둔 상태 // 세션이 일을 시작할 때의 폴더 변경 상태
   const briefing = useRef(new Set<string>()); // 브리핑을 만드는 중인 폴더
   const movedFrom = useRef({ said: "", name: "" }); // 옮기려는 말이 원래 간 곳
@@ -941,12 +942,19 @@ export default function App() {
         // 이력에서 "몇 번 전 답" 대신 보여 줄 이름: 이 답을 부른 내 말의 첫 줄과, 이 답에서 바뀐 파일 수
         const said = (await invoke<[string, string] | null>("last_exchange", { sessionId }).catch(() => null))?.[0]?.trim().split("\n")[0].slice(0, 80);
         const one = await invoke<string | null>("repo_diff", { path: cwd, from, to, file: null }).catch(() => null);
-        turns = [...turns, { at: Date.now(), from, to, session: sessionId, said, files: one ? parseDiff(one).length : undefined }].slice(-12);
+        turns = [...turns, { at: Date.now(), start: turnAt.current[`${cwd}|${sessionId}`], from, to, session: sessionId, said, files: one ? parseDiff(one).length : undefined }].slice(-12);
       }
     }
     // 세는 범위를 코드 검토의 "이 세션이 고친 것"과 맞춘다: 그 세션의 첫 답 앞에서 지금까지.
     // 기본 브랜치와 견준 값을 그대로 쓰면 세션이 커밋한 것은 빠지고, 세션과 상관없이 남아 있던 변경이 들어간다
-    const first = by ? turns.find((t) => t.session === by)?.from : undefined;
+    const firstTurn = by ? turns.find((t) => t.session === by) : undefined;
+    let first = firstTurn?.from;
+    // 그 뒤로 폴더가 다른 브랜치로 옮겨 갔으면(다른 터미널에서 바꿨을 때) 찍어 둔 답들은 더 못 쓴다.
+    // 그대로 견주면 브랜치끼리의 차이가 이 세션이 고친 것처럼 나온다. 그 답들을 버리고 전처럼 기본 브랜치와 견준다
+    if (first && firstTurn && (await invoke<boolean>("repo_moved", { path: cwd, from: first, since: turnStart(firstTurn) }).catch(() => false))) {
+      turns = turns.filter((t) => t.session !== by);
+      first = undefined;
+    }
     const scope = first ? await invoke<string | null>("repo_diff", { path: cwd, from: first, to: null, file: null }).catch(() => null) : null;
     if (scope !== null) {
       const parts = parseDiff(scope);
@@ -1634,6 +1642,7 @@ export default function App() {
       if (was !== "run" && is === "run") {
         const key = o.key;
         void invoke<[number, number, number, string, number] | null>("repo_stat", { path: o.cwd }).then((stat) => void (turnSig.current[key] = stat?.[3] ?? ""), () => {});
+        if (o.sessionId) turnAt.current[`${o.cwd}|${o.sessionId}`] = Date.now();
         // 그리고 그 순간을 찍어 둔다. 끝났을 때의 것과 견주면 이번 답에서 바뀐 것만 나온다
         void invoke<string | null>("repo_snapshot", { path: o.cwd, name: `${(o.sessionId ?? "x").slice(0, 8)}-start` }).then((sha) => void (turnFrom.current[key] = sha ?? ""), () => {});
       }
@@ -2963,6 +2972,8 @@ export default function App() {
                           ...tasks.filter((t) => t.work && (threadOf(o.sessionId)?.sessions ?? [o.sessionId]).includes(t.lead)).map((t) => ({ label: tr`${t.repo} · 일감 ${t.id}`, cwd: t.work! })),
                         ],
                         known: changes,
+                        // 세션이 다른 워크트리로 옮겨 일했을 때 그 워크트리를 먼저 고르게: 티켓 키와 브랜치 이름
+                        prefer: [ticketOfSession(o.sessionId), byId.get(o.sessionId ?? "")?.branch].filter((x): x is string => !!x),
                         sessions: threadOf(o.sessionId)?.sessions ?? (o.sessionId ? [o.sessionId] : []),
                         onSay: (text: string) => {
                           terms.submitWhenClear(key, text);

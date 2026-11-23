@@ -22,7 +22,7 @@ import swift from "highlight.js/lib/languages/swift";
 import typescript from "highlight.js/lib/languages/typescript";
 import xml from "highlight.js/lib/languages/xml";
 import yaml from "highlight.js/lib/languages/yaml";
-import { ago, Change } from "./model";
+import { ago, Change, turnStart } from "./model";
 import { tr } from "./i18n";
 import { openPr, prOf } from "./pr";
 
@@ -57,6 +57,8 @@ type Props = {
   known: Record<string, Change>;
   /** 이 세션(과 같은 줄기의 세션들). 같은 폴더에서 다른 세션이 고친 것을 섞지 않으려고 받는다 */
   sessions?: string[];
+  /** 이 낱말(티켓 키, 브랜치 이름)이 브랜치에 든 워크트리를 앞에 세운다 */
+  prefer?: string[];
   /** 세션에 말을 보낸다 */
   onSay: (text: string) => void;
   onClose: () => void;
@@ -180,14 +182,19 @@ export function parse(diff: string): FileDiff[] {
  * 읽기 좋게 문법 색칠은 하지만, 고치기나 파일 탐색 같은 에디터의 일은 하지 않는다. 여기서만 되는 것 두 가지를 한다:
  * 답마다 찍어 둔 상태로 "이번 답에서 바뀐 것"만 보기, 그리고 줄에 대고 세션에게 말하기.
  */
-export default function Review({ places, known, sessions, onSay, onClose }: Props) {
+export default function Review({ places: given, known, sessions, prefer = [], onSay, onClose }: Props) {
   const [placeAt, setPlaceAt] = useState(0);
+  // 같은 레포의 다른 워크트리도 고를 수 있게 뒤에 붙인다. 세션이 메인 폴더를 두고 워크트리로 옮겨 일하는 일이 있다
+  const [trees, setTrees] = useState<Place[]>([]);
+  const places = useMemo(() => [...given, ...trees.filter((t) => !given.some((g) => g.cwd === t.cwd))], [given, trees]);
   const place = places[Math.min(placeAt, places.length - 1)];
+  // 세션의 폴더가 그 뒤로 다른 브랜치로 옮겨 갔는가. 그러면 찍어 둔 답들과 견준 차이는 믿을 수 없다
+  const [moved, setMoved] = useState(false);
   const change = place ? known[place.cwd] : undefined;
   // 세션의 폴더(첫 자리)에서는 이 세션의 답만 센다. 일감의 워크트리는 그 일감 혼자 쓰니 전부 센다
-  const turns = (change?.turns ?? []).filter((t) => placeAt !== 0 || !sessions || sessions.includes(t.session));
+  const turns = moved && placeAt === 0 ? [] : (change?.turns ?? []).filter((t) => placeAt !== 0 || !sessions || sessions.includes(t.session));
   // 이 폴더의 깃 상태와, 브랜치에 쌓인 커밋들
-  const [git, setGit] = useState<{ branch: string; default: string; dirty: number; ahead: number; behind: number; forge: string; fork: string } | null>(null);
+  const [git, setGit] = useState<{ branch: string; default: string; dirty: number; ahead: number; behind: number; forge: string; fork: string; worktrees?: [string, string][] } | null>(null);
   const [commits, setCommits] = useState<Commit[]>([]);
   const [mr, setMr] = useState<[string, string, string, string, string] | undefined>(undefined);
   useEffect(() => {
@@ -197,11 +204,36 @@ export default function Review({ places, known, sessions, onSay, onClose }: Prop
     setMr(undefined);
     void invoke<typeof git>("repo_state", { path: place.cwd }).then((st) => {
       setGit(st);
+      // 세션의 폴더를 볼 때만 워크트리 목록을 채운다. 티켓 키나 브랜치 이름이 맞는 것을 앞에, 여덟 개까지
+      if (placeAt === 0 && st?.worktrees) {
+        const fits = (branch: string) => prefer.some((p) => branch.toLowerCase().includes(p.toLowerCase()));
+        setTrees(
+          st.worktrees
+            .filter(([dir]) => dir !== place.cwd)
+            .sort((a, b) => Number(fits(b[1])) - Number(fits(a[1])))
+            .slice(0, 8)
+            .map(([dir, branch]) => ({ label: tr`워크트리 · ${branch}`, cwd: dir })),
+        );
+      }
       if (st?.forge) void invoke<[string, string, string, string, string][]>("repo_mrs", { path: place.cwd, forge: st.forge }).then((list) => setMr(list.find((m) => m[0] === st.branch)), () => {});
     }, () => {});
     void invoke<Commit[]>("repo_commits", { path: place.cwd }).then(setCommits, () => {});
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [place?.cwd]);
+  useEffect(() => {
+    setMoved(false);
+    const first = placeAt === 0 && given[0] ? known[given[0].cwd]?.turns?.find((t) => !sessions || sessions.includes(t.session)) : undefined;
+    if (!first || !given[0]) return;
+    void invoke<boolean>("repo_moved", { path: given[0].cwd, from: first.from, since: turnStart(first) }).then(setMoved, () => {});
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [given[0]?.cwd, placeAt]);
+  // 폴더가 옮겨 갔고, 세션의 티켓이나 브랜치 이름이 맞는 워크트리가 있으면 그 워크트리를 바로 편다
+  useEffect(() => {
+    if (!moved || placeAt !== 0) return;
+    const at = places.findIndex((p, i) => i >= given.length && prefer.some((w) => p.label.toLowerCase().includes(w.toLowerCase())));
+    if (at > 0) (setPlaceAt(at), setVerKey("all"));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [moved, places.length]);
   /**
    * 볼 수 있는 판들: 전부, 브랜치에 쌓인 커밋 하나하나, Julgi가 찍어 둔 답 하나하나.
    * 판을 고르면 그 사이에 바뀐 것만 보인다. 작업 폴더는 건드리지 않는다
@@ -423,7 +455,7 @@ export default function Review({ places, known, sessions, onSay, onClose }: Prop
             {message && message[1].includes("\n") && <div className="rv-msg-body">{message[1].split("\n").slice(1).join("\n").trim()}</div>}
           </div>
         )}
-        {brief && ver.key === "all" && (
+        {brief && ver.key === "all" && !(moved && placeAt === 0) && (
           <div className={"rv-brief2" + (opened ? " open" : "")}>
             <button type="button" tabIndex={-1} className="rv-b-line" onClick={() => setBriefOpen(!opened)} title={opened ? tr`접기` : tr`펴기`}>
               <i aria-hidden="true">{opened ? "▾" : "▸"}</i>
@@ -448,6 +480,12 @@ export default function Review({ places, known, sessions, onSay, onClose }: Prop
                 {brief.unverified && <span className="rv-b-note">{tr`확인 안 된 것`} · {brief.unverified}</span>}
               </>
             )}
+          </div>
+        )}
+        {moved && placeAt === 0 && (
+          <div className="rv-warn">
+            {tr`이 폴더에는 세션이 일하는 동안 밖에서 다른 커밋이 들어왔다(브랜치를 바꿨거나 pull·merge를 했다). 답마다 찍어 둔 기록과 견주면 남의 변경이 섞여서, 지금 폴더에 남은 변경만 보여 준다.`}
+            {trees.length > 0 && " " + tr`세션이 워크트리에서 일했다면 위에서 그 워크트리를 고른다.`}
           </div>
         )}
         {ver.key !== "all" && change?.brief && <div className="rv-b-note">{tr`이 판의 브리핑은 없다. 브리핑은 "이 세션이 고친 것" 전체를 읽고 쓴다`}</div>}

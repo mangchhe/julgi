@@ -55,4 +55,7 @@ export default {
   "줄 접음": "Wrapped",
   "줄 안 접음": "Not wrapped",
   "↑↓ 파일 · ←→ 이력에서 위아래로 · f 파일 전체 · w 줄 접기 · h 이력 · n p 다음/이전 바뀐 곳 · 줄을 누르면 세션에게 말한다 · Esc": "↑↓ file · ←→ up and down the history · f whole file · w wrap lines · h history · n p next/previous change · click a line to tell the session · Esc",
+  "워크트리 · {0}": "Worktree · {0}",
+  "이 폴더에는 세션이 일하는 동안 밖에서 다른 커밋이 들어왔다(브랜치를 바꿨거나 pull·merge를 했다). 답마다 찍어 둔 기록과 견주면 남의 변경이 섞여서, 지금 폴더에 남은 변경만 보여 준다.": "Other commits arrived in this folder while the session worked (a branch switch, pull or merge). Comparing against the per-reply snapshots would mix in changes the session did not make, so only what is left in the folder is shown.",
+  "세션이 워크트리에서 일했다면 위에서 그 워크트리를 고른다.": "If the session worked in a worktree, pick it above.",
 } as Record<string, string>;

@@ -161,6 +161,26 @@ pub fn repo_snapshot(path: String, name: String) -> Option<String> {
     Some(sha)
 }
 
+/// 찍어 둔 상태(from) 뒤로 이 폴더에 세션이 만들지 않은 이력이 들어왔는가.
+/// 다른 터미널에서 브랜치를 바꾸거나 pull·merge를 하면 그렇게 된다. 그러면 from에서 지금까지의 차이에는
+/// 남의 커밋이 섞여 있어 "이 세션이 고친 것"이라고 볼 수 없다. 두 가지로 가린다:
+/// - from(그때의 커밋, 또는 그 위에 얹은 임시 커밋)이 지금 커밋의 조상이 아니다 → 다른 이력으로 옮겨 갔다
+/// - 그 뒤로 쌓인 커밋 가운데 세션이 일을 시작하기(since, 초) 전에 만들어진 것이 있다 → 밖에서 들어온 커밋이다
+#[tauri::command(async)]
+pub fn repo_moved(path: String, from: String, since: i64) -> bool {
+    if !(from.chars().all(|c| c.is_ascii_hexdigit()) && from.len() >= 7) {
+        return false;
+    }
+    // 찍어 둔 커밋을 git이 모르면(치워졌으면) 판단하지 않는다
+    if git(&path, &["cat-file", "-t", &from]).is_none() {
+        return false;
+    }
+    let ancestor = |rev: &str| Command::new("git").args(["-C", &path, "merge-base", "--is-ancestor", rev, "HEAD"]).status().is_ok_and(|s| s.success());
+    let parent = format!("{from}^");
+    let base = if ancestor(&from) { from.clone() } else if ancestor(&parent) { parent } else { return true };
+    git(&path, &["log", "--format=%ct", &format!("{base}..HEAD")]).unwrap_or_default().lines().filter_map(|l| l.trim().parse::<i64>().ok()).any(|at| at < since)
+}
+
 /// 두 상태 사이의 변경. from이 없으면 기본 브랜치에서 갈라진 곳부터, to가 없으면 지금 작업 폴더까지
 #[tauri::command(async)]
 pub fn repo_diff(path: String, from: Option<String>, to: Option<String>, file: Option<String>) -> Option<String> {
@@ -383,4 +403,50 @@ pub fn repo_commits(path: String) -> Vec<(String, String, String, u64, String)> 
             Some((sha, parents, subject, when, cols.next().unwrap_or("").to_owned()))
         })
         .collect()
+}
+
+#[cfg(test)]
+mod moved_tests {
+    use super::*;
+
+    fn sh(dir: &std::path::Path, args: &[&str]) -> String {
+        let out = Command::new("git").current_dir(dir).args(args).env("GIT_AUTHOR_NAME", "t").env("GIT_AUTHOR_EMAIL", "t@t").env("GIT_COMMITTER_NAME", "t").env("GIT_COMMITTER_EMAIL", "t@t").output().unwrap();
+        String::from_utf8_lossy(&out.stdout).trim().to_owned()
+    }
+
+    /// 세션이 같은 브랜치에서 커밋한 것은 "옮겨 감"이 아니고, 밖에서 들어온 커밋(브랜치 바꿈, 옛 커밋 합침)은 "옮겨 감"이다
+    #[test]
+    fn tells_foreign_history_from_session_commits() {
+        let dir = std::env::temp_dir().join(format!("julgi-moved-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        let path = dir.to_string_lossy().into_owned();
+        sh(&dir, &["init", "-q", "-b", "main"]);
+        std::fs::write(dir.join("f"), "a\n").unwrap();
+        sh(&dir, &["add", "f"]);
+        sh(&dir, &["commit", "-qm", "A", "--date", "2020-01-01T00:00:00"]);
+        // 다른 브랜치에 옛 커밋 하나 (세션이 시작하기 전에 만들어진 것)
+        sh(&dir, &["checkout", "-q", "-b", "other"]);
+        std::fs::write(dir.join("g"), "o\n").unwrap();
+        sh(&dir, &["add", "g"]);
+        let old = Command::new("git").current_dir(&dir).args(["commit", "-qm", "O"]).env("GIT_AUTHOR_NAME", "t").env("GIT_AUTHOR_EMAIL", "t@t").env("GIT_COMMITTER_NAME", "t").env("GIT_COMMITTER_EMAIL", "t@t").env("GIT_COMMITTER_DATE", "2020-01-02T00:00:00").status().unwrap();
+        assert!(old.success());
+        sh(&dir, &["checkout", "-q", "main"]);
+        // 세션이 일을 시작한다: 고치던 중의 상태를 찍는다
+        let since = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_secs() as i64 - 5;
+        std::fs::write(dir.join("f"), "a\nb\n").unwrap();
+        let from = sh(&dir, &["stash", "create"]);
+        assert!(from.len() >= 7);
+        assert!(!repo_moved(path.clone(), from.clone(), since), "고치기만 했으면 옮겨 간 것이 아니다");
+        sh(&dir, &["commit", "-qam", "B"]);
+        assert!(!repo_moved(path.clone(), from.clone(), since), "세션이 같은 브랜치에 커밋한 것은 옮겨 간 것이 아니다");
+        // 밖에서 옛 커밋을 합친다 (pull·merge)
+        sh(&dir, &["merge", "-q", "--no-edit", "other"]);
+        assert!(repo_moved(path.clone(), from.clone(), since), "세션이 시작하기 전의 커밋이 들어왔으면 옮겨 간 것이다");
+        // 아예 다른 브랜치로 바꾼다
+        sh(&dir, &["checkout", "-q", "other"]);
+        assert!(repo_moved(path.clone(), from.clone(), since), "다른 브랜치로 바꿨으면 옮겨 간 것이다");
+        assert!(!repo_moved(path, "zzz".into(), since), "이상한 이름은 판단하지 않는다");
+        let _ = std::fs::remove_dir_all(&dir);
+    }
 }
