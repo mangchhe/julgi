@@ -10,6 +10,8 @@ export type Pick =
   | { kind: "open"; key: string }
   | { kind: "session"; session: Session }
   | { kind: "new"; cwd: string }
+  /** 그 폴더에서 셸(터미널)을 연다 */
+  | { kind: "shell"; cwd: string }
   | { kind: "link"; url: string }
   /** 이 번호의 PR을 연다. repo가 없으면 지금 칸의 레포에서 */
   | { kind: "pr"; number: number; repo?: string }
@@ -32,6 +34,8 @@ type Props = {
   byId: Map<string, Session>;
   /** 지금 칸의 폴더. 새 세션의 기본 위치 */
   cwd: string;
+  /** 지도에 있는 레포들. 세션이 한 번도 없던 레포에서도 새 세션과 셸을 열 수 있게 한다 */
+  repos?: { repo: string; cwd: string }[];
   onPick: (pick: Pick) => void;
   /** 고른 세션의 요약만 지금 세션에 붙인다 */
   onAttach: (session: Session) => void;
@@ -51,7 +55,7 @@ type PrRow = { repo: string; number: number; title: string; author: string; bran
 
 const MAX_SESSIONS = 40;
 
-export default function Palette({ open, sessions, byId, cwd, onPick, onAttach, onJoin, onClose, asks, mine, jira, tickets }: Props) {
+export default function Palette({ open, sessions, byId, cwd, repos = [], onPick, onAttach, onJoin, onClose, asks, mine, jira, tickets }: Props) {
   const [query, setQuery] = useState("");
   const [sel, setSel] = useState(0);
   const input = useRef<HTMLInputElement>(null);
@@ -195,7 +199,11 @@ export default function Palette({ open, sessions, byId, cwd, onPick, onAttach, o
         if (s.repo.toLowerCase().includes(q) && !folders.includes(s.cwd)) folders.push(s.cwd);
       }
     }
+    // 세션이 없던 레포는 지도에서 찾는다
+    if (q) for (const r of repos) if (folders.length < 3 && r.repo.toLowerCase().includes(q) && !folders.some((f) => repoOf(f) === r.repo)) folders.push(r.cwd);
     if (!folders.length) folders.push(cwd);
+    // 셸도 같은 자리에서 연다. 레포 이름을 치면 그 레포의 터미널이 바로 열린다
+    for (const folder of folders) out.push({ pick: { kind: "shell", cwd: folder }, title: tr`+ 셸 · ${repoOf(folder)}`, meta: folder.replace(/^\/Users\/[^/]+/, "~"), isNew: true });
     for (const folder of folders)
       out.push({ pick: { kind: "new", cwd: folder }, title: tr`+ 새 세션 · ${repoOf(folder)}`, meta: folder.replace(/^\/Users\/[^/]+/, "~"), isNew: true });
     return out;

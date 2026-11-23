@@ -1841,7 +1841,8 @@ export default function App() {
       // 번호만 쳤으면 지금 칸의 레포에서 연다. GitHub 레포일 때만 된다
       const cwd = cwdOf(current);
       void invoke<string | null>("repo_slug", { path: cwd }).then((repo) => (repo ? openPr({ repo, number: p.number }) : say(tr`${repoOf(cwd)}는 GitHub 레포가 아니다.`)));
-    } else newSession(p.cwd);
+    } else if (p.kind === "shell") newShell(p.cwd);
+    else newSession(p.cwd);
   };
   const join = (sessionId: string) => {
     setOverlay(null);
@@ -2978,7 +2979,7 @@ export default function App() {
         })}
       </div>
       {overlay === "palette" && (
-        <Palette open={open} sessions={sessions} byId={byId} cwd={cwdOf(current)} onPick={pick} onAttach={attach} onJoin={join} onClose={() => setOverlay(null)} asks={asks} mine={minePrs} jira={config.jiraSite ? jiraConn() : null} tickets={tickets} />
+        <Palette open={open} sessions={sessions} byId={byId} cwd={cwdOf(current)} repos={mapState.current.repos} onPick={pick} onAttach={attach} onJoin={join} onClose={() => setOverlay(null)} asks={asks} mine={minePrs} jira={config.jiraSite ? jiraConn() : null} tickets={tickets} />
       )}
       {overlay === "send" && (
         <Send

@@ -27,4 +27,5 @@ export default {
   "내 PR": "My PRs",
   "할 일": "To do",
   "진행 중": "In progress",
+  "+ 셸 · {0}": "+ Shell · {0}",
 } as Record<string, string>;
