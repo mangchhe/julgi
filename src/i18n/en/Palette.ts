@@ -28,4 +28,6 @@ export default {
   "할 일": "To do",
   "진행 중": "In progress",
   "+ 셸 · {0}": "+ Shell · {0}",
+  "맞는 레포가 없다. Enter를 누르면 지금 폴더에서 연다": "No matching repo. Enter opens one in the current folder",
+  "이름을 친다. 하던 세션이 먼저 나온다 · \"sh 레포\"는 그 레포의 셸 · \"pr\", \"jira\"는 PR과 티켓": "Type a name. Sessions you were in come first · \"sh repo\" opens a shell in that repo · \"pr\", \"jira\" for PRs and tickets",
 } as Record<string, string>;

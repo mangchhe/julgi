@@ -151,6 +151,21 @@ export default function Palette({ open, sessions, byId, cwd, repos = [], onPick,
       if (!prRows.length) prRows.push({ pick: { kind: "pr", number: 0 }, title: prs.length ? tr`맞는 PR이 없다` : tr`열린 PR이 없거나 아직 읽는 중`, meta: tr`pr 뒤에 번호나 제목을 친다`, isLink: true });
       return prRows;
     }
+    // "sh 이름"(또는 셸, 터미널)으로 시작하면 레포만 찾아 그 폴더의 셸을 연다. 이름을 안 치면 지금 폴더가 맨 위다
+    const shQuery = query.match(/^(?:sh|셸|쉘|터미널)(?:\s+(.*))?$/i);
+    if (shQuery) {
+      const want = (shQuery[1] ?? "").trim().toLowerCase();
+      const dirs = new Map<string, string>(); // 레포 이름 → 폴더. 지도의 본 폴더가 먼저고, 세션의 워크트리는 그다음이다
+      if (!want) dirs.set(repoOf(cwd), cwd);
+      for (const r of repos) if (!dirs.has(r.repo)) dirs.set(r.repo, r.cwd);
+      for (const s of sessions) if (!dirs.has(s.repo)) dirs.set(s.repo, s.cwd);
+      const hit = [...dirs].filter(([name]) => !want || name.toLowerCase().includes(want));
+      // 이름이 찾는 말로 시작하는 것을 앞에
+      hit.sort((a, b) => Number(b[0].toLowerCase().startsWith(want)) - Number(a[0].toLowerCase().startsWith(want)));
+      const rows: Row[] = hit.slice(0, 30).map(([name, dir]) => ({ pick: { kind: "shell", cwd: dir }, title: tr`+ 셸 · ${name}`, meta: dir.replace(/^\/Users\/[^/]+/, "~"), isNew: true }));
+      if (!rows.length) rows.push({ pick: { kind: "shell", cwd }, title: tr`맞는 레포가 없다. Enter를 누르면 지금 폴더에서 연다`, meta: cwd.replace(/^\/Users\/[^/]+/, "~"), isNew: true });
+      return rows;
+    }
     // "아티팩트 환불"처럼 치면 산출물만 찾는다: 종류를 가리키는 낱말은 떼고 나머지로 세션을 찾아, 그 세션이 남긴 링크를 낸다
     const wanted = LINK_WORDS.filter(([word]) => word.test(query));
     const q = wanted.reduce((text, [word]) => text.replace(new RegExp(word.source, "gi"), " "), query).replace(/\s+/g, " ").trim().toLowerCase();
@@ -193,14 +208,9 @@ export default function Palette({ open, sessions, byId, cwd, repos = [], onPick,
     out.push(...weak);
     // 새 세션을 열 위치: 이름이 맞는 프로젝트가 있으면 그 폴더들, 없으면 지금 폴더
     const folders: string[] = [];
-    if (q) {
-      for (const s of sessions) {
-        if (folders.length >= 3) break;
-        if (s.repo.toLowerCase().includes(q) && !folders.includes(s.cwd)) folders.push(s.cwd);
-      }
-    }
-    // 세션이 없던 레포는 지도에서 찾는다
+    // 지도의 본 폴더가 먼저다. 같은 레포의 워크트리가 여러 줄로 나오지 않게 레포마다 하나만 둔다
     if (q) for (const r of repos) if (folders.length < 3 && r.repo.toLowerCase().includes(q) && !folders.some((f) => repoOf(f) === r.repo)) folders.push(r.cwd);
+    if (q) for (const s of sessions) if (folders.length < 3 && s.repo.toLowerCase().includes(q) && !folders.some((f) => repoOf(f) === s.repo)) folders.push(s.cwd);
     if (!folders.length) folders.push(cwd);
     // 셸도 같은 자리에서 연다. 레포 이름을 치면 그 레포의 터미널이 바로 열린다
     for (const folder of folders) out.push({ pick: { kind: "shell", cwd: folder }, title: tr`+ 셸 · ${repoOf(folder)}`, meta: folder.replace(/^\/Users\/[^/]+/, "~"), isNew: true });
@@ -239,7 +249,7 @@ export default function Palette({ open, sessions, byId, cwd, repos = [], onPick,
         <input
           ref={input}
           value={query}
-          placeholder={tr`이름을 친다. 하던 세션이 먼저 나온다 · "아티팩트", "MR"을 넣으면 산출물을 찾는다`}
+          placeholder={tr`이름을 친다. 하던 세션이 먼저 나온다 · "sh 레포"는 그 레포의 셸 · "pr", "jira"는 PR과 티켓`}
           onChange={(e) => {
             setQuery(e.target.value);
             setSel(0);
