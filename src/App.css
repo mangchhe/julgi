@@ -1515,9 +1515,17 @@ body.dragging .pane-body { pointer-events: none; }
 /* 터미널 부품은 글자 뒤에 검은 층(.xterm-viewport)을 하나 깔아 둔다. 창을 비치게 했으면 그 층도 비운다 */
 :root.glass .xterm .xterm-viewport { background-color: transparent !important; }
 /* 설정: 딸린 줄은 들여 쓰고 왼쪽에 줄을 그어 위 줄에 묶인 것을 보인다 */
-.set-card .set-row.child { position: relative; padding-left: 40px; }
-.set-card .set-row.child::before { content: ""; position: absolute; left: 22px; top: 0; bottom: 0; width: 2px; background: var(--line); }
-.set-card .set-row.child .set-label { font-size: 13px; }
+.set-card .set-row.child { position: relative; margin: 0 14px 10px 46px; padding: 10px 14px; border: 1px solid var(--line); border-radius: 10px; background: color-mix(in srgb, var(--bg) 55%, transparent); }
+/* 위 줄과 사이에 가로줄을 두지 않고, 위 줄에서 내려와 꺾이는 선으로 잇는다 */
+.set-card .set-row.child::before { content: ""; position: absolute; left: -22px; top: -11px; width: 21px; height: calc(50% + 11px); border-left: 2px solid var(--line); border-bottom: 2px solid var(--line); border-bottom-left-radius: 9px; }
+/* 딸린 줄이 이어지면 선도 이어 내린다 */
+.set-card .set-row.child + .set-row.child { margin-top: -2px; }
+.set-card .set-row.child + .set-row.child::before { top: -62px; height: calc(50% + 62px); }
+.set-card .set-row.child .set-label { font-size: 13px; font-weight: 500; }
+.set-card .set-row.child .set-note { font-size: 11.5px; }
+.set-card .set-row.child.on { background: var(--accent-soft); box-shadow: none; border-color: var(--accent); }
+/* 딸린 줄을 가진 위 줄은 아래 여백을 줄여 한 덩어리로 보이게 한다 */
+.set-card .set-row:has(+ .set-row.child) { padding-bottom: 10px; }
 .set-share { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 8px; }
 .set-share label.set-toggle { cursor: pointer; }
 .set-share-in { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 8px; flex-basis: 100%; font-size: 12.5px; }
