@@ -196,7 +196,7 @@ async function invoke(cmd: string, args: Record<string, unknown> = {}): Promise<
     case "ci_runs": {
       if (!flags.has("ci")) return [];
       const run = (id: string, title: string, name: string, branch: string, state: string, min: number) => ({ repo: args.repo, id, title, name, branch, state, started: new Date(Date.now() - (min + 4) * 60_000).toISOString(), at: new Date(Date.now() - min * 60_000).toISOString(), url: `https://github.com/${args.repo}/actions/runs/${id}` });
-      return String(args.repo).endsWith("acme-api") ? [run("9001", "쿠폰 여러 장일 때 환불액 1원 어긋남 수정", "Deploy", "main", "run", 0), run("9000", "쿠폰 여러 장일 때 환불액 1원 어긋남 수정", "CI", "main", "fail", 6), run("8990", "정산 배치 재시도 간격을 설정으로", "Deploy", "main", "ok", 190)] : [];
+      return String(args.repo).endsWith("acme-api") ? [run("9001", "쿠폰 여러 장일 때 환불액 1원 어긋남 수정", "Deploy", "main", "run", 0), run("9000", "쿠폰 여러 장일 때 환불액 1원 어긋남 수정", "CI", "main", flags.has("cifail") && ciReads++ < 1 ? "run" : "fail", 6), run("8990", "정산 배치 재시도 간격을 설정으로", "Deploy", "main", "ok", 190)] : [];
     }
     case "ci_jobs": {
       // 읽는 데 걸리는 시간을 흉내 낸다. 기억해 둔 것은 이 기다림 없이 바로 뜬다
@@ -336,4 +336,6 @@ setTimeout(() => {
   }
 }, 1200);
 
+/** ci_runs를 몇 번 읽었나 (cifail 깃발) */
+let ciReads = 0;
 export {};

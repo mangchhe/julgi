@@ -319,6 +319,7 @@ export default function App() {
       argoSeen.current = next;
       void invoke("data_write", { name: "argo-seen.json", text: JSON.stringify(next) });
       setArgoAppsState(linked);
+      argoRef.current = linked;
       setArgoLogin(lost);
       setArgoApps(linked);
     };
@@ -364,6 +365,7 @@ export default function App() {
       runSeen.current = Object.fromEntries(all.map((r) => [r.url, r.state]));
       void invoke("data_write", { name: "run-seen.json", text: JSON.stringify(runSeen.current) });
       setRuns(all);
+      runsRef.current = all;
     };
     // 도는 실행이 있으면 자주, 없으면 PR과 같은 주기로 본다
     const loop = () =>
@@ -3352,7 +3354,8 @@ export default function App() {
           }}
           onOpen={(key) => (open.some((o) => o.key === key) ? show(key) : wake(key.slice(2)))}
           onPr={(pr) => openPr(pr)}
-          onClose={() => setOverlay(null)}
+          // 내 차례 창만 닫는다. 그사이 다른 화면(작업 페이지 등)으로 넘어갔으면 그 화면을 닫지 않는다
+          onClose={() => setOverlay((o) => (o === "queue" ? null : o))}
         />
       )}
       {overlay === "help" && <Help onClose={() => setOverlay(null)} />}

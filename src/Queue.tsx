@@ -133,7 +133,8 @@ export default function Queue({ rows, asks, mine, tickets, loadTicket, runs = []
     } else if (ask && e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) {
       e.preventDefault();
       // 티켓: Enter 티켓 화면, ⌘Enter 이 티켓으로 시작
-      if (ask.kind === "run") return onRun?.(ask.url), onClose();
+      // 실행은 작업 페이지로 넘어간다. 여기서 닫기까지 부르면 같은 순간에 "작업 페이지 열기"와 "닫기"가 겹쳐 닫기가 이긴다
+      if (ask.kind === "run") return onRun?.(ask.url);
       if (ask.kind === "ticket") return (e.metaKey ? onStartTicket(ask.repository.nameWithOwner) : onTicket(ask.repository.nameWithOwner)), onClose();
       // 빈 채로 Enter면 PR 화면, 글을 썼거나 ⌘Enter면 세션에 맡긴다. 내 PR은 늘 PR 화면으로 연다
       if (ask.kind === "mine" || (!text.trim() && !e.metaKey)) return onView(ask), onClose();

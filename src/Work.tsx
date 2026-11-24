@@ -95,6 +95,15 @@ export default function Work({ groups, ticketGroups = [], loadTickets, ticketPan
   const deploysOn = !!deploys && groupAt === deployAt;
   const [deployPick, setDeployPick] = useState(startDeploy ?? "");
   const deploy = deploysOn ? (deploys!.find((a) => argoId(a) === deployPick) ?? deploys![0]) : undefined;
+  // 작업 페이지가 열려 있는 채로 다른 실행이나 앱을 고르라는 말이 오면 그리로 옮긴다 (처음 열 때 한 번만 읽으면 반영되지 않는다)
+  useEffect(() => {
+    if (startRun && runs) (setGroupAt(allCount), setRunAt(startRun));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [startRun]);
+  useEffect(() => {
+    if (startDeploy && deploys) (setGroupAt(deployAt), setDeployPick(startDeploy));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [startDeploy]);
   // 실행 묶음은 맨 끝 자리다 (PR 묶음들, 티켓 묶음들 다음)
   const runsOn = !!runs && groupAt === allCount;
   const navCount = allCount + (runs ? 1 : 0) + (deploys ? 1 : 0);
