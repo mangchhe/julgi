@@ -122,6 +122,7 @@ Everything is a text file under `~/.julgi/`. Conversations are not here; Claude 
 | `pr-seen.json`, `jira-seen.json`, `jira-news.json` | Last known state of PRs and tickets, to tell news from old; ticket news not yet looked at |
 | `run-seen.json` | Last known state of my CI runs, to notice when one finishes |
 | `argo-seen.json` | Last known sync and health of linked Argo CD apps, to notice a change for the worse |
+| `bots.json` | Registered bots: name, face, the situation each watches for, the message it sends, how often it answered |
 | `triage.json` | For each finished reply, whether it needed you and why |
 | `progress.json` | Goal, done, left, blocked per stem |
 | `seen.json` | When you last looked at Julgi, for the briefing |

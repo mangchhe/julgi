@@ -124,6 +124,7 @@
 | `pr-seen.json`, `jira-seen.json`, `jira-news.json` | PR과 티켓의 지난 형편. 견줘서 새로 생긴 일만 알린다. 아직 안 본 티켓 소식 |
 | `run-seen.json` | 내 CI 실행의 지난 상태. 끝난 것을 알아채는 데 쓴다 |
 | `argo-seen.json` | 이어진 Argo CD 앱의 지난 sync와 health. 나빠진 것을 알아채는 데 쓴다 |
+| `bots.json` | 등록된 봇: 이름, 얼굴, 지켜보는 상황, 보내는 말, 답한 횟수 |
 | `triage.json` | 끝난 답마다 내가 필요했는지와 그 이유 |
 | `progress.json` | 줄기마다 목표, 한 것, 남은 것, 막힌 것 |
 | `seen.json` | 마지막으로 Julgi를 본 때. 브리핑이 쓴다 |

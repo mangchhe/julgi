@@ -16,7 +16,7 @@
   and decides which session gets your message, and which one needs you now.
 </p>
 
-<p align="center"><img src="docs/images/hero.png" alt="Julgi with three Claude Code sessions in panes and a sidebar that groups sessions into my turn, working and open, each with its pull request status" width="960" /></p>
+<p align="center"><img src="docs/images/hero.png" alt="Julgi with three Claude Code sessions in panes and a sidebar that lists open sessions in a fixed order with their state, ticket and news, and sleeping sessions grouped by repo below" width="960" /></p>
 
 *Julgi* (줄기, "jool-gi") is Korean for a plant's stem. In this app a **stem** is one piece of work and the chain of sessions that carried it.
 
@@ -106,25 +106,59 @@ Tokens by day, model, project and session, counted from Claude Code's own transc
 </td>
 <td><img src="docs/images/usage.png" alt="The usage panel with summary tiles, a daily bar chart, per-model and per-project lists and a recent sessions table" /></td>
 </tr>
+<tr>
+<td>
+
+### CI and deploys
+
+The CI runs you started, including a deploy after a merge, are listed in `⌘U` with each job's state and time; GitLab pipelines are drawn stage by stage. A failed job shows the end of its log and one button hands it to a session.
+
+If you use Argo CD, the apps that belong to your repos show sync and health, whether your commit is deployed, and the deploy history. Read-only.
+
+</td>
+<td><img src="docs/images/run.png" alt="The Work page with my CI runs on the left and the selected pipeline drawn as stages with each job's state and time" /></td>
+</tr>
+<tr>
+<td>
+
+### Bots
+
+A bot is one rule: in this situation, send this message. When a session stops only to ask "shall I go on?", or reports work done without checking it, a bot can answer for you.
+
+Bots never answer a question that asks you to choose, or one about something hard to undo. Register your own in `⌘,` → Bots; each has a name and a face.
+
+</td>
+<td><img src="docs/images/bots.png" alt="The Bots tab in settings with two bots, each with a face, a name, the situation it watches for and the message it sends" /></td>
+</tr>
 </table>
 
 ### Also in the box
 
-- **CI runs without the browser** — the runs you started, including a deploy after a merge, are listed in `⌘U` with each job's state and time. A failed job shows the end of its log and one button hands it to a session.
-- **Deploy status** — if you use Argo CD, the apps that belong to your repos show their sync and health, and whether the commit you are on has been deployed. Read-only, through the `argocd` CLI.
-- **Only called when needed** — when a session finishes, a small model reads the reply. A question or a decision brings it to My turn; a plain "done" stays quiet and is collected in the briefing. A session that stalls mid-work, or runs one request for too long, is flagged.
-- **Briefing** — come back after a while and one screen shows what is waiting on you, news on PRs and tickets, where each piece of work stands, and what Julgi did meanwhile (`⌘⇧B`).
-- **Progress per stem** — goal, done, left and blocked for each piece of work, kept up to date as sessions reply.
+**Knowing whose turn it is**
+- **Only called when needed** — when a session finishes, a small model reads the reply. A question or a decision brings it to My turn; a plain "done" stays quiet. A session that stalls, or runs one request for too long, is flagged.
+- **Briefing** — come back after a while and one screen shows what is waiting, news on PRs and tickets, where each piece of work stands, and what Julgi did meanwhile (`⌘⇧B`).
+
+**Sessions**
+- **Hand-off in place** — a session that has grown too large is replaced by a fresh one in the same pane, with a written brief and the earlier screen still above it.
+- **Sessions run by scripts are kept apart** — `claude -p` and SDK runs are folded into one group, so the list shows the sessions you opened.
+- **In the terminal** — `⌘`-click a path to open it, `⌘↑` / `⌘↓` to jump between your own messages, paste a picture into `⌘L`.
 - **Fewer permission prompts** — optionally let read-only commands, or tests and builds too, through without asking.
-- **Stems** — sessions doing the same work are joined into one stem; finished work is taken off the list.
-- **Brain** — decisions, pitfalls and facts worth keeping are saved when work ends and attached to new work that needs them.
-- **Preferences** — when you correct a session ("from now on…", "don't…"), Julgi turns it into a rule every later session follows.
-- **Repo map** — Julgi draws a map of your repos so a session can find its way into another one.
-- **Coordinator** — work that spans repos gets a lead session that splits it into tasks, each in its own worktree.
+
+**Tickets**
+- **Ticket news on the session** — a new comment, status change or @mention shows on the session's row, with who wrote it.
+- **Bugs in bulk** — one button hands every bug to a session that diagnoses and stops; you choose "fix it" or "hold".
+
+**Memory**
+- **Stems** — sessions doing the same work are joined into one stem; finished work is taken off the list and its panes close.
+- **Brain and preferences** — decisions and pitfalls worth keeping are saved and attached to new work; when you correct a session ("from now on…"), it becomes a rule later sessions follow.
 - **Skills that grow** — work you repeat becomes a skill; skills you use are refined from how they were used.
-- **Housekeeping** — idle sessions are put to sleep, and woken when you pick them or their PR has news.
-- **Themes** — eleven of them, including Tokyo Night, Catppuccin Mocha, Dracula and Nord, each with its own terminal colors.
-- **From your phone** — a small web view, reachable only inside your Tailscale network, to answer and send work.
+
+**And**
+- **Repo map and coordinator** — a map of your repos, and a lead session that splits work spanning repos into tasks, each in its own worktree.
+- **Numbers** — tokens by day, model and project (`⌘⇧U`), and how much was done for you (`⌘G`).
+- **Themes, and a phone view** — eleven themes; a small web view inside your Tailscale network to answer and send work.
+
+The full tour, area by area, is in **[docs/features.md](docs/features.md)**.
 
 Where judgment is needed (where to send, whether two sessions are the same work, what to keep), a model that read the content decides, not string matching. Everything Julgi did on its own is listed in `⌘Y`, sessions are never deleted, and each automatic behavior can be turned off in `⌘,`.
 
@@ -175,6 +209,7 @@ Optional, for the integrations: [`gh`](https://cli.github.com) for GitHub, [`gla
 | `⌘G` | Stems, brain, skills, numbers, map, git |
 | `⌘Y` | What Julgi did on its own |
 | `⌘⇧B` | Briefing: what is waiting, news, where work stands |
+| `⌘`-click / `⌘↑` `⌘↓` | Open a path in the terminal / jump between your own messages |
 | `⌘T` / `⌘D` / `⌘W` | Shell in a new pane / add a pane / close |
 
 The rest are under `⌘/` in the app.
@@ -193,7 +228,7 @@ Julgi does not run other agents such as Codex CLI or Gemini CLI. What it does fo
 
 ## Reference
 
-What Julgi grants its sessions, extension points, every setting, the files it writes and the known gaps are in [docs/reference.md](docs/reference.md). Read the permissions section before you run it.
+Every feature by area is in [docs/features.md](docs/features.md). What Julgi grants its sessions, extension points, every setting, the files it writes and the known gaps are in [docs/reference.md](docs/reference.md). Read the permissions section before you run it.
 
 ## Contributing
 
