@@ -10,7 +10,7 @@ import Queue from "./Queue";
 import Status from "./Status";
 import History, { Act } from "./History";
 import Morning from "./Morning";
-import { TRIAGE_SYSTEM, triagePrompt, parseTriage } from "./triageAsk.ts";
+import { Bot, DEFAULT_BOTS, TRIAGE_SYSTEM, triagePrompt, parseTriage } from "./triageAsk.ts";
 import Pane from "./Pane";
 import Palette, { Pick } from "./Palette";
 import Send, { RouteNote, Target } from "./Send";
@@ -414,7 +414,24 @@ export default function App() {
   const noted = useRef<Record<string, number>>({}); // 세션 → 요약을 남긴 때의 대화 기록 시각
   const noting = useRef(new Set<string>());
   const trustedOnce = useRef(new Set<string>()); // 폴더 믿음 물음에 대신 답해 준 터미널
-  const goStreak = useRef<Record<string, number>>({}); // 세션마다 연달아 대신 답한 횟수
+  const goStreak = useRef<Record<string, number>>({}); // 세션마다 봇이 연달아 대신 답한 횟수
+  const [bots, setBots] = useState<Bot[]>(DEFAULT_BOTS);
+  const botsRef = useRef(bots);
+  const saveBots = (next: Bot[]) => {
+    botsRef.current = next;
+    setBots(next);
+    void invoke("data_write", { name: "bots.json", text: JSON.stringify(next, null, 1) });
+  };
+  useEffect(() => {
+    void invoke<string | null>("data_read", { name: "bots.json" }).then((json) => {
+      try {
+        const list = JSON.parse(json ?? "") as Bot[];
+        if (Array.isArray(list)) (botsRef.current = list), setBots(list);
+      } catch {
+        // 없거나 깨졌으면 처음 봇들로 둔다
+      }
+    });
+  }, []);
   const resumedOnce = useRef(new Set<string>()); // "이어서 할까" 물음에 대신 답한 칸
   // 마지막으로 알린 세션. macOS는 어느 알림을 눌렀는지 알려 주지 않아서, 알린 뒤 곧 창이 앞으로 오면 알림을 눌렀다고 보고 그 세션을 띄운다
   const notified = useRef<{ key: string; at: number } | null>(null);
@@ -1008,25 +1025,28 @@ export default function App() {
   const triage = async (sessionId: string, since: number) => {
     if (triaging.current.has(sessionId)) return;
     triaging.current.set(sessionId, Date.now());
-    let verdict = { since, need: true, go: false, why: "" };
+    let verdict = { since, need: true, bot: 0, why: "" };
+    const active = botsRef.current.filter((b) => b.on && b.when.trim() && b.say.trim());
     try {
       const pair = await invoke<[string, string] | null>("last_exchange", { sessionId });
       if (pair?.[1]) {
         // 물음은 대개 답의 끝에 있다
-        const raw = (await invoke<string | null>("route_ask", { system: TRIAGE_SYSTEM, prompt: triagePrompt(pair[0], pair[1]), model: modelFor("note") })) ?? "";
+        const raw = (await invoke<string | null>("route_ask", { system: TRIAGE_SYSTEM, prompt: triagePrompt(pair[0], pair[1], active.map((b) => b.when)), model: modelFor("note") })) ?? "";
         verdict = { since, ...parseTriage(raw) };
       }
     } catch {
       // 못 읽었으면 내 차례로 둔다. 놓치는 것보다 한 번 더 부르는 편이 낫다
     }
-    // "이대로 진행할까요?"만 물은 것이면 대신 이어 가라고 답한다. 내가 한 번도 끼지 않고 연달아 답하는 것은 세 번까지다
+    // 답이 켜 둔 봇의 상황에 들어맞으면 그 봇의 말을 대신 보낸다. 내가 한 번도 끼지 않고 연달아 보내는 것은 한 세션에 세 번까지다
     const key = live.current.open.find((o) => o.sessionId === sessionId)?.key;
-    const streak = verdict.go ? (goStreak.current[sessionId] ?? 0) : 0;
-    if (config.autoGo && verdict.go && key && streak < 3) {
+    const bot = active[verdict.bot - 1];
+    const streak = bot ? (goStreak.current[sessionId] ?? 0) : 0;
+    if (bot && key && streak < 3) {
       goStreak.current[sessionId] = streak + 1;
       verdict = { ...verdict, need: false };
-      terms.submitWhenClear(key, config.autoGoText);
-      record("대신 답함", tr`"${nameOf(key).slice(0, 40)}": ${verdict.why || tr("진행해도 되는지 물어서 이어 가라고 답함")}`, sessionId); // i18n-ok
+      terms.submitWhenClear(key, bot.say);
+      record("대신 답함", tr`봇 "${bot.name}" → "${nameOf(key).slice(0, 40)}": ${bot.say.slice(0, 60)}`, sessionId); // i18n-ok
+      saveBots(botsRef.current.map((b) => (b.id === bot.id ? { ...b, runs: b.runs + 1 } : b)));
     } else delete goStreak.current[sessionId];
     triaged.current = { ...triaged.current, [sessionId]: verdict };
     triaging.current.delete(sessionId);
@@ -2009,6 +2029,8 @@ export default function App() {
     for (const o of open) {
       if (!o.sessionId) continue;
       const st = states[o.key];
+      // 답을 기다리며 서 있는 세션은 입력 칸 아래에 남은 빈 줄을 지난 줄로 채운다 (칸이 커졌거나 키 큰 물음 화면이 닫힌 뒤)
+      if (!st || (st.state !== "run" && st.state !== "hold" && now - st.since > 2000)) terms.settle(o.key);
       // 세션이 스스로 갈아타 달라고 했으면 그 답이 끝난 뒤에 한다
       if (wantHandoff.current.has(o.key) && (waiting(st) || replied(st))) {
         wantHandoff.current.delete(o.key);
@@ -3473,6 +3495,8 @@ export default function App() {
       )}
       {overlay === "settings" && (
         <Settings
+          bots={bots}
+          onBots={saveBots}
           argoLogin={argoLogin}
           onRun={(command, label) => {
             // 설치와 로그인은 사람이 보고 답해야 한다(브라우저가 뜨거나 비밀번호를 묻는다). 셸 칸에서 돌린다. 끝나면 배포 상태를 다시 읽는다

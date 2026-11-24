@@ -350,6 +350,45 @@ export function setFontSize(size: number) {
  * 기록 전체는 2만 줄까지 쌓이고, 전부 글로 바꾸는 데 수십 밀리초가 걸린다. 그동안 화면이 멈춘다.
  * 물음이 떠 있는지 주기적으로 보는 쪽은 끝부분만 읽으면 된다(물음은 늘 맨 아래에 뜬다)
  */
+/**
+ * 화면 아래에 남은 빈 줄만큼 지난 줄을 끌어내려 채운다. 입력 칸이 위에 떠 있고 그 밑이 비는 것을 없앤다.
+ * 칸이 커지면 xterm은 커서가 마지막 줄에 있을 때만 지난 줄을 끌어내리고, 아니면 아래에 빈 줄을 붙인다.
+ * Claude Code는 커서를 입력 줄에 두고 그 아래에 상태 줄을 그려서 늘 빈 줄이 붙는다. 키 큰 물음 화면을 닫은 뒤에도 같다.
+ * 줄과 커서를 같이 내리므로 Claude Code가 아는 상대 위치는 그대로다. xterm의 안쪽 값을 만진다: 모양이 다르면 아무것도 하지 않는다
+ */
+export function settleBuffer(term: Terminal): number {
+  try {
+    const active = term.buffer.active;
+    if (active.type !== "normal" || active.baseY === 0) return 0;
+    let blank = 0;
+    for (let y = term.rows - 1; y > active.cursorY; y--) {
+      if ((active.getLine(active.baseY + y)?.translateToString(true) ?? "") !== "") break;
+      blank++;
+    }
+    const n = Math.min(blank, active.baseY);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const buf = (term as any)._core?.buffer;
+    if (!n || !buf || typeof buf.ybase !== "number" || typeof buf.y !== "number" || typeof buf.lines?.pop !== "function" || buf.lines.length !== buf.ybase + term.rows) return 0;
+    const atBottom = buf.ydisp === buf.ybase;
+    for (let i = 0; i < n; i++) buf.lines.pop();
+    buf.ybase -= n;
+    buf.ydisp = atBottom ? buf.ybase : Math.min(buf.ydisp, buf.ybase);
+    buf.y += n;
+    if (typeof buf.savedY === "number") buf.savedY = Math.min(buf.savedY + n, term.rows - 1);
+    term.refresh(0, term.rows - 1);
+    term.scrollLines(0);
+    return n;
+  } catch {
+    return 0;
+  }
+}
+
+/** 세션이 답을 기다리며 서 있을 때 부른다. 일하는 중에는 부르지 않는다: 그리는 도중의 빈 줄을 채우면 화면이 흔들린다 */
+export function settle(key: string) {
+  const entry = pool.get(key);
+  if (entry?.opened) settleBuffer(entry.term);
+}
+
 export function text(key: string, tail?: number): string {
   const buffer = pool.get(key)?.term.buffer.active;
   if (!buffer) return "";

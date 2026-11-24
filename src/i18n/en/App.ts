@@ -196,6 +196,5 @@ export default {
   "\"{0}\"이 {1}을 {2}로 옮겨 달라고 함": "\"{0}\" asked to move {1} to {2}",
   "\"{0}\"을 다시 띄우며 \"이어서 할까\"라는 물음에 이어 간다고 대신 답함": "Reopened \"{0}\" and answered \"resume this conversation?\" with resume for you",
   "\"{0}\" · 끝낸 줄기의 세션에서 다시 일을 시켜 목록에 올림": "\"{0}\" · work was sent to a session of a finished stem, so it is back on the list",
-  "\"{0}\": {1}": "\"{0}\": {1}",
-  "진행해도 되는지 물어서 이어 가라고 답함": "it asked whether to go on, so it was told to",
+  "봇 \"{0}\" → \"{1}\": {2}": "Bot \"{0}\" → \"{1}\": {2}",
 } as Record<string, string>;

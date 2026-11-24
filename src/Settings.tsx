@@ -8,6 +8,7 @@ import { THEMES } from "./themes";
 import { CORE, MORE } from "./Help";
 import { getLang, resolveLang, tr } from "./i18n";
 import { argoHost, argoLoginCommand } from "./argo";
+import { Bot } from "./triageAsk.ts";
 
 type Key = keyof typeof config;
 type Props = {
@@ -25,6 +26,9 @@ type Props = {
   onRun: (command: string, label: string) => void;
   /** 처음 열 묶음 이름 (예: "연결"). 없으면 첫 묶음 */
   startAt?: string;
+  /** 등록된 봇과 그것을 고쳐 쓰는 길 */
+  bots: Bot[];
+  onBots: (next: Bot[]) => void;
 };
 
 type Row =
@@ -38,6 +42,7 @@ type Row =
   | { kind: "gitlab"; label: string; note: string }
   | { kind: "jira"; label: string; note: string }
   | { kind: "argo"; label: string; note: string }
+  | { kind: "bots"; label: string; note: string }
   | { kind: "keys"; label: string; note: string };
 
 /** 묶음마다 줄 몇 개. 왼쪽에서 묶음을 고르면 오른쪽에 그 줄들만 나온다 */
@@ -55,8 +60,6 @@ const SECTIONS: { id: string; title: string; hint: string; needs?: "jira" | "arg
     { kind: "text", key: "scriptEntry", label: tr("스크립트 세션을 가리는 값"), note: tr("Claude Code는 대화 기록에 세션을 연 길(entrypoint)을 적는다. 터미널에서 열면 cli, 스크립트나 SDK가 돌리면 sdk-cli다. 그 값이 여기 적은 글로 시작하면 스크립트가 돌린 세션으로 본다. 쉼표로 여럿 적는다"), hint: "sdk" },
     { kind: "toggle", key: "usage", label: tr("Claude 사용량 보기"), note: tr("아래 상태 줄에 5시간 창과 주간 한도를 얼마나 썼는지 보여 준다. 켜면 Claude Code의 로그인 토큰을 키체인에서 읽어 Anthropic의 사용량 주소에만 보낸다(처음에 키체인이 허락을 묻는다). 문서에 없는 주소라 어느 날 안 나올 수 있다") },
       { kind: "toggle", key: "triage", label: tr("할 일이 있을 때만 부르기"), note: tr("세션이 답을 끝내면 작은 모델이 마지막 답을 읽는다. 내가 정하거나 답할 것이 있으면 내 차례로 올리고 알린다. 끝냈다고 보고만 한 것은 \"보고함\"으로 조용히 두고 브리핑(⌘⇧B)에서 모아 보여 준다. 판정하지 못하면 내 차례로 올린다") },
-      { kind: "toggle", key: "autoGo", label: tr("\"진행할까요?\"에 대신 답하기"), note: tr("세션이 스스로 내놓은 다음 단계를 진행해도 되는지만 묻고 멈췄으면 Julgi가 대신 이어 가라고 답한다. 여러 안 가운데 고르라는 물음, 내가 줄 정보를 기다리는 물음, 푸시·머지·배포·삭제처럼 되돌리기 어려운 일을 묻는 물음에는 답하지 않고 내 차례로 올린다. 한 세션에 연달아 세 번까지만 답한다. \"할 일이 있을 때만 부르기\"가 켜져 있어야 하고, 답한 것은 ⌘Y에 남는다") },
-      { kind: "text", key: "autoGoText", label: tr("대신 답할 때 보내는 말"), note: tr("위 설정이 켜져 있을 때 세션에 보내는 말"), hint: tr("응, 진행해") },
       { kind: "toggle", key: "autoResume", label: tr("다시 띄울 때 \"이어서 할까\"에 대신 답하기"), note: tr("오래 쉰 큰 세션을 다시 띄우면 Claude Code가 이어서 할지 새로 시작할지 묻는다. 켜 두면 이어 간다고 대신 답한다. 큰 세션을 이어 가면 다음 말을 보낼 때 사용량이 그만큼 든다") },
       { kind: "toggle", key: "claudeFullscreen", label: tr("Claude Code의 전체 화면 그리기"), note: tr("켜면 Claude Code가 화면을 직접 관리한다. 지난 대화가 터미널의 스크롤 기록에 남지 않아 ⌘F 찾기, 경로 ⌘클릭, ⌘↑↓로 내 말 건너뛰기가 지금 보이는 화면에서만 된다. 새로 여는 세션부터 적용된다") },
       { kind: "number", key: "longRunMin", label: tr("오래 도는 일 알리기"), note: tr("한 번 시킨 일이 이만큼 넘게 돌고 있으면 한 번 알린다. 0이면 알리지 않는다"), step: 10, min: 0, max: 240, show: (n) => (n ? tr`${n}분` : tr("끔")) },
@@ -95,6 +98,12 @@ const SECTIONS: { id: string; title: string; hint: string; needs?: "jira" | "arg
     { kind: "toggle", key: "taskWorktree", label: tr("일감은 따로 딴 폴더에서"), note: tr("일감을 맡은 세션은 레포의 작업 폴더가 아니라 Julgi가 만든 워크트리(브랜치 julgi/일감번호)에서 일한다. 고친 것이 없으면 끝난 뒤 지운다") },
     { kind: "toggle", key: "growSkills", label: tr("스킬 알아서 만들고 가꾸기"), note: tr("되풀이해서 시킨 일은 스킬로 만들고(한 주에 하나), 자주 쓰는 내 스킬은 쓰인 기록에 비추어 다듬는다(한 주에 하나, 옛 글은 ~/.julgi/skill-history에 남는다). 링크로 건 스킬과 레포의 스킬은 건드리지 않는다") },
     ],
+  },
+  {
+    id: "봇", // i18n-ok
+    title: tr("봇"),
+    hint: tr("세션이 답을 끝냈을 때 정해 둔 상황이면 대신 답한다"),
+    rows: [{ kind: "bots", label: tr("등록된 봇"), note: tr("봇 하나는 \"이런 상황이면 이 말을 보낸다\"이다. 세션이 답을 끝내면 작은 모델이 그 답을 읽고, 켜 둔 봇의 상황에 꼭 들어맞을 때만 그 봇의 말을 세션에 대신 보낸다. 여러 안 가운데 고르라는 물음, 내가 줄 정보를 기다리는 물음, 푸시·머지·배포·삭제처럼 되돌리기 어려운 일을 묻는 물음에는 어느 봇도 답하지 않는다. 한 세션에 연달아 세 번까지만 보내고, 보낸 것은 ⌘Y에 \"대신 답함\"으로 남는다. \"할 일이 있을 때만 부르기\"가 켜져 있어야 한다") }],
   },
   {
     id: "코드 검토", // i18n-ok
@@ -201,7 +210,7 @@ const FIRST_OF: number[] = SECTIONS.map((_, n) => SECTION_OF.indexOf(n));
 // 묶음의 이름표(id)는 저장되지 않는 안쪽 이름이다 i18n-off
 const NAV: { title: string; ids: string[] }[] = [
   { title: tr("기본"), ids: ["화면", "세션"] },
-  { title: tr("Julgi가 하는 일"), ids: ["알아서 하는 일", "코드 검토", "점검과 모델", "지도"] },
+  { title: tr("Julgi가 하는 일"), ids: ["알아서 하는 일", "봇", "코드 검토", "점검과 모델", "지도"] },
   { title: tr("밖의 서비스"), ids: ["연결", "PR", "티켓", "배포"] },
   { title: tr("그 밖"), ids: ["밖에서", "keys"] },
 ];
@@ -225,7 +234,7 @@ const showKey = (combo: string) =>
     .join("");
 
 /** 설정 (⌘,). 바꾸는 즉시 적용되고 ~/.julgi/config.json에 남는다 */
-export default function Settings({ onChange, onClose, remoteUrl, onConnect, onConnectLab, argoLogin = [], onRun, startAt }: Props) {
+export default function Settings({ onChange, onClose, remoteUrl, onConnect, onConnectLab, argoLogin = [], onRun, startAt, bots, onBots }: Props) {
   const [at, setAt] = useState(() => Math.max(0, FIRST_OF[SECTIONS.findIndex((s) => s.id === startAt)] ?? 0));
   // Jira가 연결돼 있으면 그 Jira의 상태 이름을 읽어 "옮길 상태" 칸에서 고르게 한다. 워크플로가 프로젝트마다 달라서
   // 목록은 전체 상태이고, 실제로 옮길 수 있는지는 그 티켓의 지금 상태에 달려 있다
@@ -298,7 +307,7 @@ export default function Settings({ onChange, onClose, remoteUrl, onConnect, onCo
   };
 
   const onKey = (e: React.KeyboardEvent) => {
-    const typing = e.target instanceof HTMLInputElement;
+    const typing = e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement;
     const row = ROWS[at];
     // Tab: 다음 묶음의 첫 줄로 (⇧Tab은 앞 묶음)
     if (e.key === "Tab" && !taking) {
@@ -372,7 +381,7 @@ export default function Settings({ onChange, onClose, remoteUrl, onConnect, onCo
             <div className="set-card">
               {ROWS.map((row, i) =>
                 SECTION_OF[i] !== SECTION_OF[at] ? null : (
-                <div key={`${row.label}-${i}`} className={"set-row" + (i === at ? " on" : "") + (row.kind === "keys" ? " keys" : "") + (row.kind === "theme" ? " stack" : "")} onClick={() => setAt(i)}>
+                <div key={`${row.label}-${i}`} className={"set-row" + (i === at ? " on" : "") + (row.kind === "keys" ? " keys" : "") + (row.kind === "theme" || row.kind === "bots" ? " stack" : "")} onClick={() => setAt(i)}>
                   {row.kind === "keys" && <kbd className="set-kbd">{row.label}</kbd>}
                   <div className="set-label">
                     {row.kind !== "keys" && row.label}
@@ -449,6 +458,38 @@ export default function Settings({ onChange, onClose, remoteUrl, onConnect, onCo
                           </button>
                         )}
                       </span>
+                    )}
+                    {row.kind === "bots" && (
+                      <div className="set-bots" onClick={(e) => e.stopPropagation()}>
+                        {bots.map((b) => {
+                          const put = (patch: Partial<Bot>) => onBots(bots.map((x) => (x.id === b.id ? { ...x, ...patch } : x)));
+                          return (
+                            <div key={b.id} className={"set-bot" + (b.on ? " on" : "")}>
+                              <div className="set-bot-head">
+                                <input tabIndex={-1} className="set-bot-name" value={b.name} placeholder={tr("봇 이름")} spellCheck={false} onChange={(e) => put({ name: e.target.value })} />
+                                <span className="set-note">{tr`${b.runs}번 답함`}</span>
+                                <button type="button" tabIndex={-1} className={"set-toggle" + (b.on ? " on" : "")} onClick={() => put({ on: !b.on })}>
+                                  {b.on ? tr("켬") : tr("끔")}
+                                </button>
+                                <button type="button" tabIndex={-1} className="set-toggle" title={tr("이 봇을 지운다")} onClick={() => onBots(bots.filter((x) => x.id !== b.id))}>
+                                  ×
+                                </button>
+                              </div>
+                              <label>
+                                <span>{tr("이런 상황이면")}</span>
+                                <textarea tabIndex={-1} rows={3} value={b.when} placeholder={tr("예: 끝냈다고 보고했는데 커밋하지 않았다")} spellCheck={false} onChange={(e) => put({ when: e.target.value })} />
+                              </label>
+                              <label>
+                                <span>{tr("이 말을 보낸다")}</span>
+                                <textarea tabIndex={-1} rows={3} value={b.say} placeholder={tr("예: 커밋해 줘")} spellCheck={false} onChange={(e) => put({ say: e.target.value })} />
+                              </label>
+                            </div>
+                          );
+                        })}
+                        <button type="button" tabIndex={-1} className="set-toggle" onClick={() => onBots([...bots, { id: crypto.randomUUID().slice(0, 8), name: "", when: "", say: "", on: false, runs: 0 }])}>
+                          {tr("+ 봇 더하기")}
+                        </button>
+                      </div>
                     )}
                     {row.kind === "argo" && (
                       <span className="set-argo" onClick={(e) => e.stopPropagation()}>

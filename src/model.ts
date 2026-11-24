@@ -311,10 +311,6 @@ export const config = {
   // 오래 쉰 큰 세션을 다시 띄울 때 Claude Code가 묻는 "Resume this conversation?"에 이어 간다고 대신 답한다
   autoResume: true,
   bugParallel: 3,
-  // 세션이 "이대로 진행할까요?"만 묻고 멈췄을 때 Julgi가 대신 이어 가라고 답한다. 고르라는 물음과 되돌리기 어려운 일을 묻는 물음에는 답하지 않는다
-  autoGo: false,
-  // 대신 답할 때 보내는 말
-  autoGoText: "응, 진행해. 푸시, 머지, 배포, 삭제처럼 되돌리기 어려운 일은 하기 전에 물어봐.", // i18n-ok
   // 스크립트가 돌린 세션(claude -p, SDK)을 목록에 어떻게 둘 것인가. group: 맨 아래 한 묶음으로 접어 둔다, hide: 빼고 ⌘K로만 찾는다, mix: 다른 세션과 섞는다
   scriptShow: "group",
   // 대화 기록의 entrypoint가 이 글로 시작하면 스크립트가 돌린 세션으로 본다. 쉼표로 여럿 적는다

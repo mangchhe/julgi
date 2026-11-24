@@ -94,10 +94,10 @@ export default {
   "최근 30일, 하루에 부른 수": "Last 30 days, calls per day",
   "하루에 스킬을 부른 수": "Skill calls per day",
   "대신 한 일 · 내가 안 해도 됐던 것": "Done for me · what I did not have to do",
-  "대신 답한 물음": "Questions answered for me",
-  "최근 7일 · \"진행할까요?\"에 이어 가라고 답함": "Last 7 days · told \"shall I go on?\" to go on",
   "최근 14일 · claude -p나 SDK로 돈 것": "Last 14 days · run with claude -p or the SDK",
   "최근 14일, 하루에 스크립트가 돌린 수": "Last 14 days, script runs per day",
   "하루에 스크립트가 돌린 수": "Script runs per day",
   "어디서 돌았나": "Where they ran",
+  "봇이 대신 답함": "Answered by bots",
+  "최근 7일 · 봇이 세션에 대신 보낸 말": "Last 7 days · messages bots sent to sessions for me",
 } as Record<string, string>;
