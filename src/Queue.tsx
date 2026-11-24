@@ -1,5 +1,4 @@
 import Hint from "./Hint";
-import doneArt from "./assets/art/done.png";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { ago } from "./model";
@@ -163,7 +162,7 @@ export default function Queue({ rows, asks, mine, tickets, loadTicket, runs = []
       <div className={"qu" + (total === 0 ? " empty" : "")} ref={box} tabIndex={-1} onMouseDown={(e) => e.stopPropagation()} onKeyDown={onKey}>
         {total === 0 && (
           <div className="qu-empty">
-            <img src={doneArt} width={132} height={132} alt="" />
+            <svg viewBox="0 0 48 48" aria-hidden="true"><path d="M24 44V20M24 30c-7 0-11-4-11-10 7 0 11 4 11 10ZM24 24c0-8 4-12 11-12 0 8-4 12-11 12Z" /></svg>
             <b>{tr`나를 기다리는 것이 없다`}</b>
             <p>{busy > 0 ? tr`세션 ${busy}개가 일하고 있다. 물음이나 정할 것이 생기면 여기에 올라온다.` : tr`세션이 물음을 남기거나, PR과 티켓에 일이 생기면 여기에 올라온다.`}</p>
             <small>
