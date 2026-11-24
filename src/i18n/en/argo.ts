@@ -25,4 +25,8 @@ export default {
   "로그인한 서버가 없다 · 터미널에서 argocd login <서버>:443 --grpc-web --skip-test-tls (SSO면 --sso)": "No server logged in · in a terminal: argocd login <server>:443 --grpc-web --skip-test-tls (add --sso for SSO)",
   "Argo CD에 다시 로그인해야 한다. 터미널에서: argocd login {0} --grpc-web --skip-test-tls (SSO면 --sso, 포트가 없으면 :443)": "You need to log in to Argo CD again. In a terminal: argocd login {0} --grpc-web --skip-test-tls (add --sso for SSO, and :443 if there is no port)",
   "배포된 커밋 {0}": "deployed commit {0}",
+  "커밋 {0}": "commit {0}",
+  "앞 배포 뒤 {0}개": "{0} since the previous deploy",
+  "차트·설정 변경 {0}": "chart or config changed {0}",
+  "다시 sync": "synced again",
 } as Record<string, string>;

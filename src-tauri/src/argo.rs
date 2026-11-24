@@ -180,7 +180,9 @@ pub fn argo_app(context: String, name: String) -> Result<Value, String> {
         .flatten()
         .map(|h| {
             let revision = s(h, "/revision");
-            json!({ "id": h["id"].as_i64().unwrap_or(0), "revision": if revision.is_empty() { s(h, "/revisions/0") } else { revision }, "at": s(h, "/deployedAt") })
+            // 그 배포의 소스. 이미지 태그를 앱 파라미터로 넣는 구조에서는 revision이 배포마다 같고, 달라지는 것은 여기에 적힌 이미지다
+            let sources: Vec<Value> = h["sources"].as_array().cloned().unwrap_or_else(|| if h["source"].is_object() { vec![h["source"].clone()] } else { vec![] });
+            json!({ "id": h["id"].as_i64().unwrap_or(0), "revision": if revision.is_empty() { s(h, "/revisions/0") } else { revision }, "at": s(h, "/deployedAt"), "sources": sources })
         })
         .collect();
     history.reverse();
@@ -194,6 +196,37 @@ pub fn argo_app(context: String, name: String) -> Result<Value, String> {
     out["history"] = json!(history);
     out["resources"] = json!(resources);
     Ok(out)
+}
+
+/// 배포 이력의 줄마다, 그 줄의 후보들 가운데 이 레포의 커밋으로 풀리는 것을 찾는다. 줄은 최근 것부터 온다.
+/// 돌려주는 것: 줄마다 (그 배포의 커밋, 바로 앞 배포에서 이 배포까지 쌓인 커밋 수). 커밋을 못 찾은 줄은 빈 글과 -1
+#[tauri::command(async)]
+pub fn argo_trail(path: String, rows: Vec<Vec<String>>) -> Vec<(String, i64)> {
+    let ok = |r: &str| !r.is_empty() && r.len() < 120 && !r.starts_with('-') && r.chars().all(|c| c.is_ascii_alphanumeric() || "._-/".contains(c));
+    let resolve = |rev: &str| -> Option<String> {
+        let out = Command::new("git").args(["-C", &path, "rev-parse", "--verify", "--quiet", &format!("{rev}^{{commit}}")]).output().ok()?;
+        out.status.success().then(|| String::from_utf8_lossy(&out.stdout).trim().to_owned())
+    };
+    let commits: Vec<String> = rows.iter().take(40).map(|refs| refs.iter().filter(|r| ok(r)).take(8).find_map(|r| resolve(r).or_else(|| resolve(&format!("v{r}")))).unwrap_or_default()).collect();
+    commits
+        .iter()
+        .enumerate()
+        .map(|(i, commit)| {
+            // 바로 앞 배포: 이 줄보다 아래(더 오래된) 줄 가운데 커밋이 풀린 첫 줄
+            let before = commits[i + 1..].iter().find(|c| !c.is_empty());
+            let count = match (commit.is_empty(), before) {
+                (false, Some(prev)) if prev != commit => Command::new("git")
+                    .args(["-C", &path, "rev-list", "--count", &format!("{prev}..{commit}")])
+                    .output()
+                    .ok()
+                    .and_then(|o| String::from_utf8_lossy(&o.stdout).trim().parse::<i64>().ok())
+                    .unwrap_or(-1),
+                (false, Some(_)) => 0,
+                _ => -1,
+            };
+            (commit.clone(), count)
+        })
+        .collect()
 }
 
 /// 내 커밋(mine)이 배포된 것 안에 들어 있는가. deployed: 배포된 커밋일 수 있는 후보들(커밋 앞자리, 태그 이름).
@@ -296,6 +329,36 @@ mod tests {
         // 풀리는 후보가 없으면 판단하지 않는다
         assert_eq!(argo_reach(path.clone(), "HEAD".into(), vec!["20260101".into(), "release-7".into()]), None);
         assert_eq!(argo_reach(path, "HEAD".into(), vec![]), None);
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    /// 이력의 줄마다 커밋을 찾고, 앞 배포에서 이 배포까지 커밋이 몇 개 쌓였는지 센다. 커밋을 못 찾은 줄은 건너뛰어 그다음 줄과 견준다
+    #[test]
+    fn walks_the_deploy_history() {
+        let dir = std::env::temp_dir().join(format!("julgi-trail-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        let git = |args: &[&str]| {
+            let out = Command::new("git").current_dir(&dir).args(args).env("GIT_AUTHOR_NAME", "t").env("GIT_AUTHOR_EMAIL", "t@t").env("GIT_COMMITTER_NAME", "t").env("GIT_COMMITTER_EMAIL", "t@t").output().unwrap();
+            String::from_utf8_lossy(&out.stdout).trim().to_owned()
+        };
+        git(&["init", "-q", "-b", "main"]);
+        let mut shas = Vec::new();
+        for n in 0..4 {
+            std::fs::write(dir.join("f"), format!("{n}")).unwrap();
+            git(&["add", "f"]);
+            git(&["commit", "-qm", &format!("c{n}")]);
+            shas.push(git(&["rev-parse", "HEAD"]));
+        }
+        let short = |i: usize| shas[i][..8].to_owned();
+        // 최근 것부터: 넷째 커밋, (커밋이 아닌 태그), 둘째 커밋, 둘째 커밋(다시 sync), 첫 커밋
+        let rows = vec![vec!["20260105".into(), short(3)], vec!["release-7".into()], vec![short(1)], vec![short(1)], vec![short(0)]];
+        let got = argo_trail(dir.to_string_lossy().into_owned(), rows);
+        assert_eq!(got[0], (shas[3].clone(), 2), "둘째 커밋에서 넷째 커밋까지 둘");
+        assert_eq!(got[1], (String::new(), -1), "커밋이 아닌 태그는 판단하지 않는다");
+        assert_eq!(got[2], (shas[1].clone(), 0), "앞 배포와 같은 커밋이면 0");
+        assert_eq!(got[3], (shas[1].clone(), 1), "첫 커밋에서 둘째 커밋까지 하나");
+        assert_eq!(got[4], (shas[0].clone(), -1), "가장 오래된 줄은 견줄 앞 배포가 없다");
         let _ = std::fs::remove_dir_all(&dir);
     }
 

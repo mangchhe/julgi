@@ -230,9 +230,18 @@ async function invoke(cmd: string, args: Record<string, unknown> = {}): Promise<
       return {
         context: args.context, name: args.name, project: "default", sync: String(args.name).endsWith("prod") ? "OutOfSync" : "Synced", health: String(args.name).endsWith("prod") ? "Degraded" : "Healthy", env: String(args.name).endsWith("prod") ? "prod" : "staging", namespace: "acme", cluster: "in-cluster", repos: ["https://github.com/example/acme-gitops.git"], path: "apps/x", target: "main", revision: "9f8e7d6c5b4a3210",
         images: [String(args.name).endsWith("prod") ? "registry.example.com/acme/acme-api:0f9e8d7" : "registry.example.com/acme/acme-api:1a2b3c4"], syncedAt: new Date(Date.now() - 12 * 60_000).toISOString(), phase: String(args.name).endsWith("prod") ? "Failed" : "Succeeded", message: String(args.name).endsWith("prod") ? "one or more objects failed to apply: Deployment acme-api: progress deadline exceeded" : "",
-        history: [{ id: 42, revision: "9f8e7d6c5b4a3210", at: new Date(Date.now() - 12 * 60_000).toISOString() }, { id: 41, revision: "7c6b5a4938271605", at: new Date(Date.now() - 26 * 3600_000).toISOString() }, { id: 40, revision: "5a49382716051f2e", at: new Date(Date.now() - 4 * 86400_000).toISOString() }],
+        // 이미지 태그를 앱 파라미터로 넣는 구조: revision은 거의 그대로고 배포마다 태그가 다르다
+        history: [["240105.1a2b3c4d", 12 * 60_000, "9f8e7d6c5b4a3210"], ["240105.1a2b3c4d", 3 * 3600_000, "9f8e7d6c5b4a3210"], ["240104.0f9e8d7c", 26 * 3600_000, "9f8e7d6c5b4a3210"], ["240103.7c6b5a49", 2 * 86400_000, "5a49382716051f2e"], ["240102.5a493827", 4 * 86400_000, "5a49382716051f2e"]].map(([tag, ago, revision], i) => ({
+          id: 42 - i, revision, at: new Date(Date.now() - (ago as number)).toISOString(),
+          sources: [{ repoURL: "https://github.com/example/acme-gitops.git", helm: { parameters: [{ name: "app.image.repository", value: "registry.example.com/acme/acme-api" }, { name: "app.image.tag", value: tag }] } }],
+        })),
         resources: [{ kind: "Deployment", name: "acme-api", namespace: "acme", sync: "Synced", health: String(args.name).endsWith("prod") ? "Degraded" : "Healthy", message: String(args.name).endsWith("prod") ? "Deployment exceeded its progress deadline" : "" }, { kind: "Service", name: "acme-api", namespace: "acme", sync: "Synced", health: "Healthy", message: "" }, { kind: "ConfigMap", name: "acme-api-env", namespace: "acme", sync: String(args.name).endsWith("prod") ? "OutOfSync" : "Synced", health: "", message: "" }],
       };
+    case "argo_trail": {
+      // 태그 뒤쪽의 16진수 조각을 커밋으로 보고, 앞 배포와의 사이에 커밋이 몇 개인지 지어낸다
+      const commits = (args.rows as string[][]).map((refs) => (refs[0] ? refs[0].padEnd(16, "0") : ""));
+      return commits.map((c, i) => [c, c && commits[i + 1] && commits[i + 1] !== c ? 3 + i : c ? 0 : -1]);
+    }
     case "argo_reach":
       return String(args.deployed).startsWith("1a2b") ? [true, "1a2b3c4d5e6f7081"] : String(args.deployed).startsWith("0f9e") ? [false, "0f9e8d7c6b5a4938"] : null;
     case "worktree_add":

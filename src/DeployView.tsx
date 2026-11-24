@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
-import { ArgoApp, ArgoDetail, argoId, argoMark, deployedRef } from "./argo";
+import { ArgoApp, ArgoDetail, argoId, argoMark, deployedRef, historyRows } from "./argo";
+import { openUrl } from "@tauri-apps/plugin-opener";
 import { ago, config } from "./model";
 import { tr } from "./i18n";
 
@@ -41,6 +42,28 @@ export default function DeployView({ app }: { app: ArgoApp }) {
     void invoke<[boolean, string] | null>("argo_reach", { path: app.cwd, mine: "HEAD", deployed: shipped.refs }).then(setReach, () => setReach(null));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [app.cwd, shipped.refs.join(" ")]);
+  // 이력: 배포마다의 이미지 태그와, 그 태그가 가리키는 이 레포의 커밋(줄마다 git에 물어 가린다)
+  const rows = typeof detail === "object" ? historyRows(detail.history, app.repo, app.how, config.argoTagParam, config.argoTagCommit) : [];
+  const [trail, setTrail] = useState<[string, number][]>([]);
+  const [slug, setSlug] = useState("");
+  const trailKey = rows.map((r) => r.refs.join(",")).join("|");
+  useEffect(() => {
+    setTrail([]);
+    if (!app.cwd || !rows.some((r) => r.refs.length)) return;
+    void invoke<[string, number][]>("argo_trail", { path: app.cwd, rows: rows.map((r) => r.refs) }).then(setTrail, () => {});
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [app.cwd, trailKey]);
+  useEffect(() => {
+    setSlug("");
+    if (app.cwd) void invoke<string | null>("repo_slug", { path: app.cwd }).then((v) => setSlug(v ?? ""), () => {});
+  }, [app.cwd]);
+  /** 앞 배포에서 이 배포까지의 변경을 웹의 비교 화면으로 연다. 원격을 모르면 커밋 하나를 연다 */
+  const openRange = (from: string, to: string) => {
+    if (!slug) return;
+    const lab = slug.startsWith("gitlab:");
+    const base = lab ? `https://${slug.slice(7)}` : `https://github.com/${slug}`;
+    void openUrl(from ? `${base}${lab ? "/-" : ""}/compare/${from}...${to}` : `${base}${lab ? "/-" : ""}/commit/${to}`);
+  };
   const login = typeof detail === "string" && detail.startsWith("LOGIN");
   const resources = typeof detail === "object" ? [...detail.resources].sort((a, b) => Number(b.health !== "Healthy" && b.health !== "") - Number(a.health !== "Healthy" && a.health !== "")) : [];
   return (
@@ -89,13 +112,31 @@ export default function DeployView({ app }: { app: ArgoApp }) {
           <div className="dp-cols">
             <div>
               <div className="rv-hist-head">{tr`배포 이력`}</div>
-              {detail.history.length === 0 && <div className="side-none">{tr`이력이 없다`}</div>}
-              {detail.history.map((h, i) => (
-                <div key={h.id} className={"dp-row" + (i === 0 ? " now" : "")}>
-                  <code>{h.revision.slice(0, 8) || "?"}</code>
-                  <small>{when(h.at)}</small>
-                </div>
-              ))}
+              {rows.length === 0 && <div className="side-none">{tr`이력이 없다`}</div>}
+              {rows.map((h, i) => {
+                const [commit, count] = trail[i] ?? ["", -1];
+                // 앞 배포의 커밋: 이 줄보다 오래된 줄 가운데 커밋이 풀린 첫 줄
+                const before = trail.slice(i + 1).find(([c]) => c)?.[0] ?? "";
+                return (
+                  <div key={h.id} className={"dp-hist" + (i === 0 ? " now" : "") + (h.same ? " same" : "")}>
+                    <div>
+                      {/* 이미지 태그가 있으면 그것, 없으면(설정 파일에 이미지가 든 앱) revision */}
+                      <code>{h.tag || h.revision.slice(0, 8) || "?"}</code>
+                      <small>{when(h.at)}</small>
+                    </div>
+                    <div className="dp-hist-sub">
+                      {commit && (
+                        <button type="button" tabIndex={-1} disabled={!slug} title={before && before !== commit ? `${before.slice(0, 8)}..${commit.slice(0, 8)}` : commit} onClick={() => openRange(before !== commit ? before : "", commit)}>
+                          {tr`커밋 ${commit.slice(0, 8)}`}
+                          {count > 0 && ` · ${tr`앞 배포 뒤 ${count}개`}`}
+                        </button>
+                      )}
+                      {h.tag && h.moved && <span>{tr`차트·설정 변경 ${h.revision.slice(0, 8)}`}</span>}
+                      {h.same && <span>{tr`다시 sync`}</span>}
+                    </div>
+                  </div>
+                );
+              })}
             </div>
             <div>
               <div className="rv-hist-head">{tr`리소스 ${resources.length}`}</div>

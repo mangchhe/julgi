@@ -26,7 +26,7 @@ export type ArgoApp = {
 };
 /** 앱 하나의 상세: 배포 이력(최근 것부터)과 리소스별 상태 */
 export type ArgoDetail = ArgoApp & {
-  history: { id: number; revision: string; at: string }[];
+  history: { id: number; revision: string; at: string; sources?: unknown[] }[];
   resources: { kind: string; name: string; namespace: string; sync: string; health: string; message: string }[];
 };
 /** 이을 레포 하나. slug: "소유자/레포" 또는 "gitlab:호스트/경로", name: 레포 이름 */
@@ -118,17 +118,121 @@ export function deployedRef(app: ArgoApp, custom = ""): { tag: string; refs: str
   const mine = app.repo ? app.images.filter((img) => imageOf(img, app.repo!)) : [];
   const image = (mine.length ? mine : app.images.length === 1 ? app.images : []).map(imageParts)[0];
   if (!image?.tag) return { tag: "", refs: [] };
+  return { tag: image.tag, refs: tagRefs(image.tag, custom) };
+}
+
+/** 배포 하나에 적힌 이미지. repo: 이미지 경로(모르면 빈 글), tag: 태그 */
+export type SourceImage = { repo: string; tag: string };
+/** 이미지 태그를 담은 파라미터 이름의 기본 규칙: image.tag로 끝나거나, 마지막 마디가 tag다 */
+const TAG_NAME = /(^|\.)tag$/i;
+/** 값이 그대로 이미지인가: "레지스트리/경로:태그" 꼴 */
+const IMAGE_REF = /^[\w.-]+(?::\d+)?(?:\/[\w.-]+)+:[\w][\w.-]*$/;
+const refParts = (ref: string): SourceImage => {
+  const bare = ref.split("@")[0];
+  const at = bare.lastIndexOf(":");
+  return at > bare.lastIndexOf("/") ? { repo: bare.slice(0, at), tag: bare.slice(at + 1) } : { repo: bare, tag: "" };
+};
+
+/**
+ * 배포 이력의 한 항목에 적힌 소스들에서 그 배포의 이미지를 뽑는다. Argo CD의 표준 필드만 본다:
+ * - Kustomize: kustomize.images[] ("이름=새경로:태그" 또는 "경로:태그")
+ * - Helm 파라미터: helm.parameters[] 가운데 이름이 태그 규칙에 맞는 것. 같은 앞머리의 repository(또는 name) 파라미터가 있으면 묶는다.
+ *   값이 그대로 "경로:태그"인 파라미터도 이미지로 본다
+ * - Helm values: helm.valuesObject, helm.values(YAML 글) 안의 tag와 그 곁의 repository
+ * custom: 태그 파라미터 이름을 가리는 정규식. 적어 두면 기본 규칙 대신 이것으로 이름을 가린다
+ */
+export function sourceImages(sources: unknown[], custom = ""): SourceImage[] {
+  let named = TAG_NAME;
   if (custom) {
     try {
-      const hit = image.tag.match(new RegExp(custom))?.[1];
-      if (hit) return { tag: image.tag, refs: [hit] };
+      named = new RegExp(custom, "i");
+    } catch {
+      // 틀린 정규식이면 기본 규칙으로 간다
+    }
+  }
+  const out: SourceImage[] = [];
+  const add = (img: SourceImage) => img.tag && !out.some((o) => o.repo === img.repo && o.tag === img.tag) && out.push(img);
+  type Obj = Record<string, unknown>;
+  const str = (v: unknown) => (typeof v === "string" || typeof v === "number" ? String(v) : "");
+  // 값 묶음(객체)을 훑는다: tag가 있는 자리에서 곁의 repository나 name을 같이 본다
+  const walk = (node: unknown, path: string) => {
+    if (!node || typeof node !== "object" || Array.isArray(node)) return;
+    const o = node as Obj;
+    for (const [key, value] of Object.entries(o)) {
+      const at = path ? `${path}.${key}` : key;
+      if (value && typeof value === "object") walk(value, at);
+      else if (named.test(at) && str(value)) add({ repo: str(o.repository) || str(o.name), tag: str(value) });
+    }
+  };
+  for (const raw of sources) {
+    const src = (raw ?? {}) as Obj;
+    const kustomize = (src.kustomize ?? {}) as Obj;
+    for (const img of Array.isArray(kustomize.images) ? kustomize.images : []) {
+      const text = str(img);
+      add(refParts(text.includes("=") ? text.slice(text.indexOf("=") + 1) : text));
+    }
+    const helm = (src.helm ?? {}) as Obj;
+    const params = (Array.isArray(helm.parameters) ? helm.parameters : []).map((p) => ({ name: str((p as Obj)?.name), value: str((p as Obj)?.value) }));
+    for (const p of params) {
+      if (named.test(p.name) && p.value) {
+        // "image.tag" ↔ "image.repository": 이름의 마지막 마디만 바꿔 짝을 찾는다
+        const head = p.name.slice(0, p.name.length - p.name.split(".").pop()!.length);
+        const pair = params.find((q) => q.name === head + "repository") ?? params.find((q) => q.name === head + "name");
+        add({ repo: pair?.value ?? "", tag: p.value });
+      } else if (IMAGE_REF.test(p.value)) add(refParts(p.value));
+    }
+    walk(helm.valuesObject, "");
+    // values는 YAML 글이다. 파서를 들이지 않고 줄 단위로 본다: "tag: 값" 줄과, 같은 들여쓰기로 가까이 있는 "repository: 값" 줄
+    const lines = str(helm.values).split("\n");
+    lines.forEach((line, i) => {
+      const m = line.match(/^(\s*)([\w.-]+):\s*["']?([^"'#\s]+)["']?\s*(?:#.*)?$/);
+      if (!m || !named.test(m[2])) return;
+      const near = lines.slice(Math.max(0, i - 4), i + 5).map((l) => l.match(/^(\s*)(repository|name):\s*["']?([^"'#\s]+)/)).find((r) => r && r[1] === m[1]);
+      add({ repo: near?.[3] ?? "", tag: m[3] });
+    });
+  }
+  return out;
+}
+
+/** 여러 이미지 가운데 이 레포의 것. 경로 조각이 레포 이름과 같은 것이 먼저고, 이미지가 하나뿐이면 그것이다 */
+export const pickImage = (images: SourceImage[], repo?: string): SourceImage | undefined =>
+  images.find((img) => repo && imageSegments(img.repo).includes(repo.toLowerCase())) ?? (images.length === 1 ? images[0] : undefined);
+
+/** 태그에서 "이게 커밋이냐"고 git에 물어볼 후보들. deployedRef와 같은 규칙이다: 사용자의 정규식이 맞으면 그것만, 아니면 16진수 조각(긴 것부터)과 태그 그대로 */
+export function tagRefs(tag: string, custom = ""): string[] {
+  if (!tag) return [];
+  if (custom) {
+    try {
+      const hit = tag.match(new RegExp(custom))?.[1];
+      if (hit) return [hit];
     } catch {
       // 틀린 정규식이면 기본 판정으로 간다
     }
   }
-  const hex = [...image.tag.matchAll(/[0-9a-f]{7,40}/gi)].map((m) => m[0]);
-  // 긴 조각이 커밋일 가능성이 크다. 길이순으로 물어본다
-  return { tag: image.tag, refs: [...new Set([...hex.sort((x, y) => y.length - x.length), image.tag])] };
+  const hex = [...tag.matchAll(/[0-9a-f]{7,40}/gi)].map((m) => m[0]);
+  return [...new Set([...hex.sort((x, y) => y.length - x.length), tag])];
+}
+
+/**
+ * 배포 이력을 화면에 낼 줄들로 만든다. 줄은 최근 것부터다.
+ * tag: 그 배포의 이미지 태그(소스에 이미지가 없으면 빈 글), refs: 커밋 후보.
+ * moved: 바로 앞 배포와 견줘 차트·설정(revision)이 달라졌는가. same: 이미지도 revision도 그대로인가(다시 sync만 한 것)
+ */
+export type HistoryRow = { id: number; at: string; revision: string; tag: string; refs: string[]; moved: boolean; same: boolean };
+export function historyRows(history: { id: number; revision: string; at: string; sources?: unknown[] }[], repo: string | undefined, how: ArgoApp["how"], tagParam = "", tagCommit = ""): HistoryRow[] {
+  const rows = history.map((h) => {
+    const tag = pickImage(sourceImages(h.sources ?? [], tagParam), repo)?.tag ?? "";
+    // 소스가 곧 이 레포인 앱은 revision이 이 레포의 커밋이다
+    const refs = tag ? tagRefs(tag, tagCommit) : how === "source" && h.revision ? [h.revision] : [];
+    return { id: h.id, at: h.at, revision: h.revision, tag, refs, moved: false, same: false };
+  });
+  rows.forEach((row, i) => {
+    const before = rows[i + 1];
+    if (!before) return;
+    row.moved = !!row.revision && row.revision !== before.revision;
+    row.same = !row.moved && row.tag === before.tag;
+  });
+  return rows;
 }
 
 /** 환경 이름. 사용자가 라벨 키를 정해 두었고 앱에 그 라벨이 있으면 그 값이 먼저다. 없으면 Rust가 정한 기본값(env → environment → 네임스페이스 → 클러스터) */

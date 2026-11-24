@@ -341,6 +341,8 @@ export const config = {
   // 덮어쓰기: 환경 이름으로 쓸 라벨 키(비우면 env → environment → 네임스페이스 → 클러스터), 태그에서 커밋을 꺼낼 정규식(캡처 그룹 1, 비우면 16진수 후보를 git으로 가린다)
   argoEnvLabel: "",
   argoTagCommit: "",
+  // 덮어쓰기: 배포 이력에서 이미지 태그를 담은 파라미터 이름을 가리는 정규식(비우면 마지막 마디가 tag인 이름)
+  argoTagParam: "",
   argoLagMin: 15,
   /** 나한테 온 리뷰 요청을 ⌘J에 넣고 알린다 */
   reviewAsks: true,

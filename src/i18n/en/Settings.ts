@@ -205,4 +205,6 @@ export default {
   "이 Jira에 없는 상태 이름이다. 고른다:": "This Jira has no status by that name. Pick one:",
   "비어 있어 묻지 않는다. 고르려면:": "Empty, so Julgi does not ask. To set one:",
   "비우기": "Clear",
+  "이미지 태그 파라미터 이름": "Image tag parameter name",
+  "배포 이력에서 그 배포의 이미지 태그를 찾을 때, 태그를 담은 Helm 파라미터(또는 values의 키) 이름을 가리는 정규식. 비우면 image.tag처럼 마지막 마디가 tag인 이름을 본다": "A regex for the name of the Helm parameter (or values key) that holds the image tag, used to find each deploy's image in the history. When empty, names whose last part is tag, such as image.tag, are used",
 } as Record<string, string>;

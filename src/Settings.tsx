@@ -173,6 +173,7 @@ const SECTIONS: { id: string; title: string; hint: string; needs?: "jira" | "arg
       { kind: "text", key: "argoApps", label: tr("레포 → Argo CD 앱"), note: tr("앱을 레포에 직접 잇는다. 적어 두면 소스나 이미지 이름으로 잇는 기본 판정보다 먼저다. 앱 이름 패턴에 *를 쓰거나 /정규식/으로 적고, 쉼표로 여럿을 적는다"), hint: "acme-api=acme-api-*, acme-shop=/^shop-(dev|prod)$/" },
       { kind: "text", key: "argoEnvLabel", label: tr("환경 이름으로 쓸 라벨"), note: tr("비우면 앱의 env, environment 라벨, 없으면 네임스페이스, 그것도 없으면 클러스터 이름을 쓴다"), hint: "tier" },
       { kind: "text", key: "argoTagCommit", label: tr("이미지 태그 → 커밋"), note: tr("태그에서 커밋을 꺼낼 정규식. 캡처 그룹 1이 커밋이다. 비우면 태그 안의 16진수 조각을 git으로 확인해서 찾는다"), hint: "^[0-9]+\\.([0-9a-f]+)$" },
+      { kind: "text", key: "argoTagParam", label: tr("이미지 태그 파라미터 이름"), note: tr("배포 이력에서 그 배포의 이미지 태그를 찾을 때, 태그를 담은 Helm 파라미터(또는 values의 키) 이름을 가리는 정규식. 비우면 image.tag처럼 마지막 마디가 tag인 이름을 본다"), hint: "(^|\\.)(tag|version)$" },
       { kind: "number", key: "argoLagMin", label: tr("OutOfSync가 이만큼 이어지면 알리기"), note: tr("배포가 어긋난 채로 이 시간이 넘으면 한 번 알린다. 0이면 알리지 않는다"), step: 5, min: 0, max: 120, show: (n) => (n ? tr`${n}분` : tr("끔")) },
     ],
   },

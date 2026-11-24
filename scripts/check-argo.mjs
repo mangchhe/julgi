@@ -1,6 +1,6 @@
 // Argo CD 앱을 레포에 잇는 규칙과 배포 판정을 확인한다: node scripts/check-argo.mjs
 import assert from "node:assert/strict";
-import { argoHost, argoLoginCommand, argoLineOf, argoMark, argoNews, deployedRef, imageParts, imageSegments, linkApp, parseRules, repoPath, withEnv } from "../src/argo.ts";
+import { historyRows, pickImage, sourceImages, argoHost, argoLoginCommand, argoLineOf, argoMark, argoNews, deployedRef, imageParts, imageSegments, linkApp, parseRules, repoPath, withEnv } from "../src/argo.ts";
 
 const app = (over) => ({ context: "c", name: "x", project: "", sync: "Synced", health: "Healthy", env: "staging", namespace: "", cluster: "", repos: [], path: "", target: "", revision: "", images: [], syncedAt: "", phase: "Succeeded", message: "", ...over });
 const repos = [
@@ -94,6 +94,51 @@ const later = argoNews(first.seen, app({ sync: "OutOfSync" }), t0 + 11 * 60_000,
 assert.equal(later.news, "11분째 OutOfSync");
 assert.equal(argoNews(later.seen, app({}), t0 + 12 * 60_000, 10).news, "");
 assert.equal(argoNews(first.seen, app({ sync: "OutOfSync" }), t0 + 11 * 60_000, 0).news, "", "0이면 어긋남을 알리지 않는다");
+// ── 배포 이력: 배포마다 달라지는 것은 revision이 아니라 그 배포의 소스에 적힌 이미지다 ──
+// Helm 파라미터: image.tag와 그 짝 image.repository
+const helm = (tag, extra = []) => ({ repoURL: gitops, helm: { parameters: [{ name: "app.image.repository", value: "registry.example.com/acme/acme-api" }, { name: "app.image.tag", value: tag }, ...extra] } });
+assert.deepEqual(sourceImages([helm("240101.1a2b3c4d")]), [{ repo: "registry.example.com/acme/acme-api", tag: "240101.1a2b3c4d" }]);
+// 마지막 마디가 tag인 이름이면 된다. replicas 같은 다른 파라미터는 건너뛴다
+assert.deepEqual(sourceImages([{ helm: { parameters: [{ name: "tag", value: "v2" }, { name: "replicas", value: "3" }] } }]), [{ repo: "", tag: "v2" }]);
+// 값이 그대로 "경로:태그"인 파라미터
+assert.deepEqual(sourceImages([{ helm: { parameters: [{ name: "image", value: "registry.example.com/acme/acme-api:9f8e7d6" }] } }]), [{ repo: "registry.example.com/acme/acme-api", tag: "9f8e7d6" }]);
+// Kustomize images: "이름=새경로:태그"와 "경로:태그"
+assert.deepEqual(sourceImages([{ kustomize: { images: ["acme-api=registry.example.com/acme/acme-api:1a2b3c4", "registry.example.com/mesh/proxy:1.9"] } }]), [
+  { repo: "registry.example.com/acme/acme-api", tag: "1a2b3c4" },
+  { repo: "registry.example.com/mesh/proxy", tag: "1.9" },
+]);
+// Helm values: 객체와 YAML 글
+assert.deepEqual(sourceImages([{ helm: { valuesObject: { app: { image: { repository: "registry.example.com/acme/acme-api", tag: "7c6b5a4" } } } } }]), [{ repo: "registry.example.com/acme/acme-api", tag: "7c6b5a4" }]);
+assert.deepEqual(sourceImages([{ helm: { values: "replicas: 2\nimage:\n  repository: registry.example.com/acme/acme-api\n  tag: \"5a49382\"  # 배포 태그\n" } }]), [{ repo: "registry.example.com/acme/acme-api", tag: "5a49382" }]);
+// 소스가 여럿이면 다 본다. 이미지가 없는 소스(설정 파일에 이미지가 든 앱)는 빈 목록이다
+assert.equal(sourceImages([{ repoURL: gitops, path: "apps/x" }, helm("240102.2b3c4d5e")]).length, 1);
+assert.deepEqual(sourceImages([{ repoURL: gitops, path: "apps/x" }]), []);
+// 덮어쓰기: 태그 파라미터 이름을 정규식으로. 기본 규칙에 안 맞는 이름도 잡는다
+assert.deepEqual(sourceImages([{ helm: { parameters: [{ name: "build.version", value: "240103.3c4d5e6f" }] } }]), []);
+assert.deepEqual(sourceImages([{ helm: { parameters: [{ name: "build.version", value: "240103.3c4d5e6f" }] } }], "version$"), [{ repo: "", tag: "240103.3c4d5e6f" }]);
+// 이 레포의 이미지 고르기: 사이드카가 섞여 있어도 레포 이름과 맞는 것. 하나뿐이면 그것
+assert.equal(pickImage([{ repo: "registry.example.com/mesh/proxy", tag: "1.9" }, { repo: "registry.example.com/acme/acme-api", tag: "1a2b3c4" }], "acme-api")?.tag, "1a2b3c4");
+assert.equal(pickImage([{ repo: "", tag: "v2" }], "acme-api")?.tag, "v2");
+assert.equal(pickImage([{ repo: "a/x", tag: "1" }, { repo: "a/y", tag: "2" }], "acme-api"), undefined);
+
+// 이력 줄: revision은 여섯 번 다 같고 태그만 배포마다 다르다 → 줄마다 다른 태그와 커밋 후보가 나온다
+const rev = "0123456789abcdef";
+const tags = ["240102.6f5e4d3c", "240102.5e4d3c2b", "240101.4d3c2b1a", "240101.4d3c2b1a", "240101.3c2b1a09"];
+const hist = tags.map((tag, i) => ({ id: 50 - i, revision: i === 4 ? "fedcba9876543210" : rev, at: `2026-01-0${5 - i}T00:00:00Z`, sources: [helm(tag)] }));
+const rows = historyRows(hist, "acme-api", "image");
+assert.deepEqual(rows.map((r) => r.tag), tags);
+assert.deepEqual(rows[0].refs, ["6f5e4d3c", "240102.6f5e4d3c"]);
+// revision은 앞 배포와 다를 때만 표시한다: 넷째 줄(앞 배포의 revision이 다르다)만 "차트·설정 변경"
+assert.deepEqual(rows.map((r) => r.moved), [false, false, false, true, false]);
+// 이미지도 revision도 그대로면 다시 sync만 한 것: 셋째 줄(넷째 줄과 태그가 같고 revision도 같다)
+assert.deepEqual(rows.map((r) => r.same), [false, false, true, false, false]);
+// 이미지가 소스에 없는 앱(설정 파일에 이미지가 든 앱)은 깨지지 않고 revision으로 본다. 소스가 곧 레포인 앱은 revision이 커밋 후보다
+const plain = historyRows([{ id: 2, revision: "aaaaaaaa1", at: "", sources: [{ repoURL: gitops, path: "apps/x" }] }, { id: 1, revision: "bbbbbbbb2", at: "", sources: [{ repoURL: gitops, path: "apps/x" }] }], "acme-api", "image");
+assert.deepEqual(plain.map((r) => [r.tag, r.refs.length, r.moved]), [["", 0, true], ["", 0, false]]);
+assert.deepEqual(historyRows([{ id: 1, revision: "aaaaaaaa1", at: "" }], "acme-api", "source")[0].refs, ["aaaaaaaa1"]);
+// 태그 → 커밋 덮어쓰기는 이력에도 같이 적용된다
+assert.deepEqual(historyRows(hist, "acme-api", "image", "", "^[0-9]+\\.([0-9a-f]+)$")[0].refs, ["6f5e4d3c"]);
+
 // 로그인 명령: 포트가 없으면 :443을 붙이고, 주소에 섞인 앞머리와 경로는 뗀다. 이상한 글자가 든 주소는 받지 않는다(셸에서 돌리는 명령이다)
 assert.equal(argoLoginCommand("argocd.example.com", true), "argocd login argocd.example.com:443 --grpc-web --skip-test-tls --sso --name argocd.example.com");
 assert.equal(argoLoginCommand("https://argocd.example.com:8443/applications", false), "argocd login argocd.example.com:8443 --grpc-web --skip-test-tls --name argocd.example.com");

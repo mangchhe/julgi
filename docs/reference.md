@@ -80,6 +80,7 @@ Change them in `⌘,`; they apply at once and are saved to `~/.julgi/config.json
 | `argoApps` | none | Override: link apps to a repo yourself (`repo=app name pattern`, `*` or `/regex/`, comma separated). Comes before the defaults: the app's source repo equals the repo's remote, then a path segment of a deployed image equals the repo name |
 | `argoEnvLabel` | none | Override: label key to read the environment name from. Default: `env`, `environment`, then the namespace, then the cluster name |
 | `argoTagCommit` | none | Override: regex that pulls the commit out of an image tag (capture group 1). Default: every 7 to 40 character hex run in the tag is tried against git, then the tag itself as a git tag |
+| `argoTagParam` | none | Override: regex for the name of the Helm parameter or values key that holds the image tag, used to find each deploy's image in the history. Default: names whose last part is `tag`, such as `image.tag`. Kustomize `images` are always read |
 | `prEveryMin`, `askEveryMin` | 2, 5 | Minutes between PR checks and review request checks |
 | `refreshOnFocus` | on | Check again as soon as the window regains focus |
 | `prViewRefreshSec` | 30 | Seconds between reloads of an open PR view. 0 disables |
