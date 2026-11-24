@@ -218,4 +218,9 @@ export default {
   "섞어서": "Mixed in",
   "스크립트 세션을 가리는 값": "Value that marks a script session",
   "Claude Code는 대화 기록에 세션을 연 길(entrypoint)을 적는다. 터미널에서 열면 cli, 스크립트나 SDK가 돌리면 sdk-cli다. 그 값이 여기 적은 글로 시작하면 스크립트가 돌린 세션으로 본다. 쉼표로 여럿 적는다": "Claude Code writes how a session was started (entrypoint) into its transcript: cli when opened in a terminal, sdk-cli when run by a script or the SDK. A session whose value starts with the text here counts as run by a script. Separate several with commas",
+  "\"진행할까요?\"에 대신 답하기": "Answer \"shall I go on?\" for me",
+  "세션이 스스로 내놓은 다음 단계를 진행해도 되는지만 묻고 멈췄으면 Julgi가 대신 이어 가라고 답한다. 여러 안 가운데 고르라는 물음, 내가 줄 정보를 기다리는 물음, 푸시·머지·배포·삭제처럼 되돌리기 어려운 일을 묻는 물음에는 답하지 않고 내 차례로 올린다. 한 세션에 연달아 세 번까지만 답한다. \"할 일이 있을 때만 부르기\"가 켜져 있어야 하고, 답한 것은 ⌘Y에 남는다": "When a session stops only to ask whether it may go on with the next step it proposed itself, Julgi tells it to go on. Questions that ask me to choose between options, wait for information from me, or ask about things that are hard to undo (push, merge, deploy, delete) are not answered and come up as my turn. At most three answers in a row per session. Needs \"Only call me when there is something to do\" on; each answer is kept in ⌘Y",
+  "대신 답할 때 보내는 말": "What to say when answering for me",
+  "위 설정이 켜져 있을 때 세션에 보내는 말": "The message sent to the session when the setting above is on",
+  "응, 진행해": "Yes, go on",
 } as Record<string, string>;

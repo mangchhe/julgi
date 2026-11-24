@@ -36,4 +36,5 @@ export default {
   "아직 없다": "Nothing yet",
   "⏎ 세션으로": "⏎ to session",
   "↑↓ 고르기 (고른 줄은 내용을 다 편다) · Enter 그 세션으로 · 위의 종류를 누르면 그것만 본다 · Esc": "↑↓ select (the selected row expands) · Enter go to that session · click a kind above to show only that · Esc",
+  "대신 답함": "Answered for me",
 } as Record<string, string>;

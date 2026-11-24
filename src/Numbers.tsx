@@ -130,6 +130,16 @@ export default function Numbers({ acts, tasks, reviews, sessions, threads, open,
     const by = (word: string) => sent.filter((a) => a.text.includes(word) || a.text.includes(tr(word))).length;
     const judged = routes.filter((r) => r.top);
     const recent = sessions.filter((s) => !s.auto && now / 1000 - s.mtime < 14 * 86400);
+    // 스크립트가 돌린 세션은 임시 폴더를 하나씩 따서 도는 일이 많다. 같은 윗폴더 아래 폴더가 셋 넘으면 윗폴더 하나로 센다
+    const scripts = sessions.filter((s) => s.script && now / 1000 - s.mtime < 14 * 86400);
+    const up = (cwd: string) => cwd.slice(0, cwd.lastIndexOf("/"));
+    const kids = new Map<string, Set<string>>();
+    for (const s of scripts) kids.set(up(s.cwd), (kids.get(up(s.cwd)) ?? new Set()).add(s.cwd));
+    const places = new Map<string, number>();
+    for (const s of scripts) {
+      const place = (kids.get(up(s.cwd))?.size ?? 0) >= 3 ? up(s.cwd).split("/").pop() || "/" : s.repo;
+      places.set(place, (places.get(place) ?? 0) + 1);
+    }
     const uses30 = skillUses.filter((u) => now - (Date.parse(u.at) || 0) < 30 * DAY);
     const usedSkills = new Set(uses30.map((u) => u.skill.slice(u.skill.lastIndexOf(":") + 1)));
     return {
@@ -148,6 +158,10 @@ export default function Numbers({ acts, tasks, reviews, sessions, threads, open,
       kinds: [...kinds].sort((a, b) => b[1] - a[1]),
       weekTotal: week.length,
       needCheck: week.filter((a) => a.kind === "확인 필요").length, // i18n-ok
+      scripts: scripts.length,
+      scriptDays: perDay(scripts.map((s) => s.mtime * 1000)),
+      places: [...places].sort((a, b) => b[1] - a[1]).slice(0, 8),
+      went: week.filter((a) => a.kind === "대신 답함").length, // i18n-ok
       recent: recent.length,
       big: recent.filter((s) => hot(s.tokens)).length,
       noteKinds: KINDS.map((k) => [tr(k), notes.filter((n) => n.kind === k).length]) as [string, number][],
@@ -285,6 +299,25 @@ export default function Numbers({ acts, tasks, reviews, sessions, threads, open,
           <Tile n={v.big} label={tr("갈아탈 만큼 큰 세션")} sub={tr`줄기 ${threads.length}개`} />
         </div>
         <Bars rows={v.kinds.map(([kind, n]) => [tr(kind), n])} />
+      </section>
+      <section>
+        <h3>{tr("대신 한 일 · 내가 안 해도 됐던 것")}</h3>
+        <div className="nm-tiles">
+          <Tile n={v.went} label={tr("대신 답한 물음")} sub={tr("최근 7일 · \"진행할까요?\"에 이어 가라고 답함")} />
+          <Tile n={v.scripts} label={tr("스크립트가 돌린 세션")} sub={tr("최근 14일 · claude -p나 SDK로 돈 것")} />
+        </div>
+        {v.scripts > 0 && (
+          <div className="nm-split">
+            <div>
+              <small>{tr("최근 14일, 하루에 스크립트가 돌린 수")}</small>
+              <Days counts={v.scriptDays} label={tr("하루에 스크립트가 돌린 수")} />
+            </div>
+            <div>
+              <small>{tr("어디서 돌았나")}</small>
+              <Bars rows={v.places} />
+            </div>
+          </div>
+        )}
       </section>
       <section>
         <h3>{tr("조율 · 맡긴 일감이 한 번에 끝나는가")}</h3>

@@ -414,6 +414,7 @@ export default function App() {
   const noted = useRef<Record<string, number>>({}); // 세션 → 요약을 남긴 때의 대화 기록 시각
   const noting = useRef(new Set<string>());
   const trustedOnce = useRef(new Set<string>()); // 폴더 믿음 물음에 대신 답해 준 터미널
+  const goStreak = useRef<Record<string, number>>({}); // 세션마다 연달아 대신 답한 횟수
   const resumedOnce = useRef(new Set<string>()); // "이어서 할까" 물음에 대신 답한 칸
   // 마지막으로 알린 세션. macOS는 어느 알림을 눌렀는지 알려 주지 않아서, 알린 뒤 곧 창이 앞으로 오면 알림을 눌렀다고 보고 그 세션을 띄운다
   const notified = useRef<{ key: string; at: number } | null>(null);
@@ -1007,7 +1008,7 @@ export default function App() {
   const triage = async (sessionId: string, since: number) => {
     if (triaging.current.has(sessionId)) return;
     triaging.current.set(sessionId, Date.now());
-    let verdict = { since, need: true, why: "" };
+    let verdict = { since, need: true, go: false, why: "" };
     try {
       const pair = await invoke<[string, string] | null>("last_exchange", { sessionId });
       if (pair?.[1]) {
@@ -1018,6 +1019,15 @@ export default function App() {
     } catch {
       // 못 읽었으면 내 차례로 둔다. 놓치는 것보다 한 번 더 부르는 편이 낫다
     }
+    // "이대로 진행할까요?"만 물은 것이면 대신 이어 가라고 답한다. 내가 한 번도 끼지 않고 연달아 답하는 것은 세 번까지다
+    const key = live.current.open.find((o) => o.sessionId === sessionId)?.key;
+    const streak = verdict.go ? (goStreak.current[sessionId] ?? 0) : 0;
+    if (config.autoGo && verdict.go && key && streak < 3) {
+      goStreak.current[sessionId] = streak + 1;
+      verdict = { ...verdict, need: false };
+      terms.submitWhenClear(key, config.autoGoText);
+      record("대신 답함", tr`"${nameOf(key).slice(0, 40)}": ${verdict.why || tr("진행해도 되는지 물어서 이어 가라고 답함")}`, sessionId); // i18n-ok
+    } else delete goStreak.current[sessionId];
     triaged.current = { ...triaged.current, [sessionId]: verdict };
     triaging.current.delete(sessionId);
     void invoke("data_write", { name: "triage.json", text: JSON.stringify(Object.fromEntries(Object.entries(triaged.current).slice(-200))) });
