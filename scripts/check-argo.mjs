@@ -1,6 +1,6 @@
 // Argo CD 앱을 레포에 잇는 규칙과 배포 판정을 확인한다: node scripts/check-argo.mjs
 import assert from "node:assert/strict";
-import { argoLineOf, argoMark, argoNews, deployedRef, imageParts, imageSegments, linkApp, parseRules, repoPath, withEnv } from "../src/argo.ts";
+import { argoHost, argoLoginCommand, argoLineOf, argoMark, argoNews, deployedRef, imageParts, imageSegments, linkApp, parseRules, repoPath, withEnv } from "../src/argo.ts";
 
 const app = (over) => ({ context: "c", name: "x", project: "", sync: "Synced", health: "Healthy", env: "staging", namespace: "", cluster: "", repos: [], path: "", target: "", revision: "", images: [], syncedAt: "", phase: "Succeeded", message: "", ...over });
 const repos = [
@@ -94,4 +94,11 @@ const later = argoNews(first.seen, app({ sync: "OutOfSync" }), t0 + 11 * 60_000,
 assert.equal(later.news, "11분째 OutOfSync");
 assert.equal(argoNews(later.seen, app({}), t0 + 12 * 60_000, 10).news, "");
 assert.equal(argoNews(first.seen, app({ sync: "OutOfSync" }), t0 + 11 * 60_000, 0).news, "", "0이면 어긋남을 알리지 않는다");
+// 로그인 명령: 포트가 없으면 :443을 붙이고, 주소에 섞인 앞머리와 경로는 뗀다. 이상한 글자가 든 주소는 받지 않는다(셸에서 돌리는 명령이다)
+assert.equal(argoLoginCommand("argocd.example.com", true), "argocd login argocd.example.com:443 --grpc-web --skip-test-tls --sso --name argocd.example.com");
+assert.equal(argoLoginCommand("https://argocd.example.com:8443/applications", false), "argocd login argocd.example.com:8443 --grpc-web --skip-test-tls --name argocd.example.com");
+assert.equal(argoLoginCommand("argocd.example.com:443", true, "staging"), "argocd login argocd.example.com:443 --grpc-web --skip-test-tls --sso --name staging");
+assert.equal(argoLoginCommand("argocd.example.com", true, "x; rm -rf ~"), "argocd login argocd.example.com:443 --grpc-web --skip-test-tls --sso --name argocd.example.com");
+assert.equal(argoHost("argocd.example.com; rm -rf ~"), "");
+assert.equal(argoHost("$(whoami).example.com"), "");
 console.log("argo ok");

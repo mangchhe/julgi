@@ -162,6 +162,21 @@ export function argoNews(before: ArgoSeen | undefined, now: ArgoApp, at: number,
   return { seen: { ...seen, told: false }, news: "" };
 }
 
+/** 서버 주소에서 호스트(와 포트)만: 앞의 https://와 뒤의 경로를 뗀다. 이상한 글자가 있으면 빈 글 */
+export const argoHost = (text: string) => {
+  const host = text.trim().replace(/^[a-z]+:\/\//i, "").replace(/\/.*$/, "");
+  return /^[A-Za-z0-9.-]+(:\d+)?$/.test(host) ? host : "";
+};
+/**
+ * 로그인 명령. 포트가 없으면 :443을 붙인다. 로드밸런서 뒤의 서버는 --grpc-web이 있어야 하고, --skip-test-tls가 없으면 로그인 창이 뜨기도 전에 시간이 다 돼 실패하기도 한다.
+ * SSO면 브라우저가 뜨고, 아니면 argocd가 터미널에서 아이디와 비밀번호를 묻는다. 어느 쪽이든 Julgi는 토큰과 비밀번호를 보지 않는다
+ */
+export const argoLoginCommand = (server: string, sso: boolean, name = "") => {
+  const host = argoHost(server);
+  const label = (name && /^[A-Za-z0-9._:-]+$/.test(name) ? name : host).replace(/:\d+$/, "");
+  return `argocd login ${/:\d+$/.test(host) ? host : host + ":443"} --grpc-web --skip-test-tls${sso ? " --sso" : ""} --name ${label}`;
+};
+
 // PR 화면처럼 App 밖에 있는 화면이 레포의 배포 한 줄을 읽을 수 있게 둔다 (jira.ts의 setKnownKeys와 같은 방식)
 let linked: ArgoApp[] = [];
 export const setArgoApps = (apps: ArgoApp[]) => void (linked = apps);
