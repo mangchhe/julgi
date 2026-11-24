@@ -58,6 +58,7 @@ Change them in `⌘,`; they apply at once and are saved to `~/.julgi/config.json
 | `skipPermissions` | `off` | Launch without permission prompts. `mine` (sessions I opened), `all` |
 | `triage` | on | Read each finished reply and bring the session to My turn only when there is something to decide or answer |
 | `longRunMin` | 30 | Notify once when one request has been running this many minutes. 0 disables |
+| `claudeFullscreen` | off | Let Claude Code use its fullscreen renderer. Off keeps the conversation in the terminal scrollback, which find (`⌘F`), `⌘`-click on paths and `⌘↑`/`⌘↓` rely on. Applies to sessions opened afterwards |
 | `morning`, `morningHours` | on, 6 | Show the briefing when you come back after this many hours away |
 | `autoAllow`, `allowRules` | `off`, none | Commands let through without asking: `look`, `check`, plus your own prefixes or rules |
 | `notify` | on | Notify when it becomes my turn and the window is not focused |

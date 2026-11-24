@@ -300,6 +300,9 @@ export const config = {
   triage: true,
   /** 한 번 시킨 일이 이만큼(분) 넘게 돌고 있으면 알린다. 0이면 알리지 않는다 */
   longRunMin: 30,
+  // Claude Code의 전체 화면 그리기를 쓸 것인가. 끄면(기본) 지난 대화가 터미널의 스크롤 기록에 남는다.
+  // 찾기(⌘F), 경로 ⌘클릭, 내 말 사이 건너뛰기(⌘↑↓), 갈아탈 때 화면 이어 붙이기가 모두 그 기록을 쓴다
+  claudeFullscreen: false,
   bugParallel: 3,
   /** 오래 자리를 비웠다 돌아오면 브리핑을 띄운다 */
   morning: true,
@@ -396,7 +399,7 @@ const skip = (id: string) => (config.skipPermissions === "all" || (config.skipPe
 
 // JULGI_SESSION: 세션 안에서 julgi 명령이 자기가 누구인지 아는 데 쓴다. --plugin-dir: Julgi의 스킬을 이 세션에만 얹는다
 const launch = (id: string, how: string) =>
-  `JULGI_SESSION=${id} claude ${how} ${id}${skip(id)} --settings '${settings()}'${prefs ? " --append-system-prompt-file ~/.julgi/prefs.md" : ""} --plugin-dir ~/.julgi/plugin --plugin-dir ~/.julgi/grown${config.pluginDirs.map((dir) => ` --plugin-dir "${dir.replace(/^~(?=\/|$)/, "$HOME").replace(/["`\\]/g, "")}"`).join("")}`;
+  `JULGI_SESSION=${id}${config.claudeFullscreen ? "" : " CLAUDE_CODE_DISABLE_ALTERNATE_SCREEN=1"} claude ${how} ${id}${skip(id)} --settings '${settings()}'${prefs ? " --append-system-prompt-file ~/.julgi/prefs.md" : ""} --plugin-dir ~/.julgi/plugin --plugin-dir ~/.julgi/grown${config.pluginDirs.map((dir) => ` --plugin-dir "${dir.replace(/^~(?=\/|$)/, "$HOME").replace(/["`\\]/g, "")}"`).join("")}`;
 export const resumeCommand = (id: string) => launch(id, "--resume");
 /** 파일에 적어 둔 글을 첫 입력으로 넣는다 */
 export const withPrompt = (command: string, path: string) => `${command} "$(cat '${path}')"`;

@@ -46,6 +46,7 @@ const SECTIONS: { id: string; title: string; hint: string; rows: Row[] }[] = [
     { kind: "number", key: "recentDays", label: tr("목록에 보이는 기간"), note: tr("이보다 오래 안 쓴 잠든 세션은 목록에서 빼고 ⌘K로만 찾는다"), step: 1, min: 1, max: 90, show: (n) => tr`${n}일` },
     { kind: "toggle", key: "usage", label: tr("Claude 사용량 보기"), note: tr("아래 상태 줄에 5시간 창과 주간 한도를 얼마나 썼는지 보여 준다. 켜면 Claude Code의 로그인 토큰을 키체인에서 읽어 Anthropic의 사용량 주소에만 보낸다(처음에 키체인이 허락을 묻는다). 문서에 없는 주소라 어느 날 안 나올 수 있다") },
       { kind: "toggle", key: "triage", label: tr("할 일이 있을 때만 부르기"), note: tr("세션이 답을 끝내면 작은 모델이 마지막 답을 읽는다. 내가 정하거나 답할 것이 있으면 내 차례로 올리고 알린다. 끝냈다고 보고만 한 것은 \"보고함\"으로 조용히 두고 브리핑(⌘⇧B)에서 모아 보여 준다. 판정하지 못하면 내 차례로 올린다") },
+      { kind: "toggle", key: "claudeFullscreen", label: tr("Claude Code의 전체 화면 그리기"), note: tr("켜면 Claude Code가 화면을 직접 관리한다. 지난 대화가 터미널의 스크롤 기록에 남지 않아 ⌘F 찾기, 경로 ⌘클릭, ⌘↑↓로 내 말 건너뛰기가 지금 보이는 화면에서만 된다. 새로 여는 세션부터 적용된다") },
       { kind: "number", key: "longRunMin", label: tr("오래 도는 일 알리기"), note: tr("한 번 시킨 일이 이만큼 넘게 돌고 있으면 한 번 알린다. 0이면 알리지 않는다"), step: 10, min: 0, max: 240, show: (n) => (n ? tr`${n}분` : tr("끔")) },
       { kind: "toggle", key: "morning", label: tr("돌아오면 브리핑"), note: tr("한동안 Julgi를 안 보다가 돌아오면 나를 기다리는 것, PR과 티켓에 생긴 일, 하던 일이 어디까지 왔는지, 그동안 Julgi가 한 일을 한 화면으로 보여 준다. ⌘⇧B로 언제든 연다") },
       { kind: "number", key: "morningHours", label: tr("브리핑을 띄우는 간격"), note: tr("이만큼 넘게 안 봤을 때만 띄운다"), step: 1, min: 1, max: 72, show: (n) => tr`${n}시간` },
