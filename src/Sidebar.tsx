@@ -1,6 +1,8 @@
 import { openPr, prParts, PrStatus, PrTarget } from "./pr";
 import { openTicket } from "./jira";
 import { useState } from "react";
+import BotFace, { faceSeed } from "./BotFace";
+import { Bot } from "./triageAsk.ts";
 import { tr } from "./i18n";
 import { Change, Job, ago, config, elsewhere, hot, Item, kilo, Open, Session, STATE_LABEL, TermState, Thread, waiting } from "./model";
 
@@ -44,9 +46,18 @@ type Props = {
   onWork: () => void;
   /** 스크립트가 돌린 세션. 맨 아래 한 묶음으로 접어 둔다 */
   scripts: Session[];
+  /** 나를 기다리는 것의 수 (세션, PR, 티켓) */
+  turn: number;
+  /** 등록된 봇과 오늘 대신 답한 횟수 */
+  bots: Bot[];
+  botRuns: number;
+  onQueue: () => void;
+  onBots: () => void;
+  onSettings: () => void;
+  onHistory: () => void;
 };
 
-export default function Sidebar({ open, items, threads, byId, states, tasks, changes, pinned, dead, loading, current, shown, onShow, onClose, onOpenSession, onSearch, prOf, prNews, sleepNews, ticketOf, work, onWork, scripts }: Props) {
+export default function Sidebar({ open, items, threads, byId, states, tasks, changes, pinned, dead, loading, current, shown, onShow, onClose, onOpenSession, onSearch, prOf, prNews, sleepNews, ticketOf, work, onWork, scripts, turn, bots, botRuns, onQueue, onBots, onSettings, onHistory }: Props) {
   const openIds = new Set(open.map((o) => o.sessionId));
   const cutoff = Date.now() / 1000 - config.recentDays * 86400;
   const [scriptsOpen, setScriptsOpen] = useState(false);
@@ -97,12 +108,28 @@ export default function Sidebar({ open, items, threads, byId, states, tasks, cha
           <kbd>⌘K</kbd>
         </button>
       </div>
-      {/* 작업 페이지(⌘U): PR을 묶음별로 둘러본다 */}
-      <button type="button" className={"side-work" + (work.news ? " hot" : "")} onClick={onWork} title={tr`작업: PR을 묶음별로 둘러본다 (⌘U)`}>
-        <svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="4" cy="4" r="2" /><circle cx="4" cy="12" r="2" /><circle cx="12" cy="12" r="2" /><path d="M4 6v4M12 10V7a3 3 0 0 0-3-3H7" /></svg>
-        <span>{tr`작업`}</span>
-        <small>{[work.prs ? `PR ${work.prs}` : "", work.asks ? tr`리뷰 ${work.asks}` : "", work.news ? tr`새 소식 ${work.news}` : ""].filter(Boolean).join(" · ") || "⌘U"}</small>
-      </button>
+      {/* 가는 곳 셋: 나를 기다리는 것, 밖의 일(PR·티켓·CI), 대신 답해 주는 봇 */}
+      <nav className="side-nav">
+        <button type="button" className={"side-work" + (turn ? " hot" : "")} onClick={onQueue} title={tr`내 차례: 나를 기다리는 세션, PR, 티켓 (⌘J)`}>
+          <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 2.5v6M8 8.5 5 6M8 8.5l3-2.5" /><path d="M3 11.5c1.5 1.5 3.2 2 5 2s3.5-.5 5-2" /></svg>
+          <span>{tr`내 차례`}</span>
+          {turn ? <b className="side-count">{turn}</b> : <small>⌘J</small>}
+        </button>
+        <button type="button" className={"side-work" + (work.news ? " hot" : "")} onClick={onWork} title={tr`작업: PR, 티켓, CI, 배포를 묶음별로 둘러본다 (⌘U)`}>
+          <svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="4" cy="4" r="2" /><circle cx="4" cy="12" r="2" /><circle cx="12" cy="12" r="2" /><path d="M4 6v4M12 10V7a3 3 0 0 0-3-3H7" /></svg>
+          <span>{tr`작업`}</span>
+          <small>{[work.prs ? `PR ${work.prs}` : "", work.asks ? tr`리뷰 ${work.asks}` : "", work.news ? tr`새 소식 ${work.news}` : ""].filter(Boolean).join(" · ") || "⌘U"}</small>
+        </button>
+        <button type="button" className="side-work" onClick={onBots} title={tr`봇: 정해 둔 상황이면 세션에 대신 답한다`}>
+          <span className="side-faces">
+            {(bots.some((b) => b.on) ? bots.filter((b) => b.on) : bots).slice(0, 3).map((b) => (
+              <BotFace key={b.id} seed={b.face ?? faceSeed(b.id)} size={16} image={b.image} />
+            ))}
+          </span>
+          <span>{tr`봇`}</span>
+          <small>{bots.some((b) => b.on) ? (botRuns ? tr`오늘 ${botRuns}번 답함` : tr`${bots.filter((b) => b.on).length}개 켜짐`) : tr`꺼져 있다`}</small>
+        </button>
+      </nav>
       <div className="side-list">
         {open.length === 0 && (
           <>
@@ -276,6 +303,16 @@ export default function Sidebar({ open, items, threads, byId, states, tasks, cha
             {scriptsOpen && scripted.length > PER_GROUP * 2 && <div className="side-more">{tr`외 ${scripted.length - PER_GROUP * 2}개 · ⌘K로 찾기`}</div>}
           </div>
         )}
+      </div>
+      <div className="side-foot">
+        <button type="button" onClick={onSettings} title={tr`설정 (⌘,)`}>
+          <svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="2.2" /><path d="M8 1.8v2M8 12.2v2M1.8 8h2M12.2 8h2M3.6 3.6l1.4 1.4M11 11l1.4 1.4M12.4 3.6 11 5M5 11l-1.4 1.4" /></svg>
+          {tr`설정`}
+        </button>
+        <button type="button" onClick={onHistory} title={tr`Julgi가 알아서 한 일 (⌘Y)`}>
+          <svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="5.5" /><path d="M8 5v3.2l2 1.3" /></svg>
+          {tr`한 일`}
+        </button>
       </div>
     </aside>
   );

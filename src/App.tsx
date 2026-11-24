@@ -3248,6 +3248,13 @@ export default function App() {
           }}
           work={{ prs: minePrs.length, asks: asks.length, news: Object.keys(mineNews).length + Object.keys(prNews).length + Object.keys(sleepNews).length }}
           onWork={() => setOverlay("work")}
+          turn={open.filter((o) => waiting(states[o.key]) || prNews[o.key]).length + asks.length + Object.keys(mineNews).length + Object.keys(sleepNews).length}
+          bots={bots}
+          botRuns={acts.filter((a) => a.kind === "대신 답함" && new Date(a.at).toDateString() === new Date().toDateString()).length} // i18n-ok
+          onQueue={() => setOverlay("queue")}
+          onBots={() => (setSettingsAt("봇"), setOverlay("settings"))} // i18n-ok
+          onSettings={() => (setSettingsAt(undefined), setOverlay("settings"))}
+          onHistory={() => setOverlay("history")}
         />
       )}
       <div
