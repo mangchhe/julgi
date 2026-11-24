@@ -23,6 +23,12 @@ async function invoke(cmd: string, args: Record<string, unknown> = {}): Promise<
   switch (cmd) {
     case "ledger_scan": {
       const sessions = await fetch("/mock-ledger.json").then((r) => r.json());
+      // big 깃발: 세션을 600개쯤으로 불린다. 세션이 많을 때 화면이 얼마나 무거운지 잴 때 쓴다 (앞의 것들은 그대로 두어 열린 세션과 맞는다)
+      if (flags.has("big")) {
+        const more = [];
+        for (let n = 1; n < 38; n++) for (const x of sessions) more.push({ ...x, id: x.id.replace(/^.{8}/, String(n).padStart(8, "9")), title: `${x.title} ${n}`, mtime: x.mtime - n * 3600, branch: n % 3 ? x.branch : `feature/ABC-${100 + n}-work` });
+        return { sessions: [...sessions, ...more], works: [] };
+      }
       return { sessions, works: [] };
     }
     case "repo_state":

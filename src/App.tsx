@@ -81,6 +81,9 @@ const HANDOFF_TIMEOUT_MS = 5 * 60_000;
 
 type Layout = { open: Open[]; panes: (string | null)[]; widths?: number[]; pinned?: string[]; focus: number; fontSize: number; sidebar: boolean };
 
+/** 세션 목록이 달라졌는지 가리는 표시: 세션마다 바뀌면 달라지는 값들과 일감 목록 */
+const ledgerSig = (l: Ledger) => l.sessions.map((x) => `${x.id}:${x.mtime}:${x.size}:${x.tokens}:${x.title}:${x.branch}`).join("|") + "#" + JSON.stringify(l.works);
+
 export default function App() {
   const [ledger, setLedger] = useState<Ledger | null>(null);
   const [open, setOpen] = useState<Open[]>([]);
@@ -428,6 +431,8 @@ export default function App() {
   // 변경을 세는 곳, 칸 머리의 브랜치, 코드 검토가 모두 이 폴더를 본다
   const [workdirs, setWorkdirs] = useState<Record<string, { dir: string; branch: string }>>({});
   const workdirsRef = useRef(workdirs);
+  const keysVersion = useRef(0); // 아는 Jira 프로젝트 키가 바뀔 때마다 오른다. 티켓 ↔ 세션 색인을 다시 만들 때를 안다
+  const workdirSeen = useRef(new Set<string>()); // 일하는 폴더를 한 번 알아본 세션
   workdirsRef.current = workdirs;
   const dirOf = (o: Open) => (o.sessionId && workdirsRef.current[o.sessionId]?.dir) || o.cwd;
   /** 대화 기록의 최근 도구 호출을 보고 세션이 일하는 폴더를 다시 정한다 */
@@ -454,7 +459,14 @@ export default function App() {
   }, [changes, workdirs, open]);
   // 열려 있는 세션은 켤 때와 새로 열릴 때 한 번씩 본다
   useEffect(() => {
-    const timer = setTimeout(() => void Promise.all(open.map((o) => findWorkdir(o))), 4000);
+    // 새로 열린 세션만 본다. 하나 열고 닫을 때마다 열린 세션 전부의 대화 기록을 다시 읽지 않는다 (답이 끝날 때는 그 세션을 다시 본다)
+    const timer = setTimeout(() => {
+      for (const o of open) {
+        if (!o.sessionId || workdirSeen.current.has(o.sessionId)) continue;
+        workdirSeen.current.add(o.sessionId);
+        void findWorkdir(o);
+      }
+    }, 4000);
     return () => clearTimeout(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open.length]);
@@ -1464,7 +1476,7 @@ export default function App() {
     if (key === "theme") applyTheme(String(value));
     // Jira를 연결하거나 끊으면 프로젝트 키와 내 티켓을 바로 다시 받는다
     if (key === "jiraSite") {
-      if (!value) (setTickets([]), setTicketNews({}), setKnownKeys([]));
+      if (!value) (setTickets([]), setTicketNews({}), setKnownKeys([]), keysVersion.current++);
       else refreshTickets.current(true);
     }
     // 창 꺼내기 키는 바꾸는 즉시 다시 건다. 다른 앱이 쓰는 키면 알려 준다
@@ -1947,7 +1959,7 @@ export default function App() {
     for (const o of open) {
       if (!o.sessionId || states[o.key] || trustedOnce.current.has(o.key) || !terms.opened(o.key) || terms.age(o.key) > 40_000) continue;
       if (!dirs.some((dir) => o.cwd === dir || o.cwd.startsWith(dir + "/"))) continue;
-      const lines = terms.text(o.key).split("\n");
+      const lines = terms.text(o.key, 60).split("\n");
       const yes = lines.findIndex((line) => /Yes, I trust this folder/.test(line));
       const at = lines.findIndex((line) => /❯/.test(line) && /(Yes, I trust|No, exit)/.test(line));
       if (yes < 0 || at < 0) continue;
@@ -1967,8 +1979,9 @@ export default function App() {
       for (const o of open) {
         // 재웠다 다시 띄우면 터미널이 새로 생긴다. 띄울 때마다 한 번씩 답하게 터미널 번호까지 묶어 기억한다
         const once = `${o.key}#${terms.idOf(o.key)}`;
-        if (!o.sessionId || states[o.key] || resumedOnce.current.has(once) || !terms.opened(o.key)) continue;
-        const lines = terms.text(o.key).split("\n");
+        // 물음은 띄운 직후에만 나온다. 그 뒤로는 보지 않는다: 답 없이 열려 있는 세션마다 1.5초에 한 번씩 화면을 읽으면 그만큼 화면이 멈춘다
+        if (!o.sessionId || states[o.key] || resumedOnce.current.has(once) || !terms.opened(o.key) || terms.age(o.key) > 120_000) continue;
+        const lines = terms.text(o.key, 60).split("\n");
         if (!lines.some((line) => /Resume this conversation\?/.test(line))) continue;
         const yes = lines.findIndex((line) => /\b1\.\s+Resume\b/.test(line));
         const at = lines.findIndex((line) => /❯/.test(line) && /\b[12]\.\s+(Resume|Start a new conversation)/.test(line));
@@ -2143,9 +2156,30 @@ export default function App() {
    * 티켓에 Julgi가 아는 일을 붙인다: 이어진 세션과 그 상태, 그 세션의 PR과 그 형편에서 "지금 누가 무엇을 할 차례인지"를 한 줄로 낸다.
    * Jira는 상태 이름만 알고, 그 일이 실제로 어디까지 갔는지는 세션과 PR이 안다
    */
+  /**
+   * 티켓 키 → 이어진 세션들(최근에 쓴 것부터). 세션 목록, 직접 이은 것, 아는 프로젝트 키가 바뀔 때만 다시 만든다.
+   * 티켓마다 세션 전부를 훑으면 티켓 수 × 세션 수만큼 일이 되고, 작업 페이지가 열려 있는 동안 화면을 그릴 때마다 되풀이된다
+   */
+  const ticketIdx = useRef<{ byId: unknown; links: unknown; keys: number; site: string; map: Map<string, Session[]> } | null>(null);
+  const sessionsByTicket = () => {
+    const { byId, ticketLinks } = live.current;
+    const hit = ticketIdx.current;
+    if (hit && hit.byId === byId && hit.links === ticketLinks && hit.keys === keysVersion.current && hit.site === config.jiraSite) return hit.map;
+    const map = new Map<string, Session[]>();
+    for (const s of byId.values()) {
+      const key = ticketOfSession(s.id);
+      if (!key) continue;
+      const list = map.get(key);
+      if (list) list.push(s);
+      else map.set(key, [s]);
+    }
+    for (const list of map.values()) list.sort((a, b) => b.mtime - a.mtime);
+    ticketIdx.current = { byId, links: ticketLinks, keys: keysVersion.current, site: config.jiraSite, map };
+    return map;
+  };
   const ticketWork = (t: Ticket): TicketWork => {
     const { open, states, byId, names } = live.current;
-    const ids = [...byId.values()].filter((s) => ticketOfSession(s.id) === t.key).sort((a, b) => b.mtime - a.mtime).map((s) => s.id);
+    const ids = (sessionsByTicket().get(t.key) ?? []).map((s) => s.id);
     const shown = open.filter((o) => o.sessionId && ids.includes(o.sessionId));
     const nameOfId = (id: string) => names[id] || byId.get(id)?.title || tr("세션");
     const pr = ids.map((id) => prOfSession(id)).find(Boolean) ?? minePrs.map((a) => (firstKey(a.title) === t.key ? { repo: a.repository.nameWithOwner, number: a.number } : null)).find(Boolean) ?? undefined;
@@ -2238,11 +2272,7 @@ export default function App() {
     void invoke("data_write", { name: "session-tickets.tsv", text: rows.join("\n") + (rows.length ? "\n" : "") });
   };
   /** 이 티켓에 이어진 세션들, 최근에 쓴 것부터. 티켓 목록의 줄(ticketWork)과 같은 판정이다 */
-  const sessionsOfTicket = (key: string) =>
-    [...live.current.byId.values()]
-      .filter((x) => ticketOfSession(x.id) === key)
-      .sort((a, b) => b.mtime - a.mtime)
-      .map((x) => ({ id: x.id, name: live.current.names[x.id] || x.title || tr("세션") }));
+  const sessionsOfTicket = (key: string) => (sessionsByTicket().get(key) ?? []).map((x) => ({ id: x.id, name: live.current.names[x.id] || x.title || tr("세션") }));
   /** "이 티켓으로 시작"을 눌렀다. 이미 이 티켓을 하던 세션이 있으면 그 세션을 보여 주고, 새로 만들지는 한 번 묻는다 */
   const beginTicket = (t: TicketFull) => {
     const had = ticketWork(t as unknown as Ticket);
@@ -2568,7 +2598,7 @@ export default function App() {
       if (!config.jiraSite) return;
       if (keys || Date.now() - keysAt > 86_400_000) {
         keysAt = Date.now();
-        void invoke<string[]>("jira_projects", { conn: jiraConn() }).then(setKnownKeys, () => {});
+        void invoke<string[]>("jira_projects", { conn: jiraConn() }).then((keys) => (setKnownKeys(keys), keysVersion.current++), () => {});
       }
       if (config.jiraWatch === "off") return setTickets([]);
       const list = await invoke<Ticket[]>("jira_mine", { conn: jiraConn() }).catch(() => null);
@@ -2645,7 +2675,9 @@ export default function App() {
       void invoke<string[]>("sessions_elsewhere")
         .then(setAlive, () => {})
         .then(() => invoke<Ledger>("ledger_scan", { worksCommand: config.worksCommand || null }))
-        .then(setLedger);
+        // 달라진 것이 없으면 그대로 둔다. 30초마다, 창으로 돌아올 때마다 훑는데, 매번 새 목록으로 갈아 끼우면
+        // 세션 목록에서 나오는 것(줄기, 폴더, 색인)을 전부 다시 만들고 화면도 통째로 다시 그린다
+        .then((next) => setLedger((old) => (old && ledgerSig(old) === ledgerSig(next) ? old : next)));
     scan();
     const scanTimer = setInterval(scan, 30_000);
     window.addEventListener("focus", scan);

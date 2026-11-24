@@ -20,6 +20,8 @@ export type TermSpec = { key: string; cwd?: string; command?: string };
 
 type Entry = {
   spec: TermSpec;
+  /** 그래픽 가속. 자리를 잃으면 비워 두었다가 다시 칸에 올릴 때 얻는다 */
+  gl?: WebglAddon;
   id: number;
   term: Terminal;
   fit: FitAddon;
@@ -199,6 +201,26 @@ export function park(container: HTMLElement) {
   parking().append(...container.children);
 }
 
+/**
+ * 그래픽 가속(WebGL)으로 그리게 한다. 가속이 없으면 스크롤이 눈에 띄게 느리다.
+ * 브라우저는 한 창에서 쓸 수 있는 가속 자리가 정해져 있어서(열여섯쯤), 터미널을 많이 열어 두면 오래된 것부터 자리를 잃는다.
+ * 잃으면 느린 기본 그리기로 내려가는데, 그대로 두지 않고 그 터미널을 다시 칸에 올릴 때 자리를 다시 얻는다
+ */
+function accelerate(entry: Entry) {
+  if (entry.gl) return;
+  try {
+    const gl = new WebglAddon();
+    gl.onContextLoss(() => {
+      gl.dispose();
+      entry.gl = undefined;
+    });
+    entry.term.loadAddon(gl);
+    entry.gl = gl;
+  } catch {
+    // 가속이 안 되면 기본 그리기로 돈다
+  }
+}
+
 export function attach(key: string, container: HTMLElement) {
   const entry = pool.get(key);
   if (!entry) return;
@@ -208,6 +230,7 @@ export function attach(key: string, container: HTMLElement) {
   if (!entry.opened) {
     open(entry);
   } else {
+    accelerate(entry);
     entry.fit.fit();
     entry.term.refresh(0, entry.term.rows - 1);
   }
@@ -322,11 +345,16 @@ export function setFontSize(size: number) {
 }
 
 /** 화면에 보이는 글자 (점검용) */
-export function text(key: string): string {
+/**
+ * 터미널에 찍힌 글. tail을 주면 끝의 그만큼만 읽는다.
+ * 기록 전체는 2만 줄까지 쌓이고, 전부 글로 바꾸는 데 수십 밀리초가 걸린다. 그동안 화면이 멈춘다.
+ * 물음이 떠 있는지 주기적으로 보는 쪽은 끝부분만 읽으면 된다(물음은 늘 맨 아래에 뜬다)
+ */
+export function text(key: string, tail?: number): string {
   const buffer = pool.get(key)?.term.buffer.active;
   if (!buffer) return "";
   const lines: string[] = [];
-  for (let i = 0; i < buffer.length; i++) lines.push(buffer.getLine(i)?.translateToString(true) ?? "");
+  for (let i = tail ? Math.max(0, buffer.length - tail) : 0; i < buffer.length; i++) lines.push(buffer.getLine(i)?.translateToString(true) ?? "");
   return lines.join("\n").trim();
 }
 
@@ -345,13 +373,7 @@ function open(entry: Entry) {
   entry.opened = true;
   entry.startedAt = Date.now();
   t.open(el);
-  try {
-    const gl = new WebglAddon();
-    gl.onContextLoss(() => gl.dispose());
-    t.loadAddon(gl);
-  } catch {
-    // 가속이 안 되면 기본 그리기로 돈다
-  }
+  accelerate(entry);
   entry.fit.fit();
   entry.observer.observe(el);
 
