@@ -1491,3 +1491,7 @@ body.dragging .pane-body { pointer-events: none; }
 .set-card .set-bot-head > input.set-bot-job { color: color-mix(in srgb, var(--ink) 70%, var(--muted)); }
 /* 링크에 마우스를 올렸을 때 터미널 부품이 긋는 밑줄은 늘 글자색(흰색)이라 뺀다. 대신 글자와 바탕을 강조색으로 칠한다 (terms.ts의 light) */
 .term .xterm-link-layer { display: none; }
+/* Jira 연결 칸: 입력 칸과 아래 단추 줄의 양쪽 끝을 맞춘다 */
+.set-card .set-value .set-jira.form { width: 330px; max-width: 100%; justify-content: space-between; }
+.set-card .set-value .set-jira.form input { width: 100%; box-sizing: border-box; }
+.set-card .set-value:has(.set-jira.form) { max-width: 330px; }

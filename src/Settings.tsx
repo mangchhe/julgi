@@ -598,7 +598,7 @@ export default function Settings({ onChange, onClose, remoteUrl, onConnect, onCo
                           </button>
                         </span>
                       ) : (
-                        <span className="set-jira" onClick={(e) => e.stopPropagation()}>
+                        <span className="set-jira form" onClick={(e) => e.stopPropagation()}>
                           <input tabIndex={-1} value={jiraForm.site} placeholder={tr("https://회사.atlassian.net")} spellCheck={false} onChange={(e) => setJiraForm({ ...jiraForm, site: e.target.value })} />
                           {jiraForm.kind === "cloud" && <input tabIndex={-1} value={jiraForm.email} placeholder={tr("이메일")} spellCheck={false} onChange={(e) => setJiraForm({ ...jiraForm, email: e.target.value })} />}
                           <input tabIndex={-1} type="password" value={jiraForm.token} placeholder={jiraForm.kind === "cloud" ? tr("API 토큰") : tr("개인 액세스 토큰")} onChange={(e) => setJiraForm({ ...jiraForm, token: e.target.value })} />
