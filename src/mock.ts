@@ -75,7 +75,7 @@ async function invoke(cmd: string, args: Record<string, unknown> = {}): Promise<
     case "repo_diff":
       return flags.has("review") ? 'diff --git a/src/refund/RefundCalculator.kt b/src/refund/RefundCalculator.kt\nindex 1a2b3c4..5d6e7f8 100644\n--- a/src/refund/RefundCalculator.kt\n+++ b/src/refund/RefundCalculator.kt\n@@ -84,9 +84,12 @@ class RefundCalculator(private val policy: RefundPolicy) {\n     fun refund(order: Order): Money {\n         val paid = order.paidAmount\n-        val discount = order.coupons.sumOf { it.amount }\n-        return (paid - discount).roundToWon()\n+        // 쿠폰마다 따로 반올림한 뒤 더한다. 한꺼번에 반올림하면 1원이 어긋난다\n+        val discount = order.coupons.sumOf { it.amount.roundToWon() }\n+        val refund = paid - discount\n+        require(refund >= Money.ZERO) { "환불액이 음수다: $refund" }\n+        return refund\n     }\n \n     private fun Money.roundToWon(): Money = Money(amount.setScale(0, RoundingMode.HALF_UP))\ndiff --git a/src/refund/RefundCalculatorTest.kt b/src/refund/RefundCalculatorTest.kt\nnew file mode 100644\nindex 0000000..9f8e7d6\n--- /dev/null\n+++ b/src/refund/RefundCalculatorTest.kt\n@@ -0,0 +1,9 @@\n+class RefundCalculatorTest {\n+    @Test\n+    fun `쿠폰 두 개가 겹쳐도 1원이 어긋나지 않는다`() {\n+        val order = orderWith(paid = 10_000, coupons = listOf(333.3, 333.3))\n+\n+        assertEquals(Money(9_334), RefundCalculator(policy).refund(order))\n+    }\n+}\n+' : null;
     case "config_load":
-      return JSON.stringify({ ...(flags.has("lang") ? { lang: flags.get("lang") } : {}), ...(flags.has("theme") ? { theme: flags.get("theme") } : {}), usage: flags.has("usage"), remote: flags.has("remote"), ...(flags.has("jira") ? { jiraSite: "https://example.atlassian.net", jiraEmail: "me@example.com" } : {}) });
+      return JSON.stringify({ ...(flags.has("lang") ? { lang: flags.get("lang") } : {}), ...(flags.has("theme") ? { theme: flags.get("theme") } : {}), usage: flags.has("usage"), remote: flags.has("remote"), ...(flags.has("cfg") ? JSON.parse(flags.get("cfg") ?? "{}") : {}), ...(flags.has("jira") ? { jiraSite: "https://example.atlassian.net", jiraEmail: "me@example.com" } : {}) });
     case "layout_load": {
       if (!flags.has("open")) return null;
       const sessions = await fetch("/mock-ledger.json").then((r) => r.json());
@@ -101,6 +101,9 @@ async function invoke(cmd: string, args: Record<string, unknown> = {}): Promise<
     case "default_dir":
       return "/Users/me/julgi";
     case "data_read": {
+      // 배경 사진을 보려고 넣는 가짜 그림: 노을빛 띠와 둥근 해
+      if (args.name === "background.txt" && flags.has("bg"))
+        return "data:image/svg+xml," + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="1000"><defs><linearGradient id="g" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#2b1b6b"/><stop offset="0.55" stop-color="#d9527a"/><stop offset="1" stop-color="#f6b55b"/></linearGradient></defs><rect width="1600" height="1000" fill="url(#g)"/><circle cx="1100" cy="620" r="170" fill="#ffe9a8"/><path d="M0 800 400 560 700 760 1000 520 1600 820V1000H0Z" fill="#1c1238"/></svg>');
       // 브리핑 화면을 보려고 넣는 가짜 값: 줄기 둘, 그 진행 정리, 아홉 시간 전에 마지막으로 봄
       if (flags.has("morning")) {
         const ids = (await fetch("/mock-ledger.json").then((r) => r.json())).map((x: { id: string }) => x.id);

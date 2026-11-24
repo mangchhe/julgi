@@ -311,6 +311,15 @@ export const config = {
   // 오래 쉰 큰 세션을 다시 띄울 때 Claude Code가 묻는 "Resume this conversation?"에 이어 간다고 대신 답한다
   autoResume: true,
   bugParallel: 3,
+  // 꾸미기: 터미널 글자와 칸 가장자리 사이(px), 줄 간격(%), 커서 모양과 깜빡임, 안 쓰는 칸을 어둡게 하는 정도(%)
+  termPad: 8,
+  termLine: 115,
+  cursorStyle: "block",
+  cursorBlink: true,
+  dimOthers: 0,
+  // 배경 사진(~/.julgi/background.txt)이 비치는 정도(%)와 흐림(px)
+  bgShow: 25,
+  bgBlur: 0,
   // 스크립트가 돌린 세션(claude -p, SDK)을 목록에 어떻게 둘 것인가. group: 맨 아래 한 묶음으로 접어 둔다, hide: 빼고 ⌘K로만 찾는다, mix: 다른 세션과 섞는다
   scriptShow: "group",
   // 대화 기록의 entrypoint가 이 글로 시작하면 스크립트가 돌린 세션으로 본다. 쉼표로 여럿 적는다

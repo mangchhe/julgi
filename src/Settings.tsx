@@ -27,6 +27,9 @@ type Props = {
   onRun: (command: string, label: string) => void;
   /** 처음 열 묶음 이름 (예: "연결"). 없으면 첫 묶음 */
   startAt?: string;
+  /** 배경 사진(줄인 data URL)과 그것을 바꾸는 길. null이면 사진이 없다 */
+  bg: string | null;
+  onBg: (data: string | null) => void;
   /** 등록된 봇과 그것을 고쳐 쓰는 길 */
   bots: Bot[];
   onBots: (next: Bot[]) => void;
@@ -44,7 +47,23 @@ type Row =
   | { kind: "jira"; label: string; note: string }
   | { kind: "argo"; label: string; note: string }
   | { kind: "bots"; label: string; note: string }
+  | { kind: "bg"; label: string; note: string }
   | { kind: "keys"; label: string; note: string };
+
+/** 배경으로 쓸 사진을 긴 쪽 2560px 안으로 줄여 JPEG로 만든다. 원본을 그대로 두면 켤 때마다 수십 MB를 읽게 된다 */
+const shrinkPhoto = (file: File) =>
+  new Promise<string>((done, fail) => {
+    const img = new Image();
+    img.onload = () => {
+      const scale = Math.min(1, 2560 / Math.max(img.width, img.height));
+      const canvas = Object.assign(document.createElement("canvas"), { width: Math.round(img.width * scale), height: Math.round(img.height * scale) });
+      canvas.getContext("2d")!.drawImage(img, 0, 0, canvas.width, canvas.height);
+      URL.revokeObjectURL(img.src);
+      done(canvas.toDataURL("image/jpeg", 0.85));
+    };
+    img.onerror = fail;
+    img.src = URL.createObjectURL(file);
+  });
 
 /** 묶음마다 줄 몇 개. 왼쪽에서 묶음을 고르면 오른쪽에 그 줄들만 나온다 */
 /** needs: 이 묶음은 그 서비스를 연결한 뒤에 쓴다. 연결이 안 돼 있으면 맨 위에 안내를 낸다 */
@@ -69,6 +88,21 @@ const SECTIONS: { id: string; title: string; hint: string; needs?: "jira" | "arg
       { kind: "toggle", key: "notify", label: tr("알림"), note: tr("Julgi 창을 안 보고 있을 때 세션이 답을 끝내거나 확인을 물으면 macOS 알림을 띄운다") },
     { kind: "toggle", key: "confirmClose", label: tr("닫기 전에 묻기"), note: tr("⌘W나 ×로 세션을 닫을 때 한 번 묻는다") },
     { kind: "key", key: "hotkey", label: tr("창 꺼내기 키"), note: tr("어느 앱에서든 Julgi 창을 꺼내고 다시 넣는 키. Enter를 누른 뒤 쓸 키 조합을 누른다. Backspace면 쓰지 않는다") },
+    ],
+  },
+  {
+    id: "꾸미기", // i18n-ok
+    title: tr("꾸미기"),
+    hint: tr("터미널의 생김새와 배경 사진"),
+    rows: [
+      { kind: "number", key: "termPad", label: tr("안쪽 여백"), note: tr("터미널 글자와 칸 가장자리 사이의 간격"), step: 2, min: 0, max: 32, show: (n) => `${n}px` },
+      { kind: "number", key: "termLine", label: tr("줄 간격"), note: tr("터미널 줄 사이의 간격. 1.00이 글자 높이 그대로다"), step: 5, min: 100, max: 180, show: (n) => (n / 100).toFixed(2) },
+      { kind: "pick", key: "cursorStyle", label: tr("커서 모양"), note: tr("터미널에서 글자를 치는 자리의 모양"), options: [["block", tr("네모")], ["bar", tr("세로줄")], ["underline", tr("밑줄")]] },
+      { kind: "toggle", key: "cursorBlink", label: tr("커서 깜빡임"), note: tr("끄면 커서가 깜빡이지 않고 켜져 있다") },
+      { kind: "number", key: "dimOthers", label: tr("안 쓰는 칸 어둡게"), note: tr("칸이 여럿일 때 지금 치고 있지 않은 칸을 이만큼 어둡게 한다. 0이면 그대로다"), step: 10, min: 0, max: 60, show: (n) => `${n}%` },
+      { kind: "bg", label: tr("배경 사진"), note: tr("내 사진을 터미널 칸들의 바탕에 깐다. 사진은 줄여서 ~/.julgi/background.txt 에 두고 밖으로 보내지 않는다. 글자는 그대로 두고 바탕에만 비치게 겹쳐 그린다") },
+      { kind: "number", key: "bgShow", label: tr("사진이 비치는 정도"), note: tr("클수록 사진이 진하게 보이고 글자는 읽기 어려워진다"), step: 5, min: 5, max: 80, show: (n) => `${n}%` },
+      { kind: "number", key: "bgBlur", label: tr("사진 흐림"), note: tr("사진을 뭉개서 글자가 더 잘 읽히게 한다. 0이면 또렷하게 둔다"), step: 2, min: 0, max: 30, show: (n) => `${n}px` },
     ],
   },
   {
@@ -212,7 +246,7 @@ const FIRST_OF: number[] = SECTIONS.map((_, n) => SECTION_OF.indexOf(n));
 /** 왼쪽 목록의 큰 갈래. 묶음(SECTIONS)의 순서는 이 순서와 같아야 한다 */
 // 묶음의 이름표(id)는 저장되지 않는 안쪽 이름이다 i18n-off
 const NAV: { title: string; ids: string[] }[] = [
-  { title: tr("기본"), ids: ["화면", "세션"] },
+  { title: tr("기본"), ids: ["화면", "꾸미기", "세션"] },
   { title: tr("Julgi가 하는 일"), ids: ["알아서 하는 일", "봇", "코드 검토", "점검과 모델", "지도"] },
   { title: tr("밖의 서비스"), ids: ["연결", "PR", "티켓", "배포"] },
   { title: tr("그 밖"), ids: ["밖에서", "keys"] },
@@ -237,7 +271,7 @@ const showKey = (combo: string) =>
     .join("");
 
 /** 설정 (⌘,). 바꾸는 즉시 적용되고 ~/.julgi/config.json에 남는다 */
-export default function Settings({ onChange, onClose, remoteUrl, onConnect, onConnectLab, argoLogin = [], onRun, startAt, bots, onBots }: Props) {
+export default function Settings({ onChange, onClose, remoteUrl, onConnect, onConnectLab, argoLogin = [], onRun, startAt, bots, onBots, bg, onBg }: Props) {
   const [at, setAt] = useState(() => Math.max(0, FIRST_OF[SECTIONS.findIndex((s) => s.id === startAt)] ?? 0));
   // Jira가 연결돼 있으면 그 Jira의 상태 이름을 읽어 "옮길 상태" 칸에서 고르게 한다. 워크플로가 프로젝트마다 달라서
   // 목록은 전체 상태이고, 실제로 옮길 수 있는지는 그 티켓의 지금 상태에 달려 있다
@@ -466,6 +500,20 @@ export default function Settings({ onChange, onClose, remoteUrl, onConnect, onCo
                         ) : (
                           <button type="button" tabIndex={-1} className="set-toggle" onClick={onConnect}>
                             {tr("연결하기")}
+                          </button>
+                        )}
+                      </span>
+                    )}
+                    {row.kind === "bg" && (
+                      <span className="set-bg" onClick={(e) => e.stopPropagation()}>
+                        {bg && <img src={bg} alt="" />}
+                        <label className="set-toggle">
+                          {bg ? tr("다른 사진") : tr("사진 고르기")}
+                          <input type="file" accept="image/*" tabIndex={-1} hidden onChange={(e) => e.target.files?.[0] && void shrinkPhoto(e.target.files[0]).then(onBg).catch(() => {})} />
+                        </label>
+                        {bg && (
+                          <button type="button" tabIndex={-1} className="set-toggle" onClick={() => onBg(null)}>
+                            {tr("빼기")}
                           </button>
                         )}
                       </span>

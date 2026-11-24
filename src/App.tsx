@@ -414,6 +414,31 @@ export default function App() {
   const noted = useRef<Record<string, number>>({}); // 세션 → 요약을 남긴 때의 대화 기록 시각
   const noting = useRef(new Set<string>());
   const trustedOnce = useRef(new Set<string>()); // 폴더 믿음 물음에 대신 답해 준 터미널
+  // 꾸미기: 배경 사진(줄여서 ~/.julgi/background.txt 에 둔 것)과, 설정값을 화면과 터미널에 입히기
+  const [bg, setBg] = useState<string | null>(null);
+  const saveBg = (data: string | null) => {
+    setBg(data);
+    void invoke(data ? "data_write" : "data_remove", data ? { name: "background.txt", text: data } : { name: "background.txt" });
+  };
+  useEffect(() => void invoke<string | null>("data_read", { name: "background.txt" }).then((data) => data?.startsWith("data:image/") && setBg(data), () => {}), []);
+  const [look, bgShow, bgBlur] = [`${config.termPad}/${config.termLine}/${config.cursorStyle}/${config.cursorBlink}/${config.dimOthers}`, config.bgShow, config.bgBlur];
+  useEffect(() => {
+    const root = document.documentElement.style;
+    root.setProperty("--term-pad", `${config.termPad}px`);
+    root.setProperty("--dim-others", String(1 - config.dimOthers / 100));
+    terms.setLook({ lineHeight: config.termLine / 100, cursorStyle: ["bar", "underline"].includes(config.cursorStyle) ? (config.cursorStyle as "bar" | "underline") : "block", cursorBlink: config.cursorBlink });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [look]);
+  useEffect(() => {
+    const root = document.documentElement.style;
+    root.setProperty("--bg-show", String(bgShow / 100));
+    root.setProperty("--bg-blur", `${bgBlur}px`);
+    if (!bg) return void root.removeProperty("--bg-image");
+    // 큰 글을 스타일에 그대로 넣지 않게 주소로 바꿔 건다
+    let url = "";
+    void fetch(bg).then((r) => r.blob()).then((blob) => root.setProperty("--bg-image", `url(${(url = URL.createObjectURL(blob))})`));
+    return () => void (url && URL.revokeObjectURL(url));
+  }, [bg, bgShow, bgBlur]);
   const goStreak = useRef<Record<string, number>>({}); // 세션마다 봇이 연달아 대신 답한 횟수
   const [bots, setBots] = useState<Bot[]>(DEFAULT_BOTS);
   const botsRef = useRef(bots);
@@ -3524,6 +3549,8 @@ export default function App() {
       )}
       {overlay === "settings" && (
         <Settings
+          bg={bg}
+          onBg={saveBg}
           bots={bots}
           onBots={saveBots}
           argoLogin={argoLogin}

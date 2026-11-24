@@ -44,6 +44,8 @@ type Entry = {
 const pool = new Map<string, Entry>();
 let nextId = 1;
 let fontSize = 13;
+/** 꾸미기 설정에서 오는 터미널 모양 */
+let look: { lineHeight: number; cursorStyle: "block" | "bar" | "underline"; cursorBlink: boolean } = { lineHeight: 1.15, cursorStyle: "block", cursorBlink: true };
 /** 마우스를 올린 링크의 글자색과 바탕색. 테마의 강조색과 그 옅은 색 */
 let linkColor = { fg: "#6cb4ee", bg: "#16324a" };
 let theme: ITheme = { background: "#0b1620", foreground: "#dbe7f1", cursor: "#6cb4ee", selectionBackground: "#24506f" };
@@ -98,8 +100,9 @@ export function create(spec: TermSpec) {
   const term = new Terminal({
     fontFamily: 'Menlo, "Apple SD Gothic Neo", monospace',
     fontSize,
-    lineHeight: 1.15,
-    cursorBlink: true,
+    lineHeight: look.lineHeight,
+    cursorBlink: look.cursorBlink,
+    cursorStyle: look.cursorStyle,
     scrollback: 20000,
     allowProposedApi: true,
     theme,
@@ -354,6 +357,16 @@ export function setTheme(next: ITheme, link?: { fg: string; bg: string }) {
   theme = next;
   if (link) linkColor = link;
   for (const entry of pool.values()) entry.term.options.theme = next;
+}
+
+/** 열려 있는 터미널과 앞으로 열 터미널의 줄 간격과 커서를 바꾼다 */
+export function setLook(next: typeof look) {
+  const same = next.lineHeight === look.lineHeight;
+  look = next;
+  for (const entry of pool.values()) {
+    Object.assign(entry.term.options, next);
+    if (!same && entry.opened && visible(entry)) refit(entry);
+  }
 }
 
 export function setFontSize(size: number) {

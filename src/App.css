@@ -1495,3 +1495,13 @@ body.dragging .pane-body { pointer-events: none; }
 .set-card .set-value .set-jira.form { width: 330px; max-width: 100%; justify-content: space-between; }
 .set-card .set-value .set-jira.form input { width: 100%; box-sizing: border-box; }
 .set-card .set-value:has(.set-jira.form) { max-width: 330px; }
+
+/* 꾸미기: 안쪽 여백, 안 쓰는 칸 어둡게, 배경 사진 */
+.pane-body { padding: max(0px, calc(var(--term-pad, 8px) - 2px)) max(2px, calc(var(--term-pad, 8px) - 6px)) max(0px, calc(var(--term-pad, 8px) - 4px)) var(--term-pad, 8px); }
+.pane:not(.focused) .pane-body { opacity: var(--dim-others, 1); transition: opacity 0.15s; }
+/* 사진은 칸들 위에 얇게 겹쳐 그린다. 어두운 테마에서는 밝은 쪽만 더해져서 글자는 그대로고 바탕에만 사진이 비친다 */
+.panes { position: relative; }
+.panes::after { content: ""; position: absolute; inset: 0; z-index: 3; pointer-events: none; background: var(--bg-image, none) center / cover no-repeat; opacity: var(--bg-show, 0.25); filter: blur(var(--bg-blur, 0px)); mix-blend-mode: var(--bg-blend, screen); }
+.set-bg { display: inline-flex; align-items: center; gap: 8px; }
+.set-bg img { width: 72px; height: 44px; object-fit: cover; border-radius: 6px; border: 1px solid var(--line); }
+.set-bg label.set-toggle { cursor: pointer; }

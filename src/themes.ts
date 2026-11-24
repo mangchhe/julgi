@@ -62,5 +62,8 @@ export function applyTheme(id: string) {
   const root = document.documentElement.style;
   const vars: Record<string, string> = { bg: t.bg, surface: t.surface, ink: t.ink, muted: t.muted, line: t.line, accent: t.accent, "accent-soft": t.accentSoft, ok: t.ok, wait: t.wait, "wait-soft": t.waitSoft, vis: t.vis };
   for (const [name, value] of Object.entries(vars)) root.setProperty("--" + name, value);
+  // 배경 사진을 겹치는 방식: 어두운 테마는 밝은 쪽을 더하고(screen), 밝은 테마는 어두운 쪽을 곱한다(multiply)
+  const [r, g, b] = [1, 3, 5].map((i) => parseInt(t.bg.slice(i, i + 2), 16));
+  root.setProperty("--bg-blend", r * 0.299 + g * 0.587 + b * 0.114 > 128 ? "multiply" : "screen");
   terms.setTheme({ background: t.bg, foreground: t.ink, cursor: t.accent, cursorAccent: t.bg, selectionBackground: t.selection, ...t.ansi }, { fg: t.accent, bg: t.accentSoft });
 }
