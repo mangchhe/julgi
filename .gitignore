@@ -25,3 +25,7 @@ dist-ssr
 
 # 화면 확인용 가짜 장부 (내 세션 제목이 들어 있다)
 public/mock-ledger.json
+
+# 그림 도구가 떨어뜨리는 원본들
+generated_images/
+/*.png

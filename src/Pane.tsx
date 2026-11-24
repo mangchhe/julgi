@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import helloArt from "./assets/art/hello.png";
 import Info, { Member, ThreadOps } from "./Info";
 import Review from "./CodeReview";
 import { tr } from "./i18n";
@@ -125,6 +126,7 @@ export default function Pane({ termKey, focused, active, label, cwd, session, th
       {review && termKey && <Review {...review} />}
       {!termKey && (
         <div className="pane-empty">
+          <img src={helloArt} width={128} height={128} alt="" />
           <p className="pane-empty-main">
             <kbd>⌘L</kbd> {tr`할 말을 치면 Julgi가 맞는 세션을 찾아 보낸다`}
           </p>
