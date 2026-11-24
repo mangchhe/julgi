@@ -29,6 +29,8 @@ type Props = {
   ticketNote?: { text: string; mention: boolean; open: () => void };
   /** 이 레포에 이어진 Argo CD 앱들의 한 줄 ("staging ✓ Healthy · prod … Progressing"). 누르면 배포 화면을 연다 */
   deployLine?: { text: string; bad: boolean; open: () => void };
+  /** 끝낸 줄기의 세션을 일부러 열었다. 살리거나 닫는다 */
+  stemDone?: { revive: () => void; close: () => void };
   /** 방금 갈아타서 이어받은 세션이다 */
   handed?: boolean;
   /** 고정한 세션은 Julgi가 다른 세션으로 바꿔 끼우지 않는다 */
@@ -42,7 +44,7 @@ type Props = {
   onFocus: () => void;
 };
 
-export default function Pane({ termKey, focused, active, label, cwd, session, thread, memory, state, members, thread_ops, info, finding, handing, handed, ticketNote, deployLine, pinned, change, review, ticketEnded, onPin, onFindClose, onFocus }: Props) {
+export default function Pane({ termKey, focused, active, label, cwd, session, thread, memory, state, members, thread_ops, info, finding, handing, handed, stemDone, ticketNote, deployLine, pinned, change, review, ticketEnded, onPin, onFindClose, onFocus }: Props) {
   const body = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -83,6 +85,17 @@ export default function Pane({ termKey, focused, active, label, cwd, session, th
               <button type="button" className={"pin" + (pinned ? " on" : "")} title={tr`고정하면 이 세션을 재우지 않고, 이 칸을 다른 세션으로 바꾸지도 않는다 (⌘⇧P)`} onClick={onPin}>
                 {pinned ? tr`고정됨` : tr`고정`}
               </button>
+              {stemDone && (
+                <span className="stem-done">
+                  {tr`끝낸 줄기`}
+                  <button type="button" tabIndex={-1} onClick={(e) => (e.stopPropagation(), stemDone.revive())} title={tr`목록으로 다시 올린다`}>
+                    {tr`다시 살리기`}
+                  </button>
+                  <button type="button" tabIndex={-1} onClick={(e) => (e.stopPropagation(), stemDone.close())} title={tr`칸을 닫는다. ⌘K로는 계속 찾는다`}>
+                    {tr`닫기`}
+                  </button>
+                </span>
+              )}
               {deployLine && (
                 <span className={"dp-line" + (deployLine.bad ? " bad" : "")} title={tr`배포 상태 보기`} onClick={(e) => (e.stopPropagation(), deployLine.open())}>
                   {deployLine.text}

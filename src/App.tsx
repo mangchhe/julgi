@@ -231,7 +231,7 @@ export default function App() {
       } catch {}
     });
   }, []);
-  const endWhenIdle = useRef(new Set<string>()); // 끝낸 줄기의 칸 가운데 아직 답하는 중이라 못 닫은 것
+  const keptOpen = useRef(new Set<string>()); // 끝낸 줄기인데 내가 일부러 연 칸. Julgi가 저절로 닫지 않는다
   const refreshTickets = useRef((_keys = false) => {});
   // 화면 아래에 뜨는 한 번 묻기 (예: PR이 올라왔으니 티켓을 In Review로 옮길까?)
   const [offer, setOffer] = useState<{ text: string; yes: string; run: () => void } | null>(null);
@@ -552,6 +552,8 @@ export default function App() {
     }
     // 치워 둔 세션을 다시 열면 목록으로 돌아온다
     if (hiddenRef.current.includes(s.id)) saveHidden(hiddenRef.current.filter((id) => id !== s.id));
+    // 끝낸 줄기의 세션을 일부러 열었다. 저절로 다시 닫지 않는다(칸 머리에서 살리거나 닫는다)
+    if (live.current.threads.find((t) => t.sessions.includes(s.id))?.done) keptOpen.current.add("c:" + s.id);
     openTerm({ key: "c:" + s.id, label: s.title, cwd: s.cwd, sessionId: s.id }, resumeCommand(s.id));
   };
   const newSession = (cwd: string) => {
@@ -1755,6 +1757,13 @@ export default function App() {
     const ticketName = ticket ? [ticket, tickets.find((t) => t.key === ticket)?.title].filter(Boolean).join(" ") : "";
     return (byId.get(sessionId)?.title || names[sessionId] || open.find((o) => o.sessionId === sessionId)?.label || ticketName || tr("줄기")).slice(0, 80);
   };
+  /** 끝낸 줄기를 다시 살린다(조용히). 끝낸 줄기의 칸에서 다시 일을 시켰을 때 */
+  const reviveThread = (sessionId: string) => {
+    const t = live.current.threads.find((x) => x.sessions.includes(sessionId));
+    if (!t?.done) return;
+    saveThreads(live.current.threads.map((x) => (x.id === t.id ? { ...x, done: false } : x)));
+    record("살림", tr`"${t.name.slice(0, 40)}" · 끝낸 줄기의 세션에서 다시 일을 시켜 목록에 올림`, sessionId); // i18n-ok
+  };
   const finishThread = (sessionId: string, quiet = false) => {
     const all = live.current.threads;
     const mine = all.find((t) => t.sessions.includes(sessionId));
@@ -1762,15 +1771,12 @@ export default function App() {
       ? { ...mine, done: !mine.done }
       : { id: crypto.randomUUID(), name: stemName(sessionId), sessions: [sessionId], created: Date.now(), done: true };
     saveThreads([...all.filter((t) => t !== mine), next]);
-    if (!next.done) {
-      for (const o of live.current.open) endWhenIdle.current.delete(o.key);
-      return say(tr("줄기를 다시 살렸다."));
-    }
+    if (!next.done) return say(tr("줄기를 다시 살렸다."));
     for (const o of live.current.open)
       if (o.sessionId && next.sessions.includes(o.sessionId)) {
-        // 답하는 중인 칸(julgi done을 부른 세션 자신)은 답이 끝나면 닫는다
-        if (live.current.states[o.key]?.state === "run") endWhenIdle.current.add(o.key);
-        else close(o.key);
+        // 다시 끝냈으니 일부러 열어 둔 것도 이제 닫는다. 답하는 중인 칸(julgi done을 부른 세션 자신)은 답이 끝나면 tend가 닫는다
+        keptOpen.current.delete(o.key);
+        if (live.current.states[o.key]?.state !== "run") close(o.key);
       }
     if (quiet) return; // 점검이 한 것은 점검 기록에 남긴다
     record("끝냄", tr`"${next.name.slice(0, 40)}" · 목록에서 내림`, sessionId); // i18n-ok
@@ -1799,8 +1805,12 @@ export default function App() {
     for (const o of open) {
       const was = lastStates.current[o.key]?.state;
       const is = states[o.key]?.state;
-      if (endWhenIdle.current.has(o.key) && is !== "run") {
-        endWhenIdle.current.delete(o.key);
+      // 끝낸 줄기의 칸은 답하는 중이 아니면 닫는다(julgi done을 부른 세션은 그 답이 끝난 뒤에). 내가 일부러 연 것은 두고,
+      // 그 칸에서 다시 일을 시켰으면(답하기 시작했으면) 줄기를 살린다
+      const ended = !!o.sessionId && !!live.current.threads.find((t) => t.sessions.includes(o.sessionId!))?.done;
+      if (ended && keptOpen.current.has(o.key)) {
+        if (was && was !== "run" && is === "run") reviveThread(o.sessionId!);
+      } else if (ended && is !== "run" && !handing.includes(o.key)) {
         close(o.key);
         continue;
       }
@@ -3060,8 +3070,8 @@ export default function App() {
           // 없거나 깨졌으면 전부 내가 연 것으로 본다
         }
       }, () => {})
-      .then(() => invoke<string | null>("layout_load"))
-      .then((json) => {
+      .then(() => Promise.all([invoke<string | null>("layout_load"), invoke<string | null>("data_read", { name: "threads.json" }).catch(() => null)]))
+      .then(([json, threadText]) => {
       setRestored(true);
       if (!json) return;
       let saved: Layout;
@@ -3071,8 +3081,15 @@ export default function App() {
         return;
       }
       const known = new Set(ledger.sessions.map((s) => s.id));
+      // 끝낸 줄기의 세션은 다시 열지 않는다. 칸이 닫히기 전에 앱이 꺼졌으면 열린 채로 저장돼 있다. ⌘K로는 찾는다
+      let finished = new Set<string>();
+      try {
+        finished = new Set((JSON.parse(threadText ?? "[]") as Thread[]).filter((t) => t.done).flatMap((t) => t.sessions));
+      } catch {
+        // 줄기 파일이 없거나 깨졌으면 거르지 않는다
+      }
       // 대화가 한 번도 없었던 세션은 이어 열 수 없으니 뺀다
-      const list = (saved.open ?? []).filter((o) => !o.sessionId || known.has(o.sessionId));
+      const list = (saved.open ?? []).filter((o) => !o.sessionId || (known.has(o.sessionId) && !finished.has(o.sessionId)));
       for (const o of list) terms.create({ key: o.key, cwd: o.cwd, command: o.sessionId ? resumeCommand(o.sessionId) : undefined });
       const keys = new Set(list.map((o) => o.key));
       setOpen(list);
@@ -3202,6 +3219,14 @@ export default function App() {
                 finding={finding && focus === i}
                 handing={!!key && handing.includes(key)}
                 handed={!!key && !!handed[key]}
+                stemDone={
+                  key && o?.sessionId && threadOf(o.sessionId)?.done
+                    ? {
+                        revive: () => (keptOpen.current.delete(key), reviveThread(o.sessionId!), say(tr("줄기를 다시 살렸다."))),
+                        close: () => (keptOpen.current.delete(key), close(key)),
+                      }
+                    : undefined
+                }
                 deployLine={(() => {
                   const mine = o ? argoOf(o.cwd) : [];
                   if (!mine.length) return undefined;

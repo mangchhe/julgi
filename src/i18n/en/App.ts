@@ -195,4 +195,5 @@ export default {
   "\"{0}\"이 워크트리 {1}({2})에서 일한다. 변경과 코드 검토를 그 폴더 기준으로 본다": "\"{0}\" works in the worktree {1} ({2}). Changes and code review follow that folder",
   "\"{0}\"이 {1}을 {2}로 옮겨 달라고 함": "\"{0}\" asked to move {1} to {2}",
   "\"{0}\"을 다시 띄우며 \"이어서 할까\"라는 물음에 이어 간다고 대신 답함": "Reopened \"{0}\" and answered \"resume this conversation?\" with resume for you",
+  "\"{0}\" · 끝낸 줄기의 세션에서 다시 일을 시켜 목록에 올림": "\"{0}\" · work was sent to a session of a finished stem, so it is back on the list",
 } as Record<string, string>;

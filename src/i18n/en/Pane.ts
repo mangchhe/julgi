@@ -14,4 +14,7 @@ export default {
   "⏎ 위로 · ⇧⏎ 아래로 · Esc": "⏎ up · ⇧⏎ down · Esc",
   "이어받음": "Carried over",
   "세션이 커져서 인계 글만 들고 새 세션으로 옮겼다. 일은 그대로 이어진다": "The session grew large, so it moved to a new one with only a brief. The work continues as it was",
+  "끝낸 줄기": "Finished stem",
+  "목록으로 다시 올린다": "Put it back on the list",
+  "칸을 닫는다. ⌘K로는 계속 찾는다": "Close the pane. ⌘K still finds it",
 } as Record<string, string>;
