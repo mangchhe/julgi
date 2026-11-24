@@ -1441,9 +1441,11 @@ body.dragging .pane-body { pointer-events: none; }
 .set-bot label { display: grid; grid-template-columns: 96px minmax(0, 1fr); gap: 8px; align-items: start; font-size: 12px; color: var(--muted); }
 .set-bot label > span { padding-top: 6px; }
 .set-bot textarea, .set-bot input { font: inherit; font-size: 13px; color: var(--ink); background: var(--bg); border: 1px solid var(--line); border-radius: 6px; padding: 5px 8px; resize: vertical; }
-.set-bot .set-bot-face { display: block; padding: 0; cursor: pointer; line-height: 0; flex: none; }
+.set-bot .set-bot-face { display: block; padding: 0; border: 0; background: none; cursor: pointer; line-height: 0; flex: none; }
+.set-bot label.set-bot-up { display: inline-flex; align-items: center; gap: 0; font-size: 12px; padding: 5px 10px; border: 1px solid var(--line); border-radius: 7px; cursor: pointer; flex: none; background: var(--bg); }
+.pane-empty img { margin-bottom: 10px; }
 .set-card .set-row.stack > .set-value:has(.set-bots) { max-width: none; }
-.set-bot:not(.on) .set-bot-face { opacity: 0.45; filter: saturate(0.4); }
+.set-bot:not(.on) .set-bot-face { opacity: 0.55; }
 
 /* 사이드바 위의 가는 곳 셋과 맨 아래의 설정 줄 */
 .side-nav { display: flex; flex-direction: column; gap: 1px; padding-bottom: 6px; margin-bottom: 2px; border-bottom: 1px solid var(--line); }

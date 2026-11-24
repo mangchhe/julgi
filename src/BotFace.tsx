@@ -1,3 +1,23 @@
+import go from "./assets/art/bot-go.png";
+import check from "./assets/art/bot-check.png";
+import calm from "./assets/art/bot-calm.png";
+import sleepy from "./assets/art/bot-sleepy.png";
+import type { Bot } from "./triageAsk.ts";
+
+/** 앱에 들어 있는 얼굴 그림들 */
+export const ARTS: Record<string, string> = { go, check, calm, sleepy };
+/** 처음 봇이 쓰는 그림 */
+const OWN: Record<string, string> = { go: "go", verify: "check" };
+const artOf = (b: Bot) => b.art ?? OWN[b.id] ?? "";
+/** 봇의 얼굴: 내가 고른 그림, 없으면 들어 있는 그림, 그것도 없으면 그려 주는 얼굴 */
+export const faceOf = (b: Bot) => ({ seed: b.face ?? faceSeed(b.id), image: b.image ?? ARTS[artOf(b)] });
+/** 얼굴을 누를 때마다: 들어 있는 그림들을 차례로, 끝에는 그려 주는 얼굴 */
+export const nextFace = (b: Bot): Partial<Bot> => {
+  const order = [...Object.keys(ARTS), ""];
+  const art = order[(order.indexOf(b.image ? "" : artOf(b)) + 1) % order.length];
+  return { image: undefined, art, face: art ? b.face : Math.floor(Math.random() * 1e6) };
+};
+
 /** 봇의 얼굴. 그림 파일 없이 씨앗 숫자 하나로 색, 눈, 입, 더듬이를 정해 그린다. 같은 씨앗이면 늘 같은 얼굴이다 */
 export const faceSeed = (id: string) => [...id].reduce((h, c) => (h * 31 + c.charCodeAt(0)) >>> 0, 7);
 
