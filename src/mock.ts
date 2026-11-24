@@ -15,6 +15,7 @@ const SCREEN = [
   "  \x1b[2m테스트 추가: RefundCalculatorTest.kt\x1b[0m",
   "",
   "⏺ PR을 올렸습니다. https://github.com/example/acme-api/pull/1852 · ABC-123",
+  "  기록: \x1b]8;;https://example.com/notes/refund\x1b\\환불 반올림 메모\x1b]8;;\x1b\\",
   "",
   "\x1b[1m>\x1b[0m ",
 ].join("\r\n");

@@ -1489,3 +1489,5 @@ body.dragging .pane-body { pointer-events: none; }
 .set-card .set-bot-head > button.set-toggle { padding: 0 12px; }
 .set-card .set-bot-head > .set-note { white-space: nowrap; }
 .set-card .set-bot-head > input.set-bot-job { color: color-mix(in srgb, var(--ink) 70%, var(--muted)); }
+/* 링크에 마우스를 올렸을 때 터미널 부품이 긋는 밑줄은 늘 글자색(흰색)이라 뺀다. 대신 글자와 바탕을 강조색으로 칠한다 (terms.ts의 light) */
+.term .xterm-link-layer { display: none; }

@@ -62,5 +62,5 @@ export function applyTheme(id: string) {
   const root = document.documentElement.style;
   const vars: Record<string, string> = { bg: t.bg, surface: t.surface, ink: t.ink, muted: t.muted, line: t.line, accent: t.accent, "accent-soft": t.accentSoft, ok: t.ok, wait: t.wait, "wait-soft": t.waitSoft, vis: t.vis };
   for (const [name, value] of Object.entries(vars)) root.setProperty("--" + name, value);
-  terms.setTheme({ background: t.bg, foreground: t.ink, cursor: t.accent, cursorAccent: t.bg, selectionBackground: t.selection, ...t.ansi });
+  terms.setTheme({ background: t.bg, foreground: t.ink, cursor: t.accent, cursorAccent: t.bg, selectionBackground: t.selection, ...t.ansi }, { fg: t.accent, bg: t.accentSoft });
 }

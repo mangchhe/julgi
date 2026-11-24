@@ -44,6 +44,8 @@ type Entry = {
 const pool = new Map<string, Entry>();
 let nextId = 1;
 let fontSize = 13;
+/** 마우스를 올린 링크의 글자색과 바탕색. 테마의 강조색과 그 옅은 색 */
+let linkColor = { fg: "#6cb4ee", bg: "#16324a" };
 let theme: ITheme = { background: "#0b1620", foreground: "#dbe7f1", cursor: "#6cb4ee", selectionBackground: "#24506f" };
 let lot: HTMLDivElement | null = null;
 
@@ -102,14 +104,30 @@ export function create(spec: TermSpec) {
     allowProposedApi: true,
     theme,
     // Claude Code는 PR·파일 경로를 터미널 하이퍼링크(OSC 8)로 보낸다. 기본 처리는 file://을 버리고 http도 웹뷰에서 못 연다
-    linkHandler: { activate: openLink, allowNonHttpProtocols: true },
+    linkHandler: { activate: openLink, allowNonHttpProtocols: true, hover: (_e, _text, range) => light(range), leave: () => unlight() },
   });
+  // 링크 위에 마우스를 올리면 그 글자를 테마의 강조색으로 칠한다. 기본은 글자색 그대로 밑줄만 그어져서 흰 줄로 보인다
+  const lit: { dispose(): void }[] = [];
+  const unlight = () => lit.splice(0).forEach((d) => d.dispose());
+  /** range의 x, y는 1부터 센다. viewport면 y가 화면 줄, 아니면 기록 전체에서의 줄이다 */
+  const light = (range: { start: { x: number; y: number }; end: { x: number; y: number } }, viewport = false) => {
+    unlight();
+    const hex = (c: string) => (/^#[0-9a-f]{6}$/i.test(c) ? c : undefined);
+    const buf = term.buffer.active;
+    for (let y = range.start.y; y <= range.end.y; y++) {
+      const [from, to] = [y === range.start.y ? range.start.x : 1, y === range.end.y ? range.end.x : term.cols];
+      const marker = term.registerMarker((viewport ? buf.viewportY + y : y) - 1 - (buf.baseY + buf.cursorY));
+      const deco = marker && term.registerDecoration({ marker, x: from - 1, width: Math.max(1, to - from + 1), foregroundColor: hex(linkColor.fg), backgroundColor: hex(linkColor.bg), layer: "top" });
+      if (marker) lit.push(marker);
+      if (deco) lit.push(deco);
+    }
+  };
   const fit = new FitAddon();
   term.loadAddon(fit);
   term.loadAddon(new Unicode11Addon());
   term.unicode.activeVersion = "11";
   // 링크는 ⌘를 누른 채 눌러야 열린다. 그냥 누르면 글자 선택과 헷갈린다.
-  term.loadAddon(new WebLinksAddon(openLink));
+  term.loadAddon(new WebLinksAddon(openLink, { hover: (_e, _text, location) => light(location, true), leave: () => unlight() }));
   // 파일 경로는 Claude Code가 링크로 보내지 않는다. 화면에서 찾아 ⌘를 누른 채 누르면 세션 폴더 기준으로 연다
   term.registerLinkProvider({
     provideLinks(y, callback) {
@@ -126,13 +144,14 @@ export function create(spec: TermSpec) {
         text += chars;
       }
       // 티켓 키(아는 프로젝트 키만): ⌘ 클릭하면 티켓 화면
+      const glow = (range: { start: { x: number; y: number }; end: { x: number; y: number } }) => ({ range, hover: () => light(range), leave: () => unlight() });
       const tickets = findKeys(text).map(({ start, end, key }) => ({
-        range: { start: { x: col[start] + 1, y }, end: { x: col[end - 1] + 1, y } },
+        ...glow({ start: { x: col[start] + 1, y }, end: { x: col[end - 1] + 1, y } }),
         text: key,
         activate: (e: MouseEvent) => e.metaKey && openTicket(key),
       }));
       const links = findPaths(text.trimEnd()).map(({ start, end, path }) => ({
-        range: { start: { x: col[start] + 1, y }, end: { x: col[end - 1] + 1, y } },
+        ...glow({ start: { x: col[start] + 1, y }, end: { x: col[end - 1] + 1, y } }),
         text: path,
         activate: (e: MouseEvent) => {
           if (!e.metaKey) return;
@@ -331,8 +350,9 @@ export const outAt = (key: string) => pool.get(key)?.outAt ?? 0;
 export const age = (key: string) => Date.now() - (pool.get(key)?.startedAt ?? 0);
 
 /** 열려 있는 터미널과 앞으로 열 터미널의 색을 바꾼다 */
-export function setTheme(next: ITheme) {
+export function setTheme(next: ITheme, link?: { fg: string; bg: string }) {
   theme = next;
+  if (link) linkColor = link;
   for (const entry of pool.values()) entry.term.options.theme = next;
 }
 
