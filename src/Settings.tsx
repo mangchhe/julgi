@@ -3,13 +3,14 @@ import qrcode from "qrcode-generator";
 import { Fragment, useEffect, useRef, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { openUrl } from "@tauri-apps/plugin-opener";
-import { config, kilo } from "./model";
+import { config, kilo, DEFAULTS } from "./model";
 import { THEMES } from "./themes";
 import { CORE, MORE } from "./Help";
 import { getLang, resolveLang, tr } from "./i18n";
 import { argoHost, argoLoginCommand } from "./argo";
-import { Bot } from "./triageAsk.ts";
+import { Bot, DEFAULT_BOTS } from "./triageAsk.ts";
 import { setupDiff, setupOf } from "./setup";
+import { BACKDROPS } from "./backdrops";
 import BotFace, { ARTS, faceOf, freeFace, shrinkImage } from "./BotFace";
 
 type Key = keyof typeof config;
@@ -106,7 +107,7 @@ const SECTIONS: { id: string; title: string; hint: string; needs?: "jira" | "arg
       { kind: "number", key: "dimOthers", label: tr("안 쓰는 칸 어둡게"), note: tr("칸이 여럿일 때 지금 치고 있지 않은 칸을 이만큼 어둡게 한다. 0이면 그대로다"), step: 10, min: 0, max: 60, show: (n) => `${n}%` },
       { kind: "number", key: "winOpacity", label: tr("창 불투명도"), note: tr("100%면 지금처럼 꽉 찬 바탕이다. 낮추면 창 뒤의 바탕화면과 다른 창이 비친다. 글자는 그대로 진하다. 100%에서 처음 낮출 때는 Julgi를 다시 켜야 터미널 바탕까지 비친다"), step: 5, min: 40, max: 100, show: (n) => `${n}%` },
       { under: () => config.winOpacity < 100, kind: "toggle", key: "winBlur", label: tr("비치는 뒤쪽 흐리게"), note: tr("창을 비치게 했을 때 뒤에 보이는 것을 흐리게 뭉갠다. 끄면 뒤가 또렷하게 보인다") },
-      { kind: "bg", label: tr("배경 사진"), note: tr("내 사진을 터미널 칸들의 바탕에 깐다. 사진은 줄여서 ~/.julgi/background.txt 에 두고 밖으로 보내지 않는다. 글자는 그대로 두고 바탕에만 비치게 겹쳐 그린다") },
+      { kind: "bg", label: tr("배경 사진"), note: tr("들어 있는 그림이나 내 사진을 터미널 칸들의 바탕에 깐다. 내 사진은 줄여서 ~/.julgi/background.txt 에 두고 밖으로 보내지 않는다. 글자는 그대로 두고 바탕에만 비치게 겹쳐 그린다") },
       { under: (s) => s.bg, kind: "number", key: "bgShow", label: tr("사진이 비치는 정도"), note: tr("클수록 사진이 진하게 보이고 글자는 읽기 어려워진다"), step: 5, min: 5, max: 80, show: (n) => `${n}%` },
       { under: (s) => s.bg, kind: "number", key: "bgBlur", label: tr("사진 흐림"), note: tr("사진을 뭉개서 글자가 더 잘 읽히게 한다. 0이면 또렷하게 둔다"), step: 2, min: 0, max: 30, show: (n) => `${n}px` },
     ],
@@ -246,7 +247,7 @@ const SECTIONS: { id: string; title: string; hint: string; needs?: "jira" | "arg
     title: tr("설정 파일"),
     hint: tr("어디에 있고, 어떻게 나누나"),
     rows: [
-      { kind: "share", label: tr("내 설정 내보내기와 가져오기"), note: tr("설정은 전부 ~/.julgi 아래의 글 파일이다. config.json 에는 기본값에서 바꾼 것만 적히고, 봇은 bots.json 에, 배경 사진은 background.txt 에 있다. 이 폴더를 그대로 옮기거나 dotfiles 로 관리해도 된다. 내보내기는 남과 나눌 수 있는 것만 한 파일(julgi-setup.json)로 모은다: 생김새, 일하는 방식, 봇. 내 컴퓨터와 회사에 딸린 것(폴더, 연결, 티켓과 배포 설정)과 허락을 푸는 설정은 넣지 않는다. 가져올 때 봇은 꺼진 채로 들어온다") },
+      { kind: "share", label: tr("내 설정 내보내기와 가져오기"), note: tr("설정은 전부 ~/.julgi 아래의 글 파일이다. config.json 에는 기본값에서 바꾼 것만 적히고, 봇은 bots.json 에, 배경 사진은 background.txt 에 있다. 이 폴더를 그대로 옮기거나 dotfiles 로 관리해도 된다. 내보내기는 내가 기본값에서 바꾼 것 가운데 남과 나눌 수 있는 것만 한 파일(julgi-setup.json)로 모은다: 생김새, 일하는 방식, 내가 만든 봇. 내 컴퓨터와 회사에 딸린 것(폴더, 연결, 티켓과 배포 설정)과 허락을 푸는 설정은 넣지 않는다. 가져올 때 봇은 꺼진 채로 들어온다") },
     ],
   },
 ];
@@ -371,7 +372,7 @@ export default function Settings({ onChange, onClose, remoteUrl, onConnect, onCo
   const [shareNote, setShareNote] = useState("");
   const [incoming, setIncoming] = useState<{ values: [Key, string | number | boolean][]; bots: Bot[] } | null>(null);
   const exportSetup = async () => {
-    const text = JSON.stringify(setupOf(config, bots), null, 1);
+    const text = JSON.stringify(setupOf(config, bots, DEFAULTS, DEFAULT_BOTS), null, 1);
     const path = await invoke<string>("data_write", { name: "share/julgi-setup.json", text }).catch(() => "");
     await navigator.clipboard.writeText(text).catch(() => {});
     setShareNote(path ? tr`${path.replace(/^\/Users\/[^/]+/, "~")} 에 썼고, 클립보드에도 복사했다` : tr("클립보드에 복사했다"));
@@ -576,9 +577,18 @@ export default function Settings({ onChange, onClose, remoteUrl, onConnect, onCo
                     )}
                     {row.kind === "bg" && (
                       <span className="set-bg" onClick={(e) => e.stopPropagation()}>
-                        {bg && <img src={bg} alt="" />}
+                        {BACKDROPS.map((b) => (
+                          <button key={b.id} type="button" tabIndex={-1} className={"set-bg-pick" + (bg === b.url ? " on" : "")} title={tr("들어 있는 그림")} onClick={() => onBg(b.url)}>
+                            <img src={b.url} alt="" />
+                          </button>
+                        ))}
+                        {bg && !BACKDROPS.some((b) => b.url === bg) && (
+                          <span className="set-bg-pick on">
+                            <img src={bg} alt="" />
+                          </span>
+                        )}
                         <label className="set-toggle">
-                          {bg ? tr("다른 사진") : tr("사진 고르기")}
+                          {tr("내 사진…")}
                           <input type="file" accept="image/*" tabIndex={-1} hidden onChange={(e) => e.target.files?.[0] && void shrinkPhoto(e.target.files[0]).then(onBg).catch(() => {})} />
                         </label>
                         {bg && (

@@ -13,12 +13,17 @@ type Value = string | number | boolean;
 const PRIVATE = /^(jira|argo|map|remote)|^(defaultDir|autoTrust|repoPatterns|worksCommand|stripEnv|pluginDirs|repos|hotkey|usage|lang|memoryLimitGb|skipPermissions|autoAllow|allowRules|models)$/;
 const shareable = (key: string, value: unknown): value is Value => !PRIVATE.test(key) && ["string", "number", "boolean"].includes(typeof value);
 
-/** 나눌 수 있는 것만 모은 파일의 내용 */
-export function setupOf(config: Record<string, unknown>, bots: LocalBot[]) {
+/**
+ * 나눌 수 있는 것 가운데 내가 기본값에서 바꾼 것만 모은 파일의 내용.
+ * 전부를 적으면 받는 사람이 스스로 맞춰 둔 값까지 내 기본값으로 덮인다. 봇도 처음부터 들어 있는 것과 같으면 뺀다
+ */
+export function setupOf(config: Record<string, unknown>, bots: LocalBot[], defaults: Record<string, unknown> = {}, stock: { when: string; say: string }[] = []) {
   return {
     julgi: 1,
-    config: Object.fromEntries(Object.entries(config).filter(([key, value]) => shareable(key, value))),
-    bots: bots.filter((b) => b.when.trim() && b.say.trim()).map(({ name, job, when, say, art, model }): SharedBot => ({ name, job, when, say, art, model })),
+    config: Object.fromEntries(Object.entries(config).filter(([key, value]) => shareable(key, value) && value !== defaults[key])),
+    bots: bots
+      .filter((b) => b.when.trim() && b.say.trim() && !stock.some((d) => d.when.trim() === b.when.trim() && d.say.trim() === b.say.trim()))
+      .map(({ name, job, when, say, art, model }): SharedBot => ({ name, job, when, say, art, model })),
   };
 }
 

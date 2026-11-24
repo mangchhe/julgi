@@ -409,6 +409,8 @@ export const config = {
     "이 세션을 새 세션으로 넘기려고 한다. 새 세션이 이 글만 보고 이어서 일할 수 있게 인계 글을 써줘. 도구는 쓰지 말고 글로만 답해. 포함할 것: 목표, 지금까지 알아낸 것, 내린 결정과 이유, 바뀐 파일과 브랜치, 관련 링크, 다음 할 일(순서대로).",
   // i18n-on
 };
+/** 손대기 전의 기본값. 설정을 내보낼 때 내가 바꾼 것만 고르는 데 쓴다 */
+export const DEFAULTS: Record<string, unknown> = JSON.parse(JSON.stringify(config));
 export const hot = (tokens: number) => tokens > config.hotTokens;
 
 /** 링크를 짧게: 무엇인지와 번호만 */

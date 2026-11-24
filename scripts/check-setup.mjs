@@ -20,4 +20,9 @@ assert.equal(diff.bots[0].name, "New");
 assert.equal(diff.bots[0].on, false); // 들어온 봇은 꺼져 있다
 assert.equal(setupDiff("not json", config, bots), null);
 assert.equal(setupDiff(JSON.stringify({ config: { theme: "nord" } }), config, bots), null); // Julgi 표시가 없는 파일
+
+// 기본값을 주면 내가 바꾼 것만 나간다. 처음부터 들어 있는 봇은 빠진다
+const mineOnly = setupOf(config, bots, { theme: "ink", termPad: 6, cursorBlink: true }, [{ when: "asks to go on", say: "go on" }]);
+assert.deepEqual(mineOnly.config, { termPad: 8 });
+assert.deepEqual(mineOnly.bots, []);
 console.log("setup ok");

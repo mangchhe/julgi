@@ -1503,7 +1503,10 @@ body.dragging .pane-body { pointer-events: none; }
 .panes { position: relative; }
 .panes::after { content: ""; position: absolute; inset: 0; z-index: 3; pointer-events: none; background: var(--bg-image, none) center / cover no-repeat; opacity: var(--bg-show, 0.25); filter: blur(var(--bg-blur, 0px)); mix-blend-mode: var(--bg-blend, screen); }
 .set-bg { display: inline-flex; align-items: center; gap: 8px; }
-.set-bg img { width: 72px; height: 44px; object-fit: cover; border-radius: 6px; border: 1px solid var(--line); }
+.set-bg { flex-wrap: wrap; justify-content: flex-end; }
+.set-bg-pick { padding: 0 !important; line-height: 0; border: 2px solid transparent !important; border-radius: 9px !important; background: none !important; cursor: pointer; }
+.set-bg-pick img { width: 64px; height: 40px; object-fit: cover; border-radius: 6px; display: block; }
+.set-bg-pick.on { border-color: var(--accent) !important; }
 .set-bg label.set-toggle { cursor: pointer; }
 /* 창을 비치게: 맨 아래 층들만 반투명하게 칠한다. 위에 뜨는 화면(모달, 목록)은 그대로 꽉 찬 바탕이다 */
 :root.glass, :root.glass body, :root.glass #root { background: transparent; }
