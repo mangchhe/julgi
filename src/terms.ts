@@ -150,7 +150,7 @@ export function create(spec: TermSpec) {
   el.className = "term";
   const entry: Entry = { spec, id: nextId++, term, fit, search, el, opened: false, startedAt: 0, typedAt: 0, keyAt: 0, draft: 0, outAt: Date.now(), observer: new ResizeObserver(() => {}) };
   entry.observer = new ResizeObserver(() => {
-    if (entry.opened && visible(entry)) fit.fit();
+    if (entry.opened && visible(entry)) refit(entry);
   });
   pool.set(spec.key, entry);
 }
@@ -231,7 +231,7 @@ export function attach(key: string, container: HTMLElement) {
     open(entry);
   } else {
     accelerate(entry);
-    entry.fit.fit();
+    refit(entry);
     entry.term.refresh(0, entry.term.rows - 1);
   }
 }
@@ -340,7 +340,7 @@ export function setFontSize(size: number) {
   fontSize = size;
   for (const entry of pool.values()) {
     entry.term.options.fontSize = size;
-    if (entry.opened && visible(entry)) entry.fit.fit();
+    if (entry.opened && visible(entry)) refit(entry);
   }
 }
 
@@ -351,21 +351,23 @@ export function setFontSize(size: number) {
  * 물음이 떠 있는지 주기적으로 보는 쪽은 끝부분만 읽으면 된다(물음은 늘 맨 아래에 뜬다)
  */
 /**
- * 화면 아래에 남은 빈 줄만큼 지난 줄을 끌어내려 채운다. 입력 칸이 위에 떠 있고 그 밑이 비는 것을 없앤다.
+ * 칸이 커진 뒤에, 아래에 새로 붙은 빈 줄만큼 지난 줄을 끌어내려 채운다. 입력 칸이 위에 떠 있고 그 밑이 비는 것을 없앤다.
  * 칸이 커지면 xterm은 커서가 마지막 줄에 있을 때만 지난 줄을 끌어내리고, 아니면 아래에 빈 줄을 붙인다.
- * Claude Code는 커서를 입력 줄에 두고 그 아래에 상태 줄을 그려서 늘 빈 줄이 붙는다. 키 큰 물음 화면을 닫은 뒤에도 같다.
- * 줄과 커서를 같이 내리므로 Claude Code가 아는 상대 위치는 그대로다. xterm의 안쪽 값을 만진다: 모양이 다르면 아무것도 하지 않는다
+ * Claude Code는 커서를 입력 줄에 두고 그 아래에 상태 줄을 그려서 늘 빈 줄이 붙는다.
+ * added는 방금 붙은 빈 줄 수다. 그보다 더 내리면 안 된다: Claude Code는 상태 줄 아래 빈 줄 하나까지 제 화면으로 치고
+ * "아래로 몇 줄"로 움직이는데, 그 줄이 없으면 맨 아래에서 막혀 커서가 한 줄 위로 어긋난다.
+ * 줄과 커서를 같이 내리므로 프로그램이 아는 상대 위치는 그대로다. xterm의 안쪽 값을 만진다: 모양이 다르면 아무것도 하지 않는다
  */
-export function settleBuffer(term: Terminal): number {
+export function settleBuffer(term: Terminal, added: number): number {
   try {
     const active = term.buffer.active;
-    if (active.type !== "normal" || active.baseY === 0) return 0;
+    if (active.type !== "normal" || active.baseY === 0 || added <= 0) return 0;
     let blank = 0;
     for (let y = term.rows - 1; y > active.cursorY; y--) {
       if ((active.getLine(active.baseY + y)?.translateToString(true) ?? "") !== "") break;
       blank++;
     }
-    const n = Math.min(blank, active.baseY);
+    const n = Math.min(blank, active.baseY, added);
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const buf = (term as any)._core?.buffer;
     if (!n || !buf || typeof buf.ybase !== "number" || typeof buf.y !== "number" || typeof buf.lines?.pop !== "function" || buf.lines.length !== buf.ybase + term.rows) return 0;
@@ -383,10 +385,12 @@ export function settleBuffer(term: Terminal): number {
   }
 }
 
-/** 세션이 답을 기다리며 서 있을 때 부른다. 일하는 중에는 부르지 않는다: 그리는 도중의 빈 줄을 채우면 화면이 흔들린다 */
-export function settle(key: string) {
-  const entry = pool.get(key);
-  if (entry?.opened) settleBuffer(entry.term);
+/** 칸 크기에 터미널을 맞춘다. 줄 수가 늘었으면 xterm이 아래에 붙인 빈 줄만큼 지난 줄을 끌어내린다 */
+function refit(entry: Entry) {
+  const [rows, base] = [entry.term.rows, entry.term.buffer.active.baseY];
+  entry.fit.fit();
+  // 늘어난 줄 가운데 xterm이 스스로 끌어내린 것(base가 준 만큼)을 뺀 나머지가 아래에 붙은 빈 줄이다
+  settleBuffer(entry.term, entry.term.rows - rows - (base - entry.term.buffer.active.baseY));
 }
 
 export function text(key: string, tail?: number): string {
@@ -413,7 +417,7 @@ function open(entry: Entry) {
   entry.startedAt = Date.now();
   t.open(el);
   accelerate(entry);
-  entry.fit.fit();
+  refit(entry);
   entry.observer.observe(el);
 
   const send = (data: string) => {

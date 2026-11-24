@@ -471,7 +471,8 @@ export default function Settings({ onChange, onClose, remoteUrl, onConnect, onCo
                                   <BotFace seed={b.face ?? faceSeed(b.id)} size={36} image={b.image} />
                                   <input type="file" accept="image/*" tabIndex={-1} hidden onChange={(e) => e.target.files?.[0] && void shrinkImage(e.target.files[0]).then((image) => put({ image })).catch(() => {})} />
                                 </label>
-                                <input tabIndex={-1} className="set-bot-name" value={b.name} placeholder={tr("봇 이름")} spellCheck={false} onChange={(e) => put({ name: e.target.value })} />
+                                <input tabIndex={-1} className="set-bot-name" value={b.name} placeholder={tr("이름")} spellCheck={false} onChange={(e) => put({ name: e.target.value })} />
+                                <input tabIndex={-1} className="set-bot-job" value={b.job} placeholder={tr("하는 일 한 줄")} spellCheck={false} onChange={(e) => put({ job: e.target.value })} />
                                 <span className="set-note">{tr`${b.runs}번 답함`}</span>
                                 <button type="button" tabIndex={-1} className={"set-toggle" + (b.on ? " on" : "")} onClick={() => put({ on: !b.on })}>
                                   {b.on ? tr("켬") : tr("끔")}
@@ -491,7 +492,7 @@ export default function Settings({ onChange, onClose, remoteUrl, onConnect, onCo
                             </div>
                           );
                         })}
-                        <button type="button" tabIndex={-1} className="set-toggle" onClick={() => onBots([...bots, { id: crypto.randomUUID().slice(0, 8), name: "", when: "", say: "", on: false, runs: 0 }])}>
+                        <button type="button" tabIndex={-1} className="set-toggle" onClick={() => onBots([...bots, { id: crypto.randomUUID().slice(0, 8), name: "", job: "", when: "", say: "", on: false, runs: 0 }])}>
                           {tr("+ 봇 더하기")}
                         </button>
                       </div>

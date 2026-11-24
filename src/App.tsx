@@ -426,7 +426,14 @@ export default function App() {
     void invoke<string | null>("data_read", { name: "bots.json" }).then((json) => {
       try {
         const list = JSON.parse(json ?? "") as Bot[];
-        if (Array.isArray(list)) (botsRef.current = list), setBots(list);
+        if (!Array.isArray(list)) return;
+        // 이름과 하는 일을 나누기 전에 적힌 파일: 처음 봇이면 새 이름을 주고, 내가 만든 봇이면 적어 둔 이름을 하는 일로 옮긴다
+        const next = list.map((b) => {
+          if (typeof b.job === "string") return b;
+          const base = DEFAULT_BOTS.find((d) => d.id === b.id);
+          return base ? { ...b, name: base.name, job: base.job } : { ...b, job: b.name, name: "" };
+        });
+        (botsRef.current = next), setBots(next);
       } catch {
         // 없거나 깨졌으면 처음 봇들로 둔다
       }
@@ -1045,7 +1052,7 @@ export default function App() {
       goStreak.current[sessionId] = streak + 1;
       verdict = { ...verdict, need: false };
       terms.submitWhenClear(key, bot.say);
-      record("대신 답함", tr`봇 "${bot.name}" → "${nameOf(key).slice(0, 40)}": ${bot.say.slice(0, 60)}`, sessionId); // i18n-ok
+      record("대신 답함", tr`봇 "${bot.name || bot.job}" → "${nameOf(key).slice(0, 40)}": ${bot.say.slice(0, 60)}`, sessionId); // i18n-ok
       saveBots(botsRef.current.map((b) => (b.id === bot.id ? { ...b, runs: b.runs + 1 } : b)));
     } else delete goStreak.current[sessionId];
     triaged.current = { ...triaged.current, [sessionId]: verdict };
@@ -2029,8 +2036,6 @@ export default function App() {
     for (const o of open) {
       if (!o.sessionId) continue;
       const st = states[o.key];
-      // 답을 기다리며 서 있는 세션은 입력 칸 아래에 남은 빈 줄을 지난 줄로 채운다 (칸이 커졌거나 키 큰 물음 화면이 닫힌 뒤)
-      if (!st || (st.state !== "run" && st.state !== "hold" && now - st.since > 2000)) terms.settle(o.key);
       // 세션이 스스로 갈아타 달라고 했으면 그 답이 끝난 뒤에 한다
       if (wantHandoff.current.has(o.key) && (waiting(st) || replied(st))) {
         wantHandoff.current.delete(o.key);
