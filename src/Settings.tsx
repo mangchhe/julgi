@@ -20,8 +20,25 @@ type Props = {
   onConnectLab: () => void;
   /** Argo CD: 다시 로그인해야 하는 서버들 */
   argoLogin?: string[];
+  /** 셸 칸을 열어 명령을 돌린다 (설치, 로그인처럼 사람이 보고 답해야 하는 것) */
+  onRun: (command: string, label: string) => void;
   /** 처음 열 묶음 이름 (예: "연결"). 없으면 첫 묶음 */
   startAt?: string;
+};
+
+/** 서버 주소에서 호스트(와 포트)만: 앞의 https://와 뒤의 경로를 뗀다. 이상한 글자가 있으면 빈 글 */
+export const argoHost = (text: string) => {
+  const host = text.trim().replace(/^[a-z]+:\/\//i, "").replace(/\/.*$/, "");
+  return /^[A-Za-z0-9.-]+(:\d+)?$/.test(host) ? host : "";
+};
+/**
+ * 로그인 명령. 포트가 없으면 :443을 붙인다. 로드밸런서 뒤의 서버는 --grpc-web이 있어야 하고, --skip-test-tls가 없으면 로그인 창이 뜨기도 전에 시간이 다 돼 실패하기도 한다.
+ * SSO면 브라우저가 뜨고, 아니면 argocd가 터미널에서 아이디와 비밀번호를 묻는다. 어느 쪽이든 Julgi는 토큰과 비밀번호를 보지 않는다
+ */
+export const argoLoginCommand = (server: string, sso: boolean, name = "") => {
+  const host = argoHost(server);
+  const label = (name && /^[A-Za-z0-9._:-]+$/.test(name) ? name : host).replace(/:\d+$/, "");
+  return `argocd login ${/:\d+$/.test(host) ? host : host + ":443"} --grpc-web --skip-test-tls${sso ? " --sso" : ""} --name ${label}`;
 };
 
 type Row =
@@ -30,7 +47,7 @@ type Row =
   | { kind: "toggle"; key: Key; label: string; note: string }
   | { kind: "pick"; key: Key; label: string; note: string; options: [string, string][] }
   | { kind: "key"; key: Key; label: string; note: string }
-  | { kind: "text"; key: Key; label: string; note: string; hint: string; /** Jira에서 읽은 상태 이름에서 고르게 한다 */ statuses?: boolean }
+  | { kind: "text"; key: Key; label: string; note: string; hint: string; /** Jira에서 읽은 상태 이름에서 고르게 한다 */ statuses?: boolean; /** 이 범주의 상태를 후보로 낸다 */ category?: string }
   | { kind: "github"; label: string; note: string }
   | { kind: "gitlab"; label: string; note: string }
   | { kind: "jira"; label: string; note: string }
@@ -38,7 +55,8 @@ type Row =
   | { kind: "keys"; label: string; note: string };
 
 /** 묶음마다 줄 몇 개. 왼쪽에서 묶음을 고르면 오른쪽에 그 줄들만 나온다 */
-const SECTIONS: { id: string; title: string; hint: string; rows: Row[] }[] = [
+/** needs: 이 묶음은 그 서비스를 연결한 뒤에 쓴다. 연결이 안 돼 있으면 맨 위에 안내를 낸다 */
+const SECTIONS: { id: string; title: string; hint: string; needs?: "jira" | "argo"; rows: Row[] }[] = [
   {
     id: "화면", // i18n-ok
     title: tr("화면"),
@@ -119,33 +137,57 @@ const SECTIONS: { id: string; title: string; hint: string; rows: Row[] }[] = [
   {
     id: "연결", // i18n-ok
     title: tr("연결"),
-    hint: "GitHub · GitLab · Jira",
+    hint: "GitHub · GitLab · Jira · Argo CD",
+    // 여기는 계정만 둔다. 연결한 뒤의 동작은 아래 묶음들(PR·CI, 티켓, 배포)에 있다
     rows: [
       { kind: "github", label: "GitHub", note: tr("연결하면 PR을 Julgi 안에서 본다. 터미널의 PR 링크를 ⌘ 클릭하거나 ⌘K에서 #번호를 친다. 로그인은 gh(GitHub CLI)가 하고 토큰도 gh가 키체인에 둔다. Julgi는 토큰을 보지 않는다") },
       { kind: "gitlab", label: "GitLab", note: tr("연결하면 MR도 PR과 똑같이 본다(PR 화면, 작업 페이지, 알림). 로그인은 glab(GitLab CLI)이 하고 토큰도 glab이 둔다. 회사 GitLab이면 glab auth login에서 그 호스트를 고른다") },
       { kind: "jira", label: "Jira", note: tr("연결하면 티켓을 Julgi 안에서 보고, 티켓으로 일을 시작하고, 상태를 옮긴다. 토큰은 macOS 키체인에만 둔다(Cloud는 id.atlassian.com에서 만든 API 토큰, Server/DC는 개인 액세스 토큰)") },
+      { kind: "argo", label: "Argo CD", note: tr("레포에 이어진 앱의 sync와 health를 본다. 읽기만 한다. 로그인은 argocd CLI가 하고(argocd login <서버>) 토큰도 argocd가 갖는다. Julgi는 토큰을 보지 않는다") },
+    ],
+  },
+  {
+    id: "PR", // i18n-ok
+    title: "PR · CI",
+    hint: tr("챙길 PR과 CI, 확인 주기"),
+    rows: [
+      { kind: "pick", key: "prWatch", label: tr("챙길 PR"), note: tr("정한 주기마다 PR을 보고 CI가 깨지거나 남이 코멘트를 달거나 리뷰를 받거나 머지되면 알린다. 세션이 올린 PR은 그 세션을 내 차례로 올리고, 나머지 내 PR은 ⌘J의 \"내 PR\"에 넣는다"), options: [["mine", tr("내 PR 전부")], ["session", tr("세션이 올린 PR만")], ["off", tr("끔")]] },
+      { kind: "number", key: "prEveryMin", label: tr("PR 확인 주기"), note: tr("세션 줄의 PR과 내 PR을 이만큼마다 본다. 짧을수록 알림이 빨리 온다"), step: 1, min: 1, max: 30, show: (n) => tr`${n}분` },
+      { kind: "number", key: "askEveryMin", label: tr("리뷰 요청 확인 주기"), note: tr("나한테 온 리뷰 요청을 이만큼마다 본다"), step: 1, min: 1, max: 60, show: (n) => tr`${n}분` },
+      { kind: "toggle", key: "reviewAsks", label: tr("리뷰 요청"), note: tr("정한 주기마다 나한테 리뷰를 부탁한 PR을 보고 ⌘J의 \"리뷰 요청\"에 넣는다. 새로 오면 알린다") },
+      { kind: "toggle", key: "refreshOnFocus", label: tr("돌아오면 바로 보기"), note: tr("다른 앱에 있다 Julgi 창으로 돌아오면 PR과 리뷰 요청을 기다리지 않고 바로 다시 본다") },
+      { kind: "number", key: "prViewRefreshSec", label: tr("PR 화면 새로 읽기"), note: tr("PR 화면을 열어 둔 동안 이만큼마다 새로 읽어 남이 단 코멘트와 CI를 들인다. 끄면 r을 누를 때만 읽는다"), step: 10, min: 0, max: 300, show: (n) => (n ? tr`${n}초` : tr("끔")) },
+      { kind: "toggle", key: "wakeOnPr", label: tr("잠든 세션 깨우기"), note: tr("최근 세션이 남긴 PR은 세션이 잠들어 있어도 챙긴다. 켜면 그 PR에 일이 생길 때 세션을 바로 깨워 둔다(세션 하나가 메모리를 0.3–1GB 쓴다). 끄면 알리고 ⌘J의 내 차례에 올려 두기만 하고, 고르면 그때 깨운다") },
+      { kind: "toggle", key: "ciWatch", label: tr("내가 돌린 CI 실행 보기"), note: tr("열려 있거나 최근에 쓴 세션의 레포에서 내가 돌린 CI를 읽어 ⌘U의 \"실행\"에 모은다. 끝나면 알리고, 깨진 것은 ⌘J에 올린다. gh와 glab으로 읽는다") },
+    ],
+  },
+  {
+    id: "티켓", // i18n-ok
+    title: tr("티켓"),
+    hint: "Jira",
+    needs: "jira",
+    rows: [
       { kind: "pick", key: "jiraWatch", label: tr("챙길 티켓"), note: tr("정한 주기마다 내게 배정된 티켓을 보고 새로 배정되거나 상태가 바뀌거나 남이 코멘트를 달면 알리고 ⌘J에 넣는다"), options: [["mine", tr("내게 배정된 것")], ["off", tr("끔")]] },
       { kind: "number", key: "jiraEveryMin", label: tr("티켓 확인 주기"), note: tr("내 티켓을 이만큼마다 본다"), step: 1, min: 1, max: 60, show: (n) => tr`${n}분` },
-      { kind: "text", key: "jiraStartTransition", label: tr("시작할 때 옮길 상태"), note: tr("이 티켓으로 시작할 때 이 상태로 옮길지 묻는다. 비우면 묻지 않는다. Jira가 연결돼 있으면 그 Jira의 상태 이름에서 고른다"), hint: "In Progress", statuses: true },
-      { kind: "text", key: "jiraPrTransition", label: tr("PR 올리면 옮길 상태"), note: tr("티켓과 이어진 세션이 PR을 올리면 이 상태로 옮길지 묻는다"), hint: "In Review", statuses: true },
-      { kind: "text", key: "jiraMergeTransition", label: tr("머지되면 옮길 상태"), note: tr("그 PR이 머지되면 이 상태로 옮길지 묻는다"), hint: "Done", statuses: true },
-      { kind: "number", key: "bugParallel", label: tr("버그를 한꺼번에 맡길 때 동시에 돌릴 수"), note: tr("작업 페이지에서 버그를 전부 맡기면 이만큼씩 진단 세션을 띄우고, 하나가 답을 끝내면 다음 것을 시작한다"), step: 1, min: 1, max: 8, show: (n) => tr`${n}개` },
+      { kind: "text", key: "jiraStartTransition", label: tr("시작할 때 옮길 상태"), note: tr("이 티켓으로 시작할 때 이 상태로 옮길지 묻는다. 비우면 묻지 않는다. Jira가 연결돼 있으면 그 Jira의 상태 이름에서 고른다"), hint: "In Progress", statuses: true, category: "indeterminate" },
+      { kind: "text", key: "jiraPrTransition", label: tr("PR 올리면 옮길 상태"), note: tr("티켓과 이어진 세션이 PR을 올리면 이 상태로 옮길지 묻는다"), hint: "In Review", statuses: true, category: "indeterminate" },
+      { kind: "text", key: "jiraMergeTransition", label: tr("머지되면 옮길 상태"), note: tr("그 PR이 머지되면 이 상태로 옮길지 묻는다"), hint: "Done", statuses: true, category: "done" },
       { kind: "text", key: "jiraQuiet", label: tr("조용히 받을 Jira 작성자"), note: tr("이 사람들의 댓글만 달렸으면 알리지 않고 ⌘J에도 올리지 않는다. 봇 계정은 적지 않아도 조용히 받는다"), hint: "Automation for Jira, deploy-bot" },
       { kind: "text", key: "jiraRepos", label: tr("프로젝트 키 → 레포"), note: tr("이 티켓으로 시작할 때 고를 레포. 시작 창에서 고르면 저절로 채운다"), hint: "ABC=acme-api, OPS=acme-infra" },
-      { kind: "argo", label: "Argo CD", note: tr("레포에 이어진 앱의 sync와 health를 본다. 읽기만 한다. 로그인은 argocd CLI가 하고(argocd login <서버>) 토큰도 argocd가 갖는다. Julgi는 토큰을 보지 않는다") },
+      { kind: "number", key: "bugParallel", label: tr("버그를 한꺼번에 맡길 때 동시에 돌릴 수"), note: tr("작업 페이지에서 버그를 전부 맡기면 이만큼씩 진단 세션을 띄우고, 하나가 답을 끝내면 다음 것을 시작한다"), step: 1, min: 1, max: 8, show: (n) => tr`${n}개` },
+    ],
+  },
+  {
+    id: "배포", // i18n-ok
+    title: tr("배포"),
+    hint: "Argo CD",
+    needs: "argo",
+    rows: [
       { kind: "toggle", key: "argoWatch", label: tr("Argo CD 배포 상태 보기"), note: tr("열려 있거나 최근에 쓴 세션의 레포에 이어진 앱을 ⌘U의 \"배포\"에 모으고, 나빠지면 알린다") },
       { kind: "text", key: "argoApps", label: tr("레포 → Argo CD 앱"), note: tr("앱을 레포에 직접 잇는다. 적어 두면 소스나 이미지 이름으로 잇는 기본 판정보다 먼저다. 앱 이름 패턴에 *를 쓰거나 /정규식/으로 적고, 쉼표로 여럿을 적는다"), hint: "acme-api=acme-api-*, acme-shop=/^shop-(dev|prod)$/" },
       { kind: "text", key: "argoEnvLabel", label: tr("환경 이름으로 쓸 라벨"), note: tr("비우면 앱의 env, environment 라벨, 없으면 네임스페이스, 그것도 없으면 클러스터 이름을 쓴다"), hint: "tier" },
       { kind: "text", key: "argoTagCommit", label: tr("이미지 태그 → 커밋"), note: tr("태그에서 커밋을 꺼낼 정규식. 캡처 그룹 1이 커밋이다. 비우면 태그 안의 16진수 조각을 git으로 확인해서 찾는다"), hint: "^[0-9]+\\.([0-9a-f]+)$" },
       { kind: "number", key: "argoLagMin", label: tr("OutOfSync가 이만큼 이어지면 알리기"), note: tr("배포가 어긋난 채로 이 시간이 넘으면 한 번 알린다. 0이면 알리지 않는다"), step: 5, min: 0, max: 120, show: (n) => (n ? tr`${n}분` : tr("끔")) },
-      { kind: "toggle", key: "ciWatch", label: tr("내가 돌린 CI 실행 보기"), note: tr("열려 있거나 최근에 쓴 세션의 레포에서 내가 돌린 CI를 읽어 ⌘U의 \"실행\"에 모은다. 끝나면 알리고, 깨진 것은 ⌘J에 올린다. gh와 glab으로 읽는다") },
-      { kind: "pick", key: "prWatch", label: tr("챙길 PR"), note: tr("정한 주기마다 PR을 보고 CI가 깨지거나 남이 코멘트를 달거나 리뷰를 받거나 머지되면 알린다. 세션이 올린 PR은 그 세션을 내 차례로 올리고, 나머지 내 PR은 ⌘J의 \"내 PR\"에 넣는다"), options: [["mine", tr("내 PR 전부")], ["session", tr("세션이 올린 PR만")], ["off", tr("끔")]] },
-      { kind: "number", key: "prEveryMin", label: tr("PR 확인 주기"), note: tr("세션 줄의 PR과 내 PR을 이만큼마다 본다. 짧을수록 알림이 빨리 온다"), step: 1, min: 1, max: 30, show: (n) => tr`${n}분` },
-      { kind: "number", key: "askEveryMin", label: tr("리뷰 요청 확인 주기"), note: tr("나한테 온 리뷰 요청을 이만큼마다 본다"), step: 1, min: 1, max: 60, show: (n) => tr`${n}분` },
-      { kind: "toggle", key: "refreshOnFocus", label: tr("돌아오면 바로 보기"), note: tr("다른 앱에 있다 Julgi 창으로 돌아오면 PR과 리뷰 요청을 기다리지 않고 바로 다시 본다") },
-      { kind: "number", key: "prViewRefreshSec", label: tr("PR 화면 새로 읽기"), note: tr("PR 화면을 열어 둔 동안 이만큼마다 새로 읽어 남이 단 코멘트와 CI를 들인다. 끄면 r을 누를 때만 읽는다"), step: 10, min: 0, max: 300, show: (n) => (n ? tr`${n}초` : tr("끔")) },
-      { kind: "toggle", key: "wakeOnPr", label: tr("잠든 세션 깨우기"), note: tr("최근 세션이 남긴 PR은 세션이 잠들어 있어도 챙긴다. 켜면 그 PR에 일이 생길 때 세션을 바로 깨워 둔다(세션 하나가 메모리를 0.3–1GB 쓴다). 끄면 알리고 ⌘J의 내 차례에 올려 두기만 하고, 고르면 그때 깨운다") },
-      { kind: "toggle", key: "reviewAsks", label: tr("리뷰 요청"), note: tr("정한 주기마다 나한테 리뷰를 부탁한 PR을 보고 ⌘J의 \"리뷰 요청\"에 넣는다. 새로 오면 알린다") },
     ],
   },
   {
@@ -164,6 +206,8 @@ const ROWS: Row[] = SECTIONS.flatMap((sec) => sec.rows);
 const SECTION_OF: number[] = SECTIONS.flatMap((sec, n) => sec.rows.map(() => n));
 /** 묶음 번호 → 그 묶음의 첫 줄 번호 */
 const FIRST_OF: number[] = SECTIONS.map((_, n) => SECTION_OF.indexOf(n));
+/** 계정을 연결하는 묶음의 자리 */
+const CONNECT = SECTIONS.findIndex((sec) => sec.id === "연결"); // i18n-ok
 
 /** 주소를 QR 그림(SVG)으로. 폰으로 옮길 때 찍는다 */
 const qrSvg = (text: string) => {
@@ -181,14 +225,14 @@ const showKey = (combo: string) =>
     .join("");
 
 /** 설정 (⌘,). 바꾸는 즉시 적용되고 ~/.julgi/config.json에 남는다 */
-export default function Settings({ onChange, onClose, remoteUrl, onConnect, onConnectLab, argoLogin = [], startAt }: Props) {
+export default function Settings({ onChange, onClose, remoteUrl, onConnect, onConnectLab, argoLogin = [], onRun, startAt }: Props) {
   const [at, setAt] = useState(() => Math.max(0, FIRST_OF[SECTIONS.findIndex((s) => s.id === startAt)] ?? 0));
   // Jira가 연결돼 있으면 그 Jira의 상태 이름을 읽어 "옮길 상태" 칸에서 고르게 한다. 워크플로가 프로젝트마다 달라서
   // 목록은 전체 상태이고, 실제로 옮길 수 있는지는 그 티켓의 지금 상태에 달려 있다
-  const [statuses, setStatuses] = useState<string[]>([]);
+  const [statuses, setStatuses] = useState<{ name: string; category: string }[]>([]);
   useEffect(() => {
     if (!config.jiraSite) return setStatuses([]);
-    void invoke<string[]>("jira_statuses", { conn: { site: config.jiraSite, email: config.jiraEmail, kind: config.jiraKind } }).then(setStatuses, () => setStatuses([]));
+    void invoke<{ name: string; category: string }[]>("jira_statuses", { conn: { site: config.jiraSite, email: config.jiraEmail, kind: config.jiraKind } }).then(setStatuses, () => setStatuses([]));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [config.jiraSite]);
   // gh가 있는가, 누구로 로그인했는가. undefined면 아직 보는 중
@@ -198,6 +242,8 @@ export default function Settings({ onChange, onClose, remoteUrl, onConnect, onCo
   // argocd가 있는가, 로그인해 둔 서버들. undefined면 아직 보는 중
   const [argo, setArgo] = useState<{ installed: boolean; contexts: { name: string; server: string; current: boolean }[] } | undefined>(undefined);
   useEffect(() => void invoke<NonNullable<typeof argo>>("argo_status").then(setArgo, () => setArgo({ installed: false, contexts: [] })), []);
+  const [argoServer, setArgoServer] = useState("");
+  const [argoSso, setArgoSso] = useState(true);
   // Jira: 연결돼 있으면 표시 이름, 아니면 입력 칸
   const [jira, setJira] = useState<{ name?: string; error?: string; busy?: boolean }>({});
   const [jiraForm, setJiraForm] = useState({ site: config.jiraSite || "https://", email: config.jiraEmail, token: "", kind: config.jiraKind || "cloud" });
@@ -309,6 +355,17 @@ export default function Settings({ onChange, onClose, remoteUrl, onConnect, onCo
               <b>{SECTIONS[SECTION_OF[at]].title}</b>
               <span>{SECTIONS[SECTION_OF[at]].hint}</span>
             </div>
+            {/* 연결해야 쓰는 묶음인데 연결이 안 돼 있으면 먼저 알린다 */}
+            {SECTIONS[SECTION_OF[at]].needs === "jira" && !config.jiraSite && (
+              <button type="button" tabIndex={-1} className="set-needs" onClick={() => setAt(FIRST_OF[CONNECT])}>
+                {tr("Jira가 연결돼 있지 않다. 연결 탭에서 먼저 연결한다 →")}
+              </button>
+            )}
+            {SECTIONS[SECTION_OF[at]].needs === "argo" && argo && (!argo.installed || !argo.contexts.length) && (
+              <button type="button" tabIndex={-1} className="set-needs" onClick={() => setAt(FIRST_OF[CONNECT])}>
+                {tr("Argo CD에 로그인돼 있지 않다. 연결 탭에서 먼저 연결한다 →")}
+              </button>
+            )}
             <div className="set-card">
               {ROWS.map((row, i) =>
                 SECTION_OF[i] !== SECTION_OF[at] ? null : (
@@ -391,17 +448,51 @@ export default function Settings({ onChange, onClose, remoteUrl, onConnect, onCo
                       </span>
                     )}
                     {row.kind === "argo" && (
-                      <span className="set-gh">
+                      <span className="set-argo" onClick={(e) => e.stopPropagation()}>
                         {argo === undefined ? (
                           <span className="set-note">{tr("보는 중")}</span>
                         ) : !argo.installed ? (
-                          <span className="set-note">{tr("argocd가 없다 · 터미널에서 brew install argocd")}</span>
-                        ) : !argo.contexts.length ? (
-                          <span className="set-note">{tr("로그인한 서버가 없다 · 터미널에서 argocd login <서버>:443 --grpc-web --skip-test-tls (SSO면 --sso)")}</span>
-                        ) : (
-                          <span className={argoLogin.length ? "set-note" : "set-on"}>
-                            {argoLogin.length ? tr`다시 로그인 필요: ${argoLogin.join(", ")} · argocd login <서버>:443 --grpc-web --skip-test-tls (SSO면 --sso)` : tr`● 서버 ${argo.contexts.length}곳: ${argo.contexts.map((c) => c.name).join(", ").slice(0, 80)}`}
+                          <span className="set-gh">
+                            <span className="set-note">{tr("argocd가 없다")}</span>
+                            <button type="button" tabIndex={-1} className="set-toggle" onClick={() => onRun("brew install argocd", tr("argocd 설치"))}>
+                              {tr("설치하기 (brew install argocd)")}
+                            </button>
                           </span>
+                        ) : (
+                          <>
+                            {argo.contexts.map((c) => {
+                              const lost = argoLogin.includes(c.name);
+                              return (
+                                <span key={c.name} className="set-gh">
+                                  <span className={lost ? "set-note" : "set-on"}>{lost ? tr`${c.name} · 다시 로그인 필요` : `● ${c.name}`}</span>
+                                  <button type="button" tabIndex={-1} className="set-toggle" onClick={() => onRun(argoLoginCommand(c.server || c.name, argoSso, c.name), tr("Argo CD 로그인"))}>
+                                    {tr("다시 로그인")}
+                                  </button>
+                                  <button
+                                    type="button"
+                                    tabIndex={-1}
+                                    className="set-toggle"
+                                    onClick={() => void invoke("argo_logout", { context: c.name }).finally(() => void invoke<NonNullable<typeof argo>>("argo_status").then(setArgo, () => {}))}
+                                  >
+                                    {tr("끊기")}
+                                  </button>
+                                </span>
+                              );
+                            })}
+                            <span className="set-jira">
+                              <input tabIndex={-1} value={argoServer} placeholder={tr("서버 주소 (argocd.example.com)")} spellCheck={false} onChange={(e) => setArgoServer(e.target.value)} />
+                              <span className="set-seg">
+                                {[[true, "SSO"], [false, tr("아이디·비밀번호")]].map(([v, l]) => (
+                                  <button key={String(v)} type="button" tabIndex={-1} className={argoSso === v ? "yes" : ""} onClick={() => setArgoSso(v as boolean)}>
+                                    {l}
+                                  </button>
+                                ))}
+                              </span>
+                              <button type="button" tabIndex={-1} className="set-toggle" disabled={!argoHost(argoServer)} onClick={() => onRun(argoLoginCommand(argoServer, argoSso), tr("Argo CD 로그인"))}>
+                                {tr("로그인")}
+                              </button>
+                            </span>
+                          </>
                         )}
                       </span>
                     )}
@@ -452,9 +543,28 @@ export default function Settings({ onChange, onClose, remoteUrl, onConnect, onCo
                       </span>
                     )}
                     {row.kind === "text" && <input tabIndex={-1} list={row.statuses && statuses.length ? "jira-statuses" : undefined} value={config[row.key] as string} placeholder={row.hint} spellCheck={false} onFocus={() => setAt(i)} onChange={(e) => set(row.key, e.target.value)} />}
-                    {row.kind === "text" && row.statuses && statuses.length > 0 && !!(config[row.key] as string).trim() && !statuses.some((name) => name.toLowerCase() === (config[row.key] as string).trim().toLowerCase()) && (
-                      <div className="set-warn">{tr("이 Jira에 없는 상태 이름이다")}</div>
-                    )}
+                    {row.kind === "text" &&
+                      row.statuses &&
+                      statuses.length > 0 &&
+                      !statuses.some(({ name }) => name.toLowerCase() === (config[row.key] as string).trim().toLowerCase()) && (
+                        // 적힌 이름이 이 Jira에 없거나 비어 있다. 같은 범주의 상태를 후보로 내서 고르게 한다. 안 고르면 비운 채로 두고 묻지 않는다
+                        <div className="set-cands" onClick={(e) => e.stopPropagation()}>
+                          <span>{(config[row.key] as string).trim() ? tr("이 Jira에 없는 상태 이름이다. 고른다:") : tr("비어 있어 묻지 않는다. 고르려면:")}</span>
+                          {statuses
+                            .filter((st) => !row.category || st.category === row.category)
+                            .slice(0, 8)
+                            .map((st) => (
+                              <button key={st.name} type="button" tabIndex={-1} onClick={() => set(row.key, st.name)}>
+                                {st.name}
+                              </button>
+                            ))}
+                          {!!(config[row.key] as string).trim() && (
+                            <button type="button" tabIndex={-1} className="clear" onClick={() => set(row.key, "")}>
+                              {tr("비우기")}
+                            </button>
+                          )}
+                        </div>
+                      )}
                   </div>
                 </div>
                 ),
@@ -463,7 +573,7 @@ export default function Settings({ onChange, onClose, remoteUrl, onConnect, onCo
           </div>
         </div>
         <datalist id="jira-statuses">
-          {statuses.map((name) => (
+          {statuses.map(({ name }) => (
             <option key={name} value={name} />
           ))}
         </datalist>

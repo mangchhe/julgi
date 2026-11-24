@@ -98,6 +98,15 @@ pub fn argo_status() -> Value {
     json!({ "installed": true, "contexts": contexts })
 }
 
+/// 그 서버에서 로그아웃한다. argocd가 갖고 있던 그 서버의 토큰을 지운다 (이 맥의 설정만 바뀐다)
+#[tauri::command(async)]
+pub fn argo_logout(context: String) -> Result<(), String> {
+    if !ok_name(&context) {
+        return Err("bad context".into());
+    }
+    run(&["logout", &context], 10).map(|_| ())
+}
+
 /// 앱이 어느 환경의 것인가. 정해 둔 이름은 없다: 라벨(env, environment, stage)이 있으면 그것, 없으면 네임스페이스, 그것도 없으면 클러스터 이름
 fn env_of(app: &Value) -> String {
     for key in ["env", "environment", "stage", "app.kubernetes.io/environment"] {

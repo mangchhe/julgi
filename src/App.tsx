@@ -184,6 +184,19 @@ export default function App() {
   /** 티켓을 봤다: 소식을 내린다 */
   const seenTicket = (key?: string) => key && ticketNewsRef.current[key] && setTicketNews(({ [key]: _, ...rest }) => rest);
   const jiraSeen = useRef<Record<string, TicketSeen>>({});
+  // 옮길 상태의 기본값(In Progress, In Review, Done)이 연결된 Jira에 없는 이름이면 비운다. 상태 이름이 다른 언어인 Jira에서
+  // 없는 이름으로 계속 "옮길까?"를 묻지 않게 하려는 것이다. 설정에서 같은 범주의 상태를 후보로 보여 주니 거기서 고른다.
+  // 사용자가 직접 적은 이름은 건드리지 않는다
+  useEffect(() => {
+    if (!config.jiraSite) return;
+    void invoke<{ name: string }[]>("jira_statuses", { conn: { site: config.jiraSite, email: config.jiraEmail, kind: config.jiraKind } }).then((list) => {
+      if (!list.length) return;
+      const has = (name: string) => list.some((st) => st.name.toLowerCase() === name.toLowerCase());
+      for (const [key, preset] of [["jiraStartTransition", "In Progress"], ["jiraPrTransition", "In Review"], ["jiraMergeTransition", "Done"]] as const)
+        if (config[key] === preset && !has(preset)) setConfig(key, "");
+    }, () => {});
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [config.jiraSite]);
   const [ticketLinks, setTicketLinks] = useState<Record<string, string>>({}); // 세션 ID → 티켓 키
   const [ticketDone, setTicketDone] = useState<Record<string, string>>({}); // 끝난(완료·거부) 티켓 키 → 상태 이름. 한 번 알린 것은 다시 알리지 않는다
   const doneRef = useRef<Record<string, string>>({});
@@ -3389,6 +3402,12 @@ export default function App() {
       {overlay === "settings" && (
         <Settings
           argoLogin={argoLogin}
+          onRun={(command, label) => {
+            // 설치와 로그인은 사람이 보고 답해야 한다(브라우저가 뜨거나 비밀번호를 묻는다). 셸 칸에서 돌린다. 끝나면 배포 상태를 다시 읽는다
+            setOverlay(null);
+            newShell(cwdOf(current), `${command}; echo; echo '${tr("끝났다. ⌘W로 이 칸을 닫는다.")}'; read -r _`, label);
+            setTimeout(() => refreshArgo.current(), 30_000);
+          }}
           startAt={settingsAt}
           remoteUrl={remoteUrl}
           onConnectLab={() => {

@@ -182,7 +182,10 @@ async function invoke(cmd: string, args: Record<string, unknown> = {}): Promise<
     case "jira_me":
       return "Me";
     case "jira_statuses":
-      return ["Done", "In Progress", "In Review", "To Do"];
+      // lang 깃발 없이 statusko를 주면 상태 이름이 한국어인 Jira를 흉내 낸다
+      return flags.has("statusko")
+        ? [{ name: "할 일", category: "new" }, { name: "진행 중", category: "indeterminate" }, { name: "리뷰 중", category: "indeterminate" }, { name: "완료", category: "done" }, { name: "반려", category: "done" }]
+        : [{ name: "Done", category: "done" }, { name: "In Progress", category: "indeterminate" }, { name: "In Review", category: "indeterminate" }, { name: "To Do", category: "new" }];
     case "jira_projects":
       return ["ABC", "OPS"];
     case "jira_mine":
