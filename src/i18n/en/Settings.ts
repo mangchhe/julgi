@@ -211,4 +211,11 @@ export default {
   "Julgi가 하는 일": "What Julgi does",
   "밖의 서비스": "Outside services",
   "그 밖": "Other",
+  "스크립트가 돌린 세션": "Sessions run by scripts",
+  "사람이 연 것이 아니라 스크립트나 SDK가 돌린 세션(claude -p 같은 것)을 목록에 어떻게 둘지 정한다. \"묶어서\"는 맨 아래 한 줄로 접어 두고, \"숨기기\"는 빼고 ⌘K로만 찾는다. 섞지 않는 동안에는 요약과 줄기 묶기 같은 Julgi의 자동 작업도 이 세션들을 건너뛴다": "How sessions run by a script or the SDK (such as claude -p), not opened by a person, sit in the list. \"Grouped\" folds them into one line at the bottom; \"Hidden\" leaves them out, findable with ⌘K only. Unless mixed in, Julgi's own work such as summaries and stem grouping skips these sessions",
+  "묶어서": "Grouped",
+  "숨기기": "Hidden",
+  "섞어서": "Mixed in",
+  "스크립트 세션을 가리는 값": "Value that marks a script session",
+  "Claude Code는 대화 기록에 세션을 연 길(entrypoint)을 적는다. 터미널에서 열면 cli, 스크립트나 SDK가 돌리면 sdk-cli다. 그 값이 여기 적은 글로 시작하면 스크립트가 돌린 세션으로 본다. 쉼표로 여럿 적는다": "Claude Code writes how a session was started (entrypoint) into its transcript: cli when opened in a terminal, sdk-cli when run by a script or the SDK. A session whose value starts with the text here counts as run by a script. Separate several with commas",
 } as Record<string, string>;

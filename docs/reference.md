@@ -30,6 +30,7 @@ The core knows only Claude Code and git. Company or personal pieces attach throu
 - `saveCommand`: what `⌘S` sends to the current session.
 - `worksCommand`: a command that prints a JSON list of work items used to group sessions.
 - `repoPatterns`: regexes that pull a repo name out of a path when the folder is gone.
+- `scriptShow`, `scriptEntry`: how sessions run by a script or the SDK (such as `claude -p`) sit in the list. `scriptShow` is `group` (default, folded into one group at the bottom), `hide` (left out, findable with `⌘K`) or `mix`. A session counts as run by a script when the `entrypoint` in its transcript starts with `scriptEntry` (default `sdk`, comma-separated).
 - `stripEnv`: environment variable prefixes not passed to Julgi's shells.
 - `models`: which model each kind of judgment uses.
 

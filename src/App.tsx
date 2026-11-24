@@ -506,7 +506,8 @@ export default function App() {
     // 일감을 맡은 세션도 같다. 조율 세션의 일부라 따로 말을 걸 대상이 아니고, 보낼 곳 후보에 끼면 조율 세션으로 갈 말을 가로챈다
     for (const t of tasks) if (t.session) gone.add(t.session);
     return ledger ? enrich(ledger).map((s) => ({ ...s, title: names[s.id] ?? s.title, auto: s.auto || gone.has(s.id) })) : [];
-  }, [ledger, names, hidden, tasks]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ledger, names, hidden, tasks, config.scriptShow, config.scriptEntry]);
   const byId = useMemo(() => new Map(sessions.map((s) => [s.id, s])), [sessions]);
   const items = useMemo(() => buildItems(sessions, threads, memories), [sessions, threads, memories]);
   const threadOf = (sessionId?: string) => (sessionId ? threads.find((t) => t.sessions.includes(sessionId)) : undefined);
@@ -3186,6 +3187,7 @@ export default function App() {
           current={current}
           shown={panes}
           loading={!ledger}
+          scripts={config.scriptShow === "group" ? sessions.filter((s) => s.script) : []}
           onShow={(key) => {
             // 세션을 열면 이어진 티켓의 소식도 본 것으로 친다
             seenTicket(ticketOfSession(open.find((o) => o.key === key)?.sessionId));

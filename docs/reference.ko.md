@@ -29,6 +29,7 @@
 - `saveCommand`: `⌘S`로 지금 세션에 보낼 말.
 - `worksCommand`: 세션을 "작업"으로 묶을 때 쓸 작업 목록을 JSON으로 내놓는 명령.
 - `repoPatterns`: 폴더가 지워져 git으로 레포를 알 수 없을 때 경로에서 레포 이름을 뽑는 정규식.
+- `scriptShow`, `scriptEntry`: 스크립트나 SDK가 돌린 세션(`claude -p` 같은 것)을 목록에 어떻게 둘지 정한다. `scriptShow`는 `group`(기본, 맨 아래 한 묶음으로 접음), `hide`(빼고 `⌘K`로만 찾음), `mix`(섞음). 대화 기록의 `entrypoint`가 `scriptEntry`(기본 `sdk`, 쉼표로 여럿)로 시작하면 스크립트가 돌린 세션으로 본다.
 - `stripEnv`: Julgi가 띄우는 셸에 넘기지 않을 환경 변수 앞머리.
 - `models`: 판단마다 쓸 모델을 직접 정한다.
 

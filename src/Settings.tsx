@@ -51,6 +51,8 @@ const SECTIONS: { id: string; title: string; hint: string; needs?: "jira" | "arg
     { kind: "theme", label: tr("테마"), note: tr("화면과 터미널의 색") },
     { kind: "pick", key: "lang", label: tr("언어"), note: tr("화면 글의 언어. 바꾸면 옆에 뜨는 단추로 Julgi를 다시 켜서 적용한다. 열려 있던 세션은 그대로 이어진다"), options: [["auto", tr("시스템 따름")], ["en", "English"], ["ko", "한국어"]] }, // i18n-ok
     { kind: "number", key: "recentDays", label: tr("목록에 보이는 기간"), note: tr("이보다 오래 안 쓴 잠든 세션은 목록에서 빼고 ⌘K로만 찾는다"), step: 1, min: 1, max: 90, show: (n) => tr`${n}일` },
+    { kind: "pick", key: "scriptShow", label: tr("스크립트가 돌린 세션"), note: tr("사람이 연 것이 아니라 스크립트나 SDK가 돌린 세션(claude -p 같은 것)을 목록에 어떻게 둘지 정한다. \"묶어서\"는 맨 아래 한 줄로 접어 두고, \"숨기기\"는 빼고 ⌘K로만 찾는다. 섞지 않는 동안에는 요약과 줄기 묶기 같은 Julgi의 자동 작업도 이 세션들을 건너뛴다"), options: [["group", tr("묶어서")], ["hide", tr("숨기기")], ["mix", tr("섞어서")]] },
+    { kind: "text", key: "scriptEntry", label: tr("스크립트 세션을 가리는 값"), note: tr("Claude Code는 대화 기록에 세션을 연 길(entrypoint)을 적는다. 터미널에서 열면 cli, 스크립트나 SDK가 돌리면 sdk-cli다. 그 값이 여기 적은 글로 시작하면 스크립트가 돌린 세션으로 본다. 쉼표로 여럿 적는다"), hint: "sdk" },
     { kind: "toggle", key: "usage", label: tr("Claude 사용량 보기"), note: tr("아래 상태 줄에 5시간 창과 주간 한도를 얼마나 썼는지 보여 준다. 켜면 Claude Code의 로그인 토큰을 키체인에서 읽어 Anthropic의 사용량 주소에만 보낸다(처음에 키체인이 허락을 묻는다). 문서에 없는 주소라 어느 날 안 나올 수 있다") },
       { kind: "toggle", key: "triage", label: tr("할 일이 있을 때만 부르기"), note: tr("세션이 답을 끝내면 작은 모델이 마지막 답을 읽는다. 내가 정하거나 답할 것이 있으면 내 차례로 올리고 알린다. 끝냈다고 보고만 한 것은 \"보고함\"으로 조용히 두고 브리핑(⌘⇧B)에서 모아 보여 준다. 판정하지 못하면 내 차례로 올린다") },
       { kind: "toggle", key: "autoResume", label: tr("다시 띄울 때 \"이어서 할까\"에 대신 답하기"), note: tr("오래 쉰 큰 세션을 다시 띄우면 Claude Code가 이어서 할지 새로 시작할지 묻는다. 켜 두면 이어 간다고 대신 답한다. 큰 세션을 이어 가면 다음 말을 보낼 때 사용량이 그만큼 든다") },

@@ -37,6 +37,10 @@ pub struct SessionInfo {
     /// 폴더가 속한 git 레포 이름. 훑을 때마다 다시 채운다
     #[serde(default)]
     pub repo: String,
+    /// Claude Code가 적어 둔 세션을 연 길(entrypoint). 터미널에서 열면 "cli", 스크립트나 SDK가 돌리면 "sdk-cli" 같은 값.
+    /// 가장 최근 줄의 값이다. 스크립트가 시작한 세션을 사람이 이어받으면 "cli"로 바뀐다
+    #[serde(default)]
+    pub entry: String,
 }
 
 #[derive(Serialize, Deserialize, Clone, Default)]
@@ -141,6 +145,9 @@ fn scan_file(path: &Path, mtime: u64, size: u64) -> Option<SessionInfo> {
                 info.branch = branch.to_owned();
             }
         }
+        if let Some(entry) = v["entrypoint"].as_str() {
+            info.entry = entry.to_owned();
+        }
         match v["type"].as_str() {
             Some("ai-title") => {
                 if let Some(t) = v["aiTitle"].as_str() {
@@ -204,7 +211,7 @@ fn scan_file(path: &Path, mtime: u64, size: u64) -> Option<SessionInfo> {
 }
 
 fn scan_sessions() -> Vec<SessionInfo> {
-    let cache_path = home().join(".julgi/ledger-v4.json");
+    let cache_path = home().join(".julgi/ledger-v5.json");
     let cache: HashMap<String, Option<SessionInfo>> = fs::read_to_string(&cache_path)
         .ok()
         .and_then(|s| serde_json::from_str(&s).ok())

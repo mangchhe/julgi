@@ -1,5 +1,6 @@
 import { openPr, prParts, PrStatus, PrTarget } from "./pr";
 import { openTicket } from "./jira";
+import { useState } from "react";
 import { tr } from "./i18n";
 import { Change, Job, ago, config, elsewhere, hot, Item, kilo, Open, Session, STATE_LABEL, TermState, Thread, waiting } from "./model";
 
@@ -41,11 +42,15 @@ type Props = {
   /** 작업 페이지 줄에 보일 숫자: 내 PR, 리뷰 요청, 새 소식 */
   work: { prs: number; asks: number; news: number };
   onWork: () => void;
+  /** 스크립트가 돌린 세션. 맨 아래 한 묶음으로 접어 둔다 */
+  scripts: Session[];
 };
 
-export default function Sidebar({ open, items, threads, byId, states, tasks, changes, pinned, dead, loading, current, shown, onShow, onClose, onOpenSession, onSearch, prOf, prNews, sleepNews, ticketOf, work, onWork }: Props) {
+export default function Sidebar({ open, items, threads, byId, states, tasks, changes, pinned, dead, loading, current, shown, onShow, onClose, onOpenSession, onSearch, prOf, prNews, sleepNews, ticketOf, work, onWork, scripts }: Props) {
   const openIds = new Set(open.map((o) => o.sessionId));
   const cutoff = Date.now() / 1000 - config.recentDays * 86400;
+  const [scriptsOpen, setScriptsOpen] = useState(false);
+  const scripted = scripts.filter((s) => s.mtime >= cutoff && !openIds.has(s.id));
 
   // 잠든 것: 줄기는 맨 위에 따로, 나머지는 작업이 있으면 작업으로, 없으면 프로젝트로 묶는다. 묶음은 최근에 쓴 순서.
   const threadOf = (id?: string) => (id ? threads.find((t) => t.sessions.includes(id)) : undefined);
@@ -251,6 +256,26 @@ export default function Sidebar({ open, items, threads, byId, states, tasks, cha
             {list.length > (group === THREADS ? PER_GROUP * 2 : PER_GROUP) && <div className="side-more">{tr`외 ${list.length - (group === THREADS ? PER_GROUP * 2 : PER_GROUP)}개 · ⌘K로 찾기`}</div>}
           </div>
         ))}
+        {scripted.length > 0 && (
+          <div>
+            <div className="grp repo fold" onClick={() => setScriptsOpen(!scriptsOpen)} title={tr`사람이 연 것이 아니라 스크립트나 SDK가 돌린 세션. 설정의 "화면"에서 숨기거나 섞을 수 있다`}>
+              <span>{scriptsOpen ? "▾" : "▸"} {tr`스크립트가 돌린 세션`}</span>
+              <span className="n">{scripted.length}</span>
+            </div>
+            {scriptsOpen &&
+              scripted.slice(0, PER_GROUP * 2).map((s) => (
+                <div key={s.id} className="row sleep" onClick={() => onOpenSession(s)} title={[s.title, [s.repo, ago(s.mtime)].filter(Boolean).join(" · ")].join("\n")}>
+                  <div className="row-body">
+                    <div className="row-one">
+                      <span className="row-title">{s.title}</span>
+                      <small>{ago(s.mtime).replace(/ 전$| ago$/, "")}</small>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            {scriptsOpen && scripted.length > PER_GROUP * 2 && <div className="side-more">{tr`외 ${scripted.length - PER_GROUP * 2}개 · ⌘K로 찾기`}</div>}
+          </div>
+        )}
       </div>
     </aside>
   );

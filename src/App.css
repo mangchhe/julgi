@@ -1304,6 +1304,7 @@ body.dragging .pane-body { pointer-events: none; }
    왼쪽 선 하나에 맞춘다: 묶음 제목, 잠든 세션, 열린 세션의 번호가 모두 같은 자리에서 시작한다.
    글자는 세 단계만 쓴다: 이름 13px, 덧말 11.5px, 묶음 제목과 오른쪽 숫자 11px */
 .side .side-list { padding: 2px 8px 16px; }
+.side .grp.fold { cursor: pointer; }
 .side .grp, .side .grp.repo { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; padding: 16px 8px 5px; font-size: 11px; font-weight: 600; letter-spacing: 0.04em; text-transform: none; color: var(--muted); }
 .side .side-list > div:first-child .grp { padding-top: 8px; }
 .side .grp > span:first-child { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

@@ -12,14 +12,16 @@ export type SessionInfo = {
   size: number;
   /** 폴더가 속한 git 레포 이름. 폴더가 이미 없으면 비어 있다 */
   repo?: string;
+  /** Claude Code가 적은 세션을 연 길. 터미널은 "cli", 스크립트나 SDK는 "sdk-cli" 같은 값. 옛 기록에는 없다 */
+  entry?: string;
 };
 export type Work = { key: string; title: string; repo: string; branches: string[] };
 export type Ledger = { sessions: SessionInfo[]; works: Work[] };
 
 /** 장부의 세션에 프로젝트 이름과 속한 작업을 붙인 것 */
-/** auto: 같은 첫 글로 여러 번 돈 세션. 스크립트가 찍어 낸 것이라 목록과 보낼 곳에서 뺀다 */
+/** script: 사람이 연 것이 아니라 스크립트가 돌린 세션. auto: 목록과 보낼 곳, Julgi가 알아서 하는 일에서 빼는 세션 */
 /** said: 세션을 열 때 내가 처음 한 말. title은 Julgi가 요약에서 지은 이름으로 바뀔 수 있어서, 찾을 때는 이것도 본다 */
-export type Session = SessionInfo & { repo: string; work?: Work; group: string; auto: boolean; said: string };
+export type Session = SessionInfo & { repo: string; work?: Work; group: string; auto: boolean; script: boolean; said: string };
 
 /** 같은 제목이 이만큼 되면 사람이 연 세션이 아니라고 본다 */
 const AUTO_REPEATS = 4;
@@ -166,6 +168,7 @@ export function repoOf(cwd: string): string {
 export function enrich(ledger: Ledger): Session[] {
   const repeats = new Map<string, number>();
   for (const s of ledger.sessions) repeats.set(s.title, (repeats.get(s.title) ?? 0) + 1);
+  const marks = config.scriptEntry.split(",").map((m) => m.trim()).filter(Boolean);
   return ledger.sessions.map((s) => {
     const repo = s.repo || repoOf(s.cwd);
     const branch = s.branch.toLowerCase();
@@ -174,8 +177,10 @@ export function enrich(ledger: Ledger): Session[] {
       : undefined;
     // 제목 앞의 첨부 표시와 링크, 요약 끝의 안내 문구는 보여 줄 필요가 없다
     const title = s.title.replace(/\[Image #\d+\]\s*/g, "").replace(/https?:\/\/\S+\s*/g, "").trim() || s.title;
+    // 연 길이 적혀 있으면 그것으로 가린다. 적히지 않은 옛 기록만 같은 첫 글이 여러 번 나왔는지로 짐작한다
+    const script = s.entry ? marks.some((m) => s.entry!.startsWith(m)) : (repeats.get(s.title) ?? 0) >= AUTO_REPEATS;
     const recap = s.recap.replace(/\s*\(disable recaps in \/config\)\s*$/, "");
-    return { ...s, title, said: title, recap, branch: s.branch === "HEAD" ? "" : s.branch, repo, work, group: work ? `${work.key} ${work.title}`.trim() : repo, auto: (repeats.get(s.title) ?? 0) >= AUTO_REPEATS };
+    return { ...s, title, said: title, recap, branch: s.branch === "HEAD" ? "" : s.branch, repo, work, group: work ? `${work.key} ${work.title}`.trim() : repo, script, auto: script && config.scriptShow !== "mix" };
   });
 }
 
@@ -306,6 +311,10 @@ export const config = {
   // 오래 쉰 큰 세션을 다시 띄울 때 Claude Code가 묻는 "Resume this conversation?"에 이어 간다고 대신 답한다
   autoResume: true,
   bugParallel: 3,
+  // 스크립트가 돌린 세션(claude -p, SDK)을 목록에 어떻게 둘 것인가. group: 맨 아래 한 묶음으로 접어 둔다, hide: 빼고 ⌘K로만 찾는다, mix: 다른 세션과 섞는다
+  scriptShow: "group",
+  // 대화 기록의 entrypoint가 이 글로 시작하면 스크립트가 돌린 세션으로 본다. 쉼표로 여럿 적는다
+  scriptEntry: "sdk",
   /** 오래 자리를 비웠다 돌아오면 브리핑을 띄운다 */
   morning: true,
   /** 몇 시간 넘게 안 봤으면 브리핑을 띄우나 */
