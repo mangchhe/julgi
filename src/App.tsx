@@ -27,6 +27,8 @@ import TicketView from "./TicketView";
 import StartTicket, { promptOf } from "./StartTicket";
 import { parse as parseDiff } from "./CodeReview";
 import RunView from "./RunView";
+import DeployView from "./DeployView";
+import { ArgoApp, ArgoRepo, ArgoSeen, argoBad, argoId, argoLineOf, argoNews, linkApp, parseRules, setArgoApps, withEnv } from "./argo";
 import { CiRun, CiState, ciLabel, ciLive, ciNews, ciOrder } from "./ci";
 import { TicketWork, firstKey, JiraConn, keyOfUrl, setKnownKeys, Ticket, TicketFull, TicketSeen, ticketNews, ticketNewsMeta, TicketNewsMeta, quietNews, BugJob, slugOf } from "./jira";
 import { prNo, isLab, newsOf, openPr, prOf, PrStatus, PrTarget, prUrl, repoName, ReviewAsk } from "./pr";
@@ -234,6 +236,95 @@ export default function App() {
   const refreshRuns = useRef(() => {});
   const runsRef = useRef(runs);
   runsRef.current = runs;
+  // Argo CD: 레포에 이어진 앱들, 다시 로그인해야 하는 서버, 나빠진 앱의 소식(앱 → 글). argocd가 없으면 아무것도 하지 않는다
+  const [argoApps, setArgoAppsState] = useState<ArgoApp[]>([]);
+  const [argoLogin, setArgoLogin] = useState<string[]>([]);
+  const [argoNewsMap, setArgoNews] = useState<Record<string, string>>({});
+  const [argoReady, setArgoReady] = useState<{ installed: boolean; contexts: number } | null>(null);
+  const [deployShown, setDeployShown] = useState(""); // ⌘J나 칸 머리에서 고른 앱. 작업 페이지를 그 앱으로 연다
+  const argoSeen = useRef<Record<string, ArgoSeen> | null>(null);
+  const refreshArgo = useRef(() => {});
+  const argoRef = useRef(argoApps);
+  argoRef.current = argoApps;
+  useEffect(() => {
+    let timer = 0;
+    let gone = false;
+    const poll = async () => {
+      if (!config.argoWatch) return (setArgoAppsState([]), setArgoLogin([]), setArgoApps([]));
+      const status = await invoke<{ installed: boolean; contexts: { name: string }[] }>("argo_status").catch(() => ({ installed: false, contexts: [] as { name: string }[] }));
+      if (gone) return;
+      setArgoReady({ installed: status.installed, contexts: status.contexts.length });
+      if (!status.installed || !status.contexts.length) return (setArgoAppsState([]), setArgoLogin([]), setArgoApps([]));
+      if (!argoSeen.current) argoSeen.current = await invoke<string | null>("data_read", { name: "argo-seen.json" }).then((t) => (t ? JSON.parse(t) : {}), () => ({}));
+      // 이을 레포: CI와 같은 범위(열려 있는 세션의 폴더와 최근에 쓴 레포)
+      const dirs = [...new Set([...live.current.open.map((o) => o.cwd), ...live.current.folders.slice(0, 8).map((f) => f.cwd)])];
+      for (const d of dirs) if (!(d in slugs.current)) slugs.current[d] = await invoke<string | null>("repo_slug", { path: d }).catch(() => null);
+      const repos: ArgoRepo[] = [];
+      for (const d of dirs) {
+        const slug = slugs.current[d];
+        // 같은 레포의 워크트리가 여럿이면 처음 것(세션을 연 폴더)을 쓴다
+        if (slug && !repos.some((r) => r.slug === slug)) repos.push({ slug, name: slug.replace(/^.*\//, ""), cwd: d });
+      }
+      const rules = parseRules(config.argoApps);
+      const lost: string[] = [];
+      const lists = await Promise.all(
+        status.contexts.map((c) =>
+          invoke<ArgoApp[]>("argo_apps", { context: c.name }).catch((e) => {
+            if (String(e).startsWith("LOGIN")) lost.push(c.name);
+            return [] as ArgoApp[];
+          }),
+        ),
+      );
+      if (gone) return;
+      const linked = lists
+        .flat()
+        // 환경 이름으로 쓸 라벨을 정해 두었으면 그 라벨이 먼저다
+        .map((a) => withEnv(a, config.argoEnvLabel))
+        .map((a) => linkApp(a, repos, rules))
+        .filter((a): a is ArgoApp => !!a)
+        .sort((a, b) => (a.repo ?? "").localeCompare(b.repo ?? "") || a.env.localeCompare(b.env) || a.name.localeCompare(b.name));
+      const now = Date.now();
+      const seen = argoSeen.current!;
+      const next: Record<string, ArgoSeen> = {};
+      for (const a of linked) {
+        const id = argoId(a);
+        const r = argoNews(seen[id], a, now, config.argoLagMin);
+        next[id] = r.seen;
+        if (r.news === undefined) continue;
+        if (!r.news) {
+          // 다시 좋아졌으면 소식을 내린다
+          setArgoNews((old) => (old[id] ? Object.fromEntries(Object.entries(old).filter(([k]) => k !== id)) : old));
+          continue;
+        }
+        // 어긋난 채 오래 간 것은 한 번만 알린다. 나빠진 것은 상태가 바뀐 때에만
+        const fresh = !seen[id]?.told;
+        setArgoNews((old) => ({ ...old, [id]: r.news! }));
+        if (!fresh) continue;
+        actions.current.record("배포", `${a.repo} · ${a.env} · ${r.news}: ${a.name}`); // i18n-ok
+        if (config.notify && !document.hasFocus()) void invoke("notify", { title: `${a.repo} · ${a.env} · ${r.news}`, body: a.name });
+      }
+      argoSeen.current = next;
+      void invoke("data_write", { name: "argo-seen.json", text: JSON.stringify(next) });
+      setArgoAppsState(linked);
+      setArgoLogin(lost);
+      setArgoApps(linked);
+    };
+    // 맞추는 중인 앱이 있으면 자주, 없으면 PR과 같은 주기로 본다
+    const loop = () =>
+      void poll()
+        .catch(() => {})
+        .finally(() => !gone && (timer = window.setTimeout(loop, argoRef.current.some((a) => a.health === "Progressing" || a.phase === "Running") ? 20_000 : config.prEveryMin * 60_000)));
+    timer = window.setTimeout(loop, 18_000);
+    refreshArgo.current = () => void poll().catch(() => {});
+    return () => ((gone = true), clearTimeout(timer));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  /** 그 폴더의 레포에 이어진 앱들 */
+  const argoOf = (cwd?: string) => {
+    const slug = cwd ? slugs.current[cwd] : undefined;
+    const name = slug?.replace(/^.*\//, "");
+    return name ? argoApps.filter((a) => a.repo === name) : [];
+  };
   useEffect(() => {
     let timer = 0;
     let gone = false;
@@ -2629,7 +2720,7 @@ export default function App() {
       else if (cmd && e.code === "Comma") (setSettingsAt(undefined), setOverlay(overlay === "settings" ? null : "settings"));
       else if (cmd && e.code === "KeyG") setOverlay(overlay === "threads" ? null : "threads");
       else if (cmd && e.shiftKey && e.code === "KeyU") setOverlay(overlay === "usage" ? null : "usage");
-      else if (cmd && e.code === "KeyU") (setRunShown(""), setOverlay(overlay === "work" ? null : "work"));
+      else if (cmd && e.code === "KeyU") (setRunShown(""), setDeployShown(""), setOverlay(overlay === "work" ? null : "work"));
       else if (overlay) {
         // 작업 페이지는 Esc를 스스로 다룬다(PR 화면 안이면 목록으로, 목록이면 닫기)
         if (overlay === "work" && e.target instanceof Element && e.target.closest(".wk")) return;
@@ -3096,6 +3187,11 @@ export default function App() {
                 finding={finding && focus === i}
                 handing={!!key && handing.includes(key)}
                 handed={!!key && !!handed[key]}
+                deployLine={(() => {
+                  const mine = o ? argoOf(o.cwd) : [];
+                  if (!mine.length) return undefined;
+                  return { text: argoLineOf(mine), bad: mine.some(argoBad), open: () => (setRunShown(""), setDeployShown(argoId(mine.find(argoBad) ?? mine[0])), setOverlay("work")) };
+                })()}
                 ticketNote={(() => {
                   const tk = ticketOfSession(o?.sessionId);
                   if (!tk || !ticketNewsMap[tk] || ticketQuiet.has(tk)) return undefined;
@@ -3189,8 +3285,18 @@ export default function App() {
               }),
             )}
           asks={asks}
-          runs={runs.filter((r) => runNews[r.url]).map((r) => ({ url: r.url, title: r.title || r.name, where: `${r.repo.replace(/^.*\//, "")} · ${r.name} · ${r.branch}`, news: runNews[r.url] }))}
-          onRun={(url) => (setRunNews(({ [url]: _, ...rest }) => rest), setRunShown(url), setOverlay("work"))}
+          runs={[
+            ...runs.filter((r) => runNews[r.url]).map((r) => ({ url: r.url, title: r.title || r.name, where: `${r.repo.replace(/^.*\//, "")} · ${r.name} · ${r.branch}`, news: runNews[r.url] })),
+            // 나빠진 배포도 같은 자리에 온다. 주소 자리에 "argo:앱"을 넣어 구분한다
+            ...argoApps.filter((a) => argoNewsMap[argoId(a)]).map((a) => ({ url: "argo:" + argoId(a), title: `${a.repo} · ${a.env}`, where: a.name, news: argoNewsMap[argoId(a)] })),
+          ]}
+          onRun={(url) => {
+            if (url.startsWith("argo:")) return setRunShown(""), setDeployShown(url.slice(5)), setOverlay("work");
+            setRunNews(({ [url]: _, ...rest }) => rest);
+            setDeployShown("");
+            setRunShown(url);
+            setOverlay("work");
+          }}
           onFixBug={fixBug}
           onHoldBug={holdBug}
           mine={Object.values(mineNews)}
@@ -3282,6 +3388,7 @@ export default function App() {
       )}
       {overlay === "settings" && (
         <Settings
+          argoLogin={argoLogin}
           startAt={settingsAt}
           remoteUrl={remoteUrl}
           onConnectLab={() => {
@@ -3322,10 +3429,16 @@ export default function App() {
           loadTickets={(jql) => invoke<Ticket[]>("jira_search", { conn: jiraConn(), jql, limit: 50 })}
           ticketNews={ticketNewsMap}
           ticketQuiet={ticketQuiet}
+          deploys={config.argoWatch && argoReady ? argoApps : undefined}
+          deployNews={argoNewsMap}
+          deployLogin={argoLogin}
+          argoHint={argoReady && !argoReady.installed ? tr("argocd가 없다 · 터미널에서 brew install argocd") : argoReady && !argoReady.contexts ? tr("로그인한 서버가 없다 · 터미널에서 argocd login <서버>:443 --grpc-web --skip-test-tls (SSO면 --sso)") : undefined}
+          startDeploy={deployShown || undefined}
+          deployPane={(a) => <DeployView key={argoId(a)} app={a} />}
           runs={config.ciWatch ? runs : undefined}
           runNews={runNews}
           startRun={runShown || undefined}
-          onRefreshRuns={() => refreshRuns.current()}
+          onRefreshRuns={() => (refreshRuns.current(), refreshArgo.current())}
           runPane={(run) => (
             <RunView
               key={run.url}

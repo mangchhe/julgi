@@ -8,6 +8,7 @@ import { ago, config } from "./model";
 import { openPr, prNo, prOf, PrTarget, repoName } from "./pr";
 import { firstKey, openTicket } from "./jira";
 import { tr } from "./i18n";
+import { argoLineFor } from "./argo";
 
 type Who = { login: string };
 type Check = { __typename?: string; name?: string; context?: string; status?: string; conclusion?: string; state?: string };
@@ -266,6 +267,8 @@ export default function PrView({ target, onClose, inline = false, autoFocus = tr
               <span>
                 <b>{view.baseRefName}</b> ← <b className="off">{view.headRefName}</b>
               </span>
+              {/* 이 레포에 이어진 Argo CD 앱이 있으면 배포 상태를 한 줄로 */}
+              {argoLineFor(target.repo) && <span title={tr`이 레포에 이어진 Argo CD 앱의 상태`}>{tr`배포`} {argoLineFor(target.repo)}</span>}
               <span className="delta">
                 {tr`파일 ${view.changedFiles}`} <b>+{view.additions}</b> <i>−{view.deletions}</i>
               </span>

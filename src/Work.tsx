@@ -4,6 +4,8 @@ import { Fragment, ReactNode, useEffect, useMemo, useRef, useState } from "react
 import { BugJob, CATEGORY, Ticket, TicketWork } from "./jira";
 import { CiRun, ciLabel, ciLive } from "./ci";
 import { prefetchRun } from "./RunView";
+import { ArgoApp, argoId, argoMark } from "./argo";
+import { argoTone } from "./DeployView";
 import PrView from "./PrView";
 import { ago } from "./model";
 import { openUrl } from "@tauri-apps/plugin-opener";
@@ -51,6 +53,13 @@ type Props = {
   /** 열자마자 이 실행을 고른다 (⌘J에서 넘어왔을 때) */
   startRun?: string;
   onRefreshRuns?: () => void;
+  /** 레포에 이어진 Argo CD 앱들. 고르면 오른쪽에 deployPane을 편다. deployLogin: 다시 로그인해야 하는 서버들. argoHint: argocd가 없을 때의 안내 */
+  deploys?: ArgoApp[];
+  deployPane?: (app: ArgoApp) => ReactNode;
+  deployNews?: Record<string, string>;
+  deployLogin?: string[];
+  argoHint?: string;
+  startDeploy?: string;
   /** 한꺼번에 맡긴 버그들과 그 진행. 버그 머리글에서 맡기고, 멈추고, 비운다 */
   bugJobs?: BugJob[];
   bugStopped?: boolean;
@@ -77,13 +86,18 @@ const idOf = (t: PrTarget) => `${t.repo}#${t.number}`;
  * 작업 (⌘U). PR을 묶음별로 한 화면에서 둘러본다: 왼쪽 묶음, 가운데 목록, 오른쪽 PR 화면.
  * ⌘J가 "지금 손댈 것"만 모은다면, 여기는 "전부 둘러보기"다. Jira를 붙이면 티켓 묶음이 같은 자리에 들어온다
  */
-export default function Work({ groups, ticketGroups = [], loadTickets, ticketPane, ticketNews = {}, ticketQuiet, ticketWork, bugJobs = [], bugStopped, bugRepos = [], bugRepoOf, onHandBugs, onStopBugs, onClearBugs, runs, runPane, runNews = {}, startRun, onRefreshRuns, onStartTicket, onShowSession, onConnectJira, onClose, onRefresh, onOpenSession, onHand }: Props) {
+export default function Work({ groups, ticketGroups = [], loadTickets, ticketPane, ticketNews = {}, ticketQuiet, ticketWork, bugJobs = [], bugStopped, bugRepos = [], bugRepoOf, onHandBugs, onStopBugs, onClearBugs, runs, runPane, runNews = {}, startRun, onRefreshRuns, deploys, deployPane, deployNews = {}, deployLogin = [], argoHint, startDeploy, onStartTicket, onShowSession, onConnectJira, onClose, onRefresh, onOpenSession, onHand }: Props) {
   const allCount = groups.length + ticketGroups.length;
   // 새 소식이 있는 묶음부터 연다
-  const [groupAt, setGroupAt] = useState(() => (startRun && runs ? allCount : Math.max(0, groups.findIndex((g) => g.rows.some((r) => r.news)))));
+  // 배포 묶음은 실행 묶음 다음 자리다
+  const deployAt = allCount + (runs ? 1 : 0);
+  const [groupAt, setGroupAt] = useState(() => (startDeploy && deploys ? deployAt : startRun && runs ? allCount : Math.max(0, groups.findIndex((g) => g.rows.some((r) => r.news)))));
+  const deploysOn = !!deploys && groupAt === deployAt;
+  const [deployPick, setDeployPick] = useState(startDeploy ?? "");
+  const deploy = deploysOn ? (deploys!.find((a) => argoId(a) === deployPick) ?? deploys![0]) : undefined;
   // 실행 묶음은 맨 끝 자리다 (PR 묶음들, 티켓 묶음들 다음)
   const runsOn = !!runs && groupAt === allCount;
-  const navCount = allCount + (runs ? 1 : 0);
+  const navCount = allCount + (runs ? 1 : 0) + (deploys ? 1 : 0);
   const [runAt, setRunAt] = useState(startRun ?? "");
   const run = runsOn ? (runs!.find((r) => r.url === runAt) ?? runs![0]) : undefined;
   // 곧 볼 실행의 job을 미리 받아 둔다: 고른 것의 위아래 둘씩. 실행 묶음을 열기 전에도 맨 위 것은 받아 둔다
@@ -136,7 +150,7 @@ export default function Work({ groups, ticketGroups = [], loadTickets, ticketPan
   const chosen = targets.filter((t) => !bugPick?.off.includes(t.key));
   const jobs = (state: BugJob["state"]) => bugJobs.filter((j) => j.state === state).length;
   const JOB_STEP: Record<string, string> = { queued: tr`맡김 · 차례를 기다리는 중`, diag: tr`맡김 · 진단 중`, decide: tr`진단 끝남 · ⌘J에서 고쳐 또는 보류를 고른다` };
-  const rows = runsOn ? [] : (group?.rows ?? []);
+  const rows = runsOn || deploysOn ? [] : (group?.rows ?? []);
   const at = tgroup ? Math.max(0, tlist.findIndex((t) => t.key === picked)) : Math.max(0, rows.findIndex((r) => idOf(r.target) === picked));
   const row = tgroup ? undefined : rows[at];
   const ticket = tgroup ? tlist[at] : undefined;
@@ -164,6 +178,14 @@ export default function Work({ groups, ticketGroups = [], loadTickets, ticketPan
   const onKey = (e: React.KeyboardEvent) => {
     // 오른쪽 PR 화면 안의 키는 그 화면이 받는다. Esc만 목록으로 돌아오게 PrView가 onClose를 부른다
     if ((e.target as Element).closest(".pr-inline")) return;
+    if (deploysOn && ["ArrowDown", "ArrowUp", "j", "k", "r"].includes(e.key)) {
+      const i = deploys!.findIndex((a) => argoId(a) === (deploy ? argoId(deploy) : ""));
+      if (e.key === "r") onRefreshRuns?.();
+      else setDeployPick(argoId(deploys![Math.min(deploys!.length - 1, Math.max(0, i + (e.key === "ArrowDown" || e.key === "j" ? 1 : -1)))] ?? deploys![0]));
+      e.preventDefault();
+      e.stopPropagation();
+      return;
+    }
     if (runsOn && ["ArrowDown", "ArrowUp", "j", "k", "o", "r"].includes(e.key)) {
       const i = runs!.findIndex((r) => r.url === run?.url);
       if (e.key === "o") run && void openUrl(run.url);
@@ -242,11 +264,23 @@ export default function Work({ groups, ticketGroups = [], loadTickets, ticketPan
             </button>
           </>
         )}
+        {deploys && (
+          <>
+            {!runs && <div className="wk-sec">CI</div>}
+            <button type="button" tabIndex={-1} className={"wk-grp" + (deploysOn ? " on" : "") + (deploys.some((a) => deployNews[argoId(a)]) || deployLogin.length ? " hot" : "")} onClick={() => switchGroup(deployAt)} title={tr`레포에 이어진 Argo CD 앱의 sync와 health`}>
+              <span>
+                {deployAt < 9 && <kbd>{deployAt + 1}</kbd>}
+                {tr`배포`}
+              </span>
+              <b>{deploys.length || ""}</b>
+            </button>
+          </>
+        )}
       </nav>
       <div className="wk-list" ref={list}>
         <div className="wk-head">
-          <b>{runsOn ? tr`실행` : (tgroup ?? group)?.title}</b>
-          <small>{runsOn ? tr`열려 있거나 최근에 쓴 세션의 레포에서 내가 돌린 CI. 도는 것이 위에 온다` : (tgroup ?? group)?.hint}</small>
+          <b>{deploysOn ? tr`배포` : runsOn ? tr`실행` : (tgroup ?? group)?.title}</b>
+          <small>{deploysOn ? tr`열려 있거나 최근에 쓴 세션의 레포에 이어진 Argo CD 앱. 읽기만 한다` : runsOn ? tr`열려 있거나 최근에 쓴 세션의 레포에서 내가 돌린 CI. 도는 것이 위에 온다` : (tgroup ?? group)?.hint}</small>
         </div>
         {tgroup && tickets === undefined && <div className="side-none">{tr`읽는 중`}</div>}
         {tgroup && typeof tickets === "string" && <div className="side-none">{tickets}</div>}
@@ -355,6 +389,32 @@ export default function Work({ groups, ticketGroups = [], loadTickets, ticketPan
           </button>
           </Fragment>
         ))}
+        {deploysOn && argoHint && <div className="side-none">{argoHint}</div>}
+        {deploysOn && deployLogin.map((c) => (
+          <div key={c} className="rv-warn" style={{ margin: "4px 8px" }}>
+            {tr`Argo CD에 다시 로그인해야 한다. 터미널에서: argocd login ${c} --grpc-web --skip-test-tls (SSO면 --sso, 포트가 없으면 :443)`}
+          </div>
+        ))}
+        {deploysOn && !argoHint && !deploys!.length && !deployLogin.length && <div className="side-none">{tr`이어진 앱이 없다. 앱의 소스나 이미지 이름으로 잇고, 안 되면 ⌘,의 연결에 "레포=앱 이름 패턴"을 적는다`}</div>}
+        {deploysOn &&
+          deploys!.map((a, i) => (
+            <Fragment key={argoId(a)}>
+              {(i === 0 || deploys![i - 1].repo !== a.repo) && <div className="wk-sec">{a.repo}</div>}
+              <button type="button" tabIndex={-1} className={"wk-row" + (deploy && argoId(a) === argoId(deploy) ? " on" : "")} onClick={() => setDeployPick(argoId(a))}>
+                <span className="wk-row-title">
+                  <span className={"ci-state s-" + argoTone(a)}>
+                    {argoMark(a)} {a.health || "?"}
+                  </span>{" "}
+                  {a.env} <small style={{ color: "var(--muted)", fontWeight: 400 }}>{a.name}</small>
+                </span>
+                <span className="wk-row-meta">
+                  {deployNews[argoId(a)] && <b className="loud">{deployNews[argoId(a)]} · </b>}
+                  {a.sync}
+                  {a.syncedAt && ` · ${tr`sync ${ago(Date.parse(a.syncedAt) / 1000)}`}`}
+                </span>
+              </button>
+            </Fragment>
+          ))}
         {runsOn && !runs!.length && <div className="side-none">{tr`내가 돌린 실행이 없다`}</div>}
         {runsOn &&
           runs!.map((r) => (
@@ -369,7 +429,7 @@ export default function Work({ groups, ticketGroups = [], loadTickets, ticketPan
               </span>
             </button>
           ))}
-        {!runsOn && !tgroup && !rows.length && <div className="side-none">{total ? tr`이 묶음은 비었다` : tr`챙기는 PR이 없다. ⌘,의 연결에서 GitHub를 연결하고 챙길 범위를 고른다`}</div>}
+        {!runsOn && !deploysOn && !tgroup && !rows.length && <div className="side-none">{total ? tr`이 묶음은 비었다` : tr`챙기는 PR이 없다. ⌘,의 연결에서 GitHub를 연결하고 챙길 범위를 고른다`}</div>}
         {rows.map((r, i) => (
           <button key={idOf(r.target)} type="button" tabIndex={-1} className={"wk-row" + (i === at ? " on" : "")} onClick={() => pick(i)} onDoubleClick={enterPr}>
             <span className="wk-row-title">
@@ -392,7 +452,9 @@ export default function Work({ groups, ticketGroups = [], loadTickets, ticketPan
         ))}
       </div>
       <div className="wk-main">
-        {run && runPane ? (
+        {deploy && deployPane ? (
+          deployPane(deploy)
+        ) : run && runPane ? (
           runPane(run)
         ) : row ? (
           <PrView key={idOf(row.target)} target={row.target} inline autoFocus={false} onClose={() => box.current?.focus()} />
@@ -405,7 +467,7 @@ export default function Work({ groups, ticketGroups = [], loadTickets, ticketPan
       <Hint
         className="wk-foot"
         text={[
-          runsOn ? tr`1–9·Tab 묶음 · ↑↓ 고르기` : tgroup ? tr`1–9·Tab 묶음 · ↑↓ 고르기 · Enter·→ 티켓 화면으로 (Esc로 목록에 돌아옴)` : tr`1–9·Tab 묶음 · ↑↓ 고르기 · Enter·→ PR 화면으로 (Esc로 목록에 돌아옴)`,
+          runsOn || deploysOn ? tr`1–9·Tab 묶음 · ↑↓ 고르기` : tgroup ? tr`1–9·Tab 묶음 · ↑↓ 고르기 · Enter·→ 티켓 화면으로 (Esc로 목록에 돌아옴)` : tr`1–9·Tab 묶음 · ↑↓ 고르기 · Enter·→ PR 화면으로 (Esc로 목록에 돌아옴)`,
           row?.sessionId ? tr`s 세션 열기` : "",
           row?.ask ? tr`⌘Enter 세션에 리뷰 맡기기` : "",
           ticket && works.get(ticket.key)?.session ? tr`s 이어진 세션으로` : "",

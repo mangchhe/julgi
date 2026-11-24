@@ -111,6 +111,7 @@ Tokens by day, model, project and session, counted from Claude Code's own transc
 ### Also in the box
 
 - **CI runs without the browser** — the runs you started, including a deploy after a merge, are listed in `⌘U` with each job's state and time. A failed job shows the end of its log and one button hands it to a session.
+- **Deploy status** — if you use Argo CD, the apps that belong to your repos show their sync and health, and whether the commit you are on has been deployed. Read-only, through the `argocd` CLI.
 - **Only called when needed** — when a session finishes, a small model reads the reply. A question or a decision brings it to My turn; a plain "done" stays quiet and is collected in the briefing. A session that stalls mid-work, or runs one request for too long, is flagged.
 - **Briefing** — come back after a while and one screen shows what is waiting on you, news on PRs and tickets, where each piece of work stands, and what Julgi did meanwhile (`⌘⇧B`).
 - **Progress per stem** — goal, done, left and blocked for each piece of work, kept up to date as sessions reply.

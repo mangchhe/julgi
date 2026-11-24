@@ -76,6 +76,10 @@ Change them in `⌘,`; they apply at once and are saved to `~/.julgi/config.json
 |---|---|---|
 | `prWatch` | `mine` | Which PRs to watch. `mine` (all I opened), `session` (only those sessions opened), `off` |
 | `ciWatch` | on | Read the CI runs I started (GitHub Actions, GitLab pipelines) in the repos of open or recently used sessions; notify when one finishes and put failed ones in `⌘J` |
+| `argoWatch`, `argoLagMin` | on, 15 | Argo CD deploy status through the `argocd` CLI, read-only. `argoLagMin`: notify when OutOfSync lasts this many minutes, 0 disables |
+| `argoApps` | none | Override: link apps to a repo yourself (`repo=app name pattern`, `*` or `/regex/`, comma separated). Comes before the defaults: the app's source repo equals the repo's remote, then a path segment of a deployed image equals the repo name |
+| `argoEnvLabel` | none | Override: label key to read the environment name from. Default: `env`, `environment`, then the namespace, then the cluster name |
+| `argoTagCommit` | none | Override: regex that pulls the commit out of an image tag (capture group 1). Default: every 7 to 40 character hex run in the tag is tried against git, then the tag itself as a git tag |
 | `prEveryMin`, `askEveryMin` | 2, 5 | Minutes between PR checks and review request checks |
 | `refreshOnFocus` | on | Check again as soon as the window regains focus |
 | `prViewRefreshSec` | 30 | Seconds between reloads of an open PR view. 0 disables |
@@ -92,6 +96,7 @@ What the connections use:
 
 - **GitHub**: `gh`. Login and token stay with `gh`.
 - **GitLab**: `glab api`. Login and token stay with `glab`.
+- **Argo CD**: the `argocd` CLI, read-only (`context`, `app list`, `app get`). Login and token stay with `argocd` (`argocd login <server>`); every logged-in context is read. Julgi never syncs, rolls back or deletes.
 - **Jira**: REST directly. The API token is kept only in the macOS keychain (`julgi-jira`) and is never passed on a command line.
 - All three poll on an interval rather than receive webhooks. Julgi has no server to receive them.
 
@@ -113,6 +118,7 @@ Everything is a text file under `~/.julgi/`. Conversations are not here; Claude 
 | `plugin/`, `grown/`, `bin/julgi` | Julgi's skills, skills it grew, the session command |
 | `pr-seen.json`, `jira-seen.json`, `jira-news.json` | Last known state of PRs and tickets, to tell news from old; ticket news not yet looked at |
 | `run-seen.json` | Last known state of my CI runs, to notice when one finishes |
+| `argo-seen.json` | Last known sync and health of linked Argo CD apps, to notice a change for the worse |
 | `triage.json` | For each finished reply, whether it needed you and why |
 | `progress.json` | Goal, done, left, blocked per stem |
 | `seen.json` | When you last looked at Julgi, for the briefing |

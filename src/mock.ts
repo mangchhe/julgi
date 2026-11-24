@@ -211,6 +211,27 @@ async function invoke(cmd: string, args: Record<string, unknown> = {}): Promise<
     }
     case "ci_log":
       return "RefundCalculatorTest > 쿠폰 두 개가 겹쳐도 1원이 어긋나지 않는다 FAILED\n    org.opentest4j.AssertionFailedError: expected: <9334> but was: <9333>\n        at RefundCalculatorTest.kt:14\n\n42 tests completed, 1 failed\n\nFAILURE: Build failed with an exception.\n* What went wrong:\nExecution failed for task ':test'.\n##[error]Process completed with exit code 1.";
+    case "argo_status":
+      return flags.has("argo") ? { installed: true, contexts: [{ name: "argocd.example.com", server: "argocd.example.com", current: true }, { name: "argo-old", server: "argo-old.example.com", current: false }] } : { installed: false, contexts: [] };
+    case "argo_apps": {
+      // 둘째 서버는 로그인이 풀린 것으로 한다
+      if (args.context === "argo-old") throw "LOGIN token is expired";
+      const mk = (name: string, env: string, sync: string, health: string, image: string, min: number, over = {}) => ({ context: args.context, name, project: "default", sync, health, env, namespace: env, cluster: "in-cluster", repos: ["https://github.com/example/acme-gitops.git"], path: `apps/${name}`, target: "main", revision: "9f8e7d6c5b4a3210", images: [image], syncedAt: new Date(Date.now() - min * 60_000).toISOString(), phase: "Succeeded", message: "", ...over });
+      return [
+        mk("acme-api-staging", "staging", "Synced", "Healthy", "registry.example.com/acme/acme-api:1a2b3c4", 12),
+        mk("acme-api-prod", "prod", "OutOfSync", "Degraded", "registry.example.com/acme/acme-api:0f9e8d7", 190, { phase: "Failed", message: "one or more objects failed to apply: Deployment acme-api: progress deadline exceeded" }),
+        mk("unrelated-tool", "tools", "Synced", "Healthy", "registry.example.com/other/tool:3", 500),
+      ];
+    }
+    case "argo_app":
+      return {
+        context: args.context, name: args.name, project: "default", sync: String(args.name).endsWith("prod") ? "OutOfSync" : "Synced", health: String(args.name).endsWith("prod") ? "Degraded" : "Healthy", env: String(args.name).endsWith("prod") ? "prod" : "staging", namespace: "acme", cluster: "in-cluster", repos: ["https://github.com/example/acme-gitops.git"], path: "apps/x", target: "main", revision: "9f8e7d6c5b4a3210",
+        images: [String(args.name).endsWith("prod") ? "registry.example.com/acme/acme-api:0f9e8d7" : "registry.example.com/acme/acme-api:1a2b3c4"], syncedAt: new Date(Date.now() - 12 * 60_000).toISOString(), phase: String(args.name).endsWith("prod") ? "Failed" : "Succeeded", message: String(args.name).endsWith("prod") ? "one or more objects failed to apply: Deployment acme-api: progress deadline exceeded" : "",
+        history: [{ id: 42, revision: "9f8e7d6c5b4a3210", at: new Date(Date.now() - 12 * 60_000).toISOString() }, { id: 41, revision: "7c6b5a4938271605", at: new Date(Date.now() - 26 * 3600_000).toISOString() }, { id: 40, revision: "5a49382716051f2e", at: new Date(Date.now() - 4 * 86400_000).toISOString() }],
+        resources: [{ kind: "Deployment", name: "acme-api", namespace: "acme", sync: "Synced", health: String(args.name).endsWith("prod") ? "Degraded" : "Healthy", message: String(args.name).endsWith("prod") ? "Deployment exceeded its progress deadline" : "" }, { kind: "Service", name: "acme-api", namespace: "acme", sync: "Synced", health: "Healthy", message: "" }, { kind: "ConfigMap", name: "acme-api-env", namespace: "acme", sync: String(args.name).endsWith("prod") ? "OutOfSync" : "Synced", health: "", message: "" }],
+      };
+    case "argo_reach":
+      return String(args.deployed).startsWith("1a2b") ? [true, "1a2b3c4d5e6f7081"] : String(args.deployed).startsWith("0f9e") ? [false, "0f9e8d7c6b5a4938"] : null;
     case "worktree_add":
       return `/Users/me/.julgi/worktrees/${args.name}`;
     case "jira_image":

@@ -27,6 +27,8 @@ type Props = {
   handing: boolean;
   /** 이 세션에 이어진 티켓에 새 소식이 있다. 누르면 티켓 화면을 연다 */
   ticketNote?: { text: string; mention: boolean; open: () => void };
+  /** 이 레포에 이어진 Argo CD 앱들의 한 줄 ("staging ✓ Healthy · prod … Progressing"). 누르면 배포 화면을 연다 */
+  deployLine?: { text: string; bad: boolean; open: () => void };
   /** 방금 갈아타서 이어받은 세션이다 */
   handed?: boolean;
   /** 고정한 세션은 Julgi가 다른 세션으로 바꿔 끼우지 않는다 */
@@ -40,7 +42,7 @@ type Props = {
   onFocus: () => void;
 };
 
-export default function Pane({ termKey, focused, active, label, cwd, session, thread, memory, state, members, thread_ops, info, finding, handing, handed, ticketNote, pinned, change, review, ticketEnded, onPin, onFindClose, onFocus }: Props) {
+export default function Pane({ termKey, focused, active, label, cwd, session, thread, memory, state, members, thread_ops, info, finding, handing, handed, ticketNote, deployLine, pinned, change, review, ticketEnded, onPin, onFindClose, onFocus }: Props) {
   const body = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -81,6 +83,11 @@ export default function Pane({ termKey, focused, active, label, cwd, session, th
               <button type="button" className={"pin" + (pinned ? " on" : "")} title={tr`고정하면 이 세션을 재우지 않고, 이 칸을 다른 세션으로 바꾸지도 않는다 (⌘⇧P)`} onClick={onPin}>
                 {pinned ? tr`고정됨` : tr`고정`}
               </button>
+              {deployLine && (
+                <span className={"dp-line" + (deployLine.bad ? " bad" : "")} title={tr`배포 상태 보기`} onClick={(e) => (e.stopPropagation(), deployLine.open())}>
+                  {deployLine.text}
+                </span>
+              )}
               {ticketNote && (
                 <span className={"tk-note" + (ticketNote.mention ? " mention" : "")} title={tr`티켓 화면 열기`} onClick={(e) => (e.stopPropagation(), ticketNote.open())}>
                   {ticketNote.text}

@@ -335,6 +335,13 @@ export const config = {
   /** 챙길 PR: mine 내가 연 PR 전부, session 세션이 올린 PR만, off 안 챙김 */
   prWatch: "mine",
   ciWatch: true,
+  // Argo CD: 레포에 이어진 앱의 배포 상태를 본다(argocd CLI, 읽기만). argoApps: "레포=앱 이름 패턴, …". argoLagMin: 어긋난 채 이만큼 가면 알린다
+  argoWatch: true,
+  argoApps: "",
+  // 덮어쓰기: 환경 이름으로 쓸 라벨 키(비우면 env → environment → 네임스페이스 → 클러스터), 태그에서 커밋을 꺼낼 정규식(캡처 그룹 1, 비우면 16진수 후보를 git으로 가린다)
+  argoEnvLabel: "",
+  argoTagCommit: "",
+  argoLagMin: 15,
   /** 나한테 온 리뷰 요청을 ⌘J에 넣고 알린다 */
   reviewAsks: true,
   /** PR을 몇 분마다 볼까 (세션 줄의 PR, 내 PR) */

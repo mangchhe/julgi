@@ -18,6 +18,8 @@ type Props = {
   onConnect: () => void;
   /** GitLab 연결: 셸 칸에서 glab auth login을 돌린다 */
   onConnectLab: () => void;
+  /** Argo CD: 다시 로그인해야 하는 서버들 */
+  argoLogin?: string[];
   /** 처음 열 묶음 이름 (예: "연결"). 없으면 첫 묶음 */
   startAt?: string;
 };
@@ -32,6 +34,7 @@ type Row =
   | { kind: "github"; label: string; note: string }
   | { kind: "gitlab"; label: string; note: string }
   | { kind: "jira"; label: string; note: string }
+  | { kind: "argo"; label: string; note: string }
   | { kind: "keys"; label: string; note: string };
 
 /** 묶음마다 줄 몇 개. 왼쪽에서 묶음을 고르면 오른쪽에 그 줄들만 나온다 */
@@ -129,6 +132,12 @@ const SECTIONS: { id: string; title: string; hint: string; rows: Row[] }[] = [
       { kind: "number", key: "bugParallel", label: tr("버그를 한꺼번에 맡길 때 동시에 돌릴 수"), note: tr("작업 페이지에서 버그를 전부 맡기면 이만큼씩 진단 세션을 띄우고, 하나가 답을 끝내면 다음 것을 시작한다"), step: 1, min: 1, max: 8, show: (n) => tr`${n}개` },
       { kind: "text", key: "jiraQuiet", label: tr("조용히 받을 Jira 작성자"), note: tr("이 사람들의 댓글만 달렸으면 알리지 않고 ⌘J에도 올리지 않는다. 봇 계정은 적지 않아도 조용히 받는다"), hint: "Automation for Jira, deploy-bot" },
       { kind: "text", key: "jiraRepos", label: tr("프로젝트 키 → 레포"), note: tr("이 티켓으로 시작할 때 고를 레포. 시작 창에서 고르면 저절로 채운다"), hint: "ABC=acme-api, OPS=acme-infra" },
+      { kind: "argo", label: "Argo CD", note: tr("레포에 이어진 앱의 sync와 health를 본다. 읽기만 한다. 로그인은 argocd CLI가 하고(argocd login <서버>) 토큰도 argocd가 갖는다. Julgi는 토큰을 보지 않는다") },
+      { kind: "toggle", key: "argoWatch", label: tr("Argo CD 배포 상태 보기"), note: tr("열려 있거나 최근에 쓴 세션의 레포에 이어진 앱을 ⌘U의 \"배포\"에 모으고, 나빠지면 알린다") },
+      { kind: "text", key: "argoApps", label: tr("레포 → Argo CD 앱"), note: tr("앱을 레포에 직접 잇는다. 적어 두면 소스나 이미지 이름으로 잇는 기본 판정보다 먼저다. 앱 이름 패턴에 *를 쓰거나 /정규식/으로 적고, 쉼표로 여럿을 적는다"), hint: "acme-api=acme-api-*, acme-shop=/^shop-(dev|prod)$/" },
+      { kind: "text", key: "argoEnvLabel", label: tr("환경 이름으로 쓸 라벨"), note: tr("비우면 앱의 env, environment 라벨, 없으면 네임스페이스, 그것도 없으면 클러스터 이름을 쓴다"), hint: "tier" },
+      { kind: "text", key: "argoTagCommit", label: tr("이미지 태그 → 커밋"), note: tr("태그에서 커밋을 꺼낼 정규식. 캡처 그룹 1이 커밋이다. 비우면 태그 안의 16진수 조각을 git으로 확인해서 찾는다"), hint: "^[0-9]+\\.([0-9a-f]+)$" },
+      { kind: "number", key: "argoLagMin", label: tr("OutOfSync가 이만큼 이어지면 알리기"), note: tr("배포가 어긋난 채로 이 시간이 넘으면 한 번 알린다. 0이면 알리지 않는다"), step: 5, min: 0, max: 120, show: (n) => (n ? tr`${n}분` : tr("끔")) },
       { kind: "toggle", key: "ciWatch", label: tr("내가 돌린 CI 실행 보기"), note: tr("열려 있거나 최근에 쓴 세션의 레포에서 내가 돌린 CI를 읽어 ⌘U의 \"실행\"에 모은다. 끝나면 알리고, 깨진 것은 ⌘J에 올린다. gh와 glab으로 읽는다") },
       { kind: "pick", key: "prWatch", label: tr("챙길 PR"), note: tr("정한 주기마다 PR을 보고 CI가 깨지거나 남이 코멘트를 달거나 리뷰를 받거나 머지되면 알린다. 세션이 올린 PR은 그 세션을 내 차례로 올리고, 나머지 내 PR은 ⌘J의 \"내 PR\"에 넣는다"), options: [["mine", tr("내 PR 전부")], ["session", tr("세션이 올린 PR만")], ["off", tr("끔")]] },
       { kind: "number", key: "prEveryMin", label: tr("PR 확인 주기"), note: tr("세션 줄의 PR과 내 PR을 이만큼마다 본다. 짧을수록 알림이 빨리 온다"), step: 1, min: 1, max: 30, show: (n) => tr`${n}분` },
@@ -172,7 +181,7 @@ const showKey = (combo: string) =>
     .join("");
 
 /** 설정 (⌘,). 바꾸는 즉시 적용되고 ~/.julgi/config.json에 남는다 */
-export default function Settings({ onChange, onClose, remoteUrl, onConnect, onConnectLab, startAt }: Props) {
+export default function Settings({ onChange, onClose, remoteUrl, onConnect, onConnectLab, argoLogin = [], startAt }: Props) {
   const [at, setAt] = useState(() => Math.max(0, FIRST_OF[SECTIONS.findIndex((s) => s.id === startAt)] ?? 0));
   // Jira가 연결돼 있으면 그 Jira의 상태 이름을 읽어 "옮길 상태" 칸에서 고르게 한다. 워크플로가 프로젝트마다 달라서
   // 목록은 전체 상태이고, 실제로 옮길 수 있는지는 그 티켓의 지금 상태에 달려 있다
@@ -186,6 +195,9 @@ export default function Settings({ onChange, onClose, remoteUrl, onConnect, onCo
   const [gh, setGh] = useState<[boolean, string] | undefined>(undefined);
   useEffect(() => void invoke<[boolean, string]>("gh_status").then(setGh, () => setGh([false, ""])), []);
   const [lab, setLab] = useState<[boolean, string] | undefined>(undefined);
+  // argocd가 있는가, 로그인해 둔 서버들. undefined면 아직 보는 중
+  const [argo, setArgo] = useState<{ installed: boolean; contexts: { name: string; server: string; current: boolean }[] } | undefined>(undefined);
+  useEffect(() => void invoke<NonNullable<typeof argo>>("argo_status").then(setArgo, () => setArgo({ installed: false, contexts: [] })), []);
   // Jira: 연결돼 있으면 표시 이름, 아니면 입력 칸
   const [jira, setJira] = useState<{ name?: string; error?: string; busy?: boolean }>({});
   const [jiraForm, setJiraForm] = useState({ site: config.jiraSite || "https://", email: config.jiraEmail, token: "", kind: config.jiraKind || "cloud" });
@@ -375,6 +387,21 @@ export default function Settings({ onChange, onClose, remoteUrl, onConnect, onCo
                           <button type="button" tabIndex={-1} className="set-toggle" onClick={onConnect}>
                             {tr("연결하기")}
                           </button>
+                        )}
+                      </span>
+                    )}
+                    {row.kind === "argo" && (
+                      <span className="set-gh">
+                        {argo === undefined ? (
+                          <span className="set-note">{tr("보는 중")}</span>
+                        ) : !argo.installed ? (
+                          <span className="set-note">{tr("argocd가 없다 · 터미널에서 brew install argocd")}</span>
+                        ) : !argo.contexts.length ? (
+                          <span className="set-note">{tr("로그인한 서버가 없다 · 터미널에서 argocd login <서버>:443 --grpc-web --skip-test-tls (SSO면 --sso)")}</span>
+                        ) : (
+                          <span className={argoLogin.length ? "set-note" : "set-on"}>
+                            {argoLogin.length ? tr`다시 로그인 필요: ${argoLogin.join(", ")} · argocd login <서버>:443 --grpc-web --skip-test-tls (SSO면 --sso)` : tr`● 서버 ${argo.contexts.length}곳: ${argo.contexts.map((c) => c.name).join(", ").slice(0, 80)}`}
+                          </span>
                         )}
                       </span>
                     )}

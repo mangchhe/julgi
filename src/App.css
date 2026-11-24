@@ -1376,3 +1376,22 @@ body.dragging .pane-body { pointer-events: none; }
 .qu-tk-acts { display: flex; gap: 6px; }
 .qu-tk-acts button { font: inherit; font-size: 12px; color: var(--ink); background: var(--surface); border: 1px solid var(--line); border-radius: 6px; padding: 3px 11px; cursor: pointer; }
 .qu-tk-acts button.primary { color: var(--accent); background: var(--accent-soft); border-color: var(--accent); }
+
+/* Argo CD 배포: 칸 머리의 한 줄, 앱 상세 */
+.pane-right .dp-line { cursor: pointer; font-size: 11.5px; color: var(--muted); white-space: nowrap; max-width: 280px; overflow: hidden; text-overflow: ellipsis; }
+.pane-right .dp-line:hover { color: var(--ink); }
+.pane-right .dp-line.bad { color: #e5484d; font-weight: 600; }
+.dp-ship { display: flex; flex-direction: column; gap: 4px; padding: 10px 12px; margin: 4px 0 10px; border: 1px solid var(--line); border-radius: 9px; background: var(--surface); font-size: 13px; }
+.dp-ship b { font-family: ui-monospace, Menlo, monospace; font-size: 12.5px; }
+.dp-ship em { font-style: normal; font-weight: 600; }
+.dp-ship em.ok { color: var(--ok); }
+.dp-ship em.wait { color: var(--wait); }
+.dp-ship small { font-size: 12px; color: var(--muted); }
+.dp-msg { margin: 0 0 10px; padding: 8px 10px; border-radius: 8px; background: color-mix(in srgb, #e5484d 10%, var(--surface)); border: 1px solid color-mix(in srgb, #e5484d 40%, transparent); font-family: ui-monospace, Menlo, monospace; font-size: 12px; white-space: pre-wrap; word-break: break-word; }
+.dp-cols { display: grid; grid-template-columns: minmax(150px, 230px) minmax(0, 1fr); gap: 20px; }
+.dp-row { display: flex; align-items: center; gap: 8px; padding: 4px 2px; border-bottom: 1px solid var(--line); font-size: 12.5px; min-width: 0; }
+.dp-row code { font-family: ui-monospace, Menlo, monospace; font-size: 12px; }
+.dp-row.now code { color: var(--accent); font-weight: 600; }
+.dp-row span { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--muted); }
+.dp-row span b { color: var(--ink); font-weight: 500; }
+.dp-row small { margin-left: auto; flex: none; font-size: 11.5px; color: var(--muted); }

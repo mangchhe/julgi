@@ -77,6 +77,10 @@
 |---|---|---|
 | `prWatch` | `mine` | 챙길 PR. `mine`(내가 연 PR 전부), `session`(세션이 올린 PR만), `off` |
 | `ciWatch` | 켬 | 열려 있거나 최근에 쓴 세션의 레포에서 내가 돌린 CI(GitHub Actions, GitLab 파이프라인)를 읽는다. 끝나면 알리고 깨진 것은 `⌘J`에 올린다 |
+| `argoWatch`, `argoLagMin` | 켬, 15 | `argocd` CLI로 Argo CD 배포 상태를 본다(읽기만). `argoLagMin`: OutOfSync가 이만큼(분) 이어지면 알린다. 0이면 끔 |
+| `argoApps` | 없음 | 덮어쓰기: 앱을 레포에 직접 잇는다(`레포=앱 이름 패턴`, `*`나 `/정규식/`, 쉼표로 여럿). 기본 판정보다 먼저다. 기본: 앱의 소스 레포가 레포의 원격과 같음, 다음으로 배포된 이미지의 경로 조각이 레포 이름과 같음 |
+| `argoEnvLabel` | 없음 | 덮어쓰기: 환경 이름을 읽을 라벨 키. 기본: `env`, `environment`, 다음으로 네임스페이스, 클러스터 이름 |
+| `argoTagCommit` | 없음 | 덮어쓰기: 이미지 태그에서 커밋을 꺼낼 정규식(캡처 그룹 1). 기본: 태그 안의 7~40자리 16진수 조각을 모두 git에 물어 커밋인 것을 찾고, 안 되면 태그 그대로를 git 태그로 본다 |
 | `prEveryMin`, `askEveryMin` | 2, 5 | PR과 리뷰 요청을 보는 주기(분) |
 | `refreshOnFocus` | 켜짐 | Julgi 창으로 돌아오면 바로 다시 본다 |
 | `prViewRefreshSec` | 30 | PR 화면을 열어 둔 동안 새로 읽는 주기(초). 0이면 끈다 |
@@ -93,6 +97,7 @@
 
 - **GitHub**: `gh`(GitHub CLI). 로그인과 토큰은 `gh`가 갖고 있다.
 - **GitLab**: `glab`(GitLab CLI)의 `glab api`. 로그인과 토큰은 `glab`이 갖고 있다.
+- **Argo CD**: `argocd` CLI, 읽기만(`context`, `app list`, `app get`). 로그인과 토큰은 `argocd`가 갖고 있다(`argocd login <서버>`). 로그인해 둔 서버(context)를 모두 읽는다. sync, rollback, 삭제는 하지 않는다.
 - **Jira**: REST API를 직접 부른다. API 토큰은 macOS 키체인(`julgi-jira`)에만 두고, 명령줄 인자에 실리지 않게 넘긴다.
 - 셋 다 웹훅이 아니라 주기 조회다. Julgi는 받을 서버가 없다.
 
@@ -115,6 +120,7 @@
 | `skill-history/` | 다듬기 전의 스킬 글 |
 | `pr-seen.json`, `jira-seen.json`, `jira-news.json` | PR과 티켓의 지난 형편. 견줘서 새로 생긴 일만 알린다. 아직 안 본 티켓 소식 |
 | `run-seen.json` | 내 CI 실행의 지난 상태. 끝난 것을 알아채는 데 쓴다 |
+| `argo-seen.json` | 이어진 Argo CD 앱의 지난 sync와 health. 나빠진 것을 알아채는 데 쓴다 |
 | `triage.json` | 끝난 답마다 내가 필요했는지와 그 이유 |
 | `progress.json` | 줄기마다 목표, 한 것, 남은 것, 막힌 것 |
 | `seen.json` | 마지막으로 Julgi를 본 때. 브리핑이 쓴다 |
