@@ -1,6 +1,6 @@
 import Hint from "./Hint";
 import qrcode from "qrcode-generator";
-import { useEffect, useRef, useState } from "react";
+import { Fragment, useEffect, useRef, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import { config, kilo } from "./model";
@@ -193,6 +193,15 @@ const ROWS: Row[] = SECTIONS.flatMap((sec) => sec.rows);
 const SECTION_OF: number[] = SECTIONS.flatMap((sec, n) => sec.rows.map(() => n));
 /** 묶음 번호 → 그 묶음의 첫 줄 번호 */
 const FIRST_OF: number[] = SECTIONS.map((_, n) => SECTION_OF.indexOf(n));
+/** 왼쪽 목록의 큰 갈래. 묶음(SECTIONS)의 순서는 이 순서와 같아야 한다 */
+// 묶음의 이름표(id)는 저장되지 않는 안쪽 이름이다 i18n-off
+const NAV: { title: string; ids: string[] }[] = [
+  { title: tr("기본"), ids: ["화면", "세션"] },
+  { title: tr("Julgi가 하는 일"), ids: ["알아서 하는 일", "코드 검토", "점검과 모델", "지도"] },
+  { title: tr("밖의 서비스"), ids: ["연결", "PR", "티켓", "배포"] },
+  { title: tr("그 밖"), ids: ["밖에서", "keys"] },
+];
+// i18n-on
 /** 계정을 연결하는 묶음의 자리 */
 const CONNECT = SECTIONS.findIndex((sec) => sec.id === "연결"); // i18n-ok
 
@@ -330,11 +339,14 @@ export default function Settings({ onChange, onClose, remoteUrl, onConnect, onCo
         <div className="set-body">
           <nav className="set-nav">
             <div className="set-title">{tr("설정")}</div>
+            {/* 묶음을 다시 큰 갈래로 묶는다. 갈래의 첫 묶음 앞에 제목을 단다 */}
             {SECTIONS.map((sec, n) => (
-              <button key={sec.id} type="button" tabIndex={-1} className={n === SECTION_OF[at] ? "on" : ""} onClick={() => setAt(FIRST_OF[n])}>
-                <b>{sec.title}</b>
-                <small>{sec.hint}</small>
-              </button>
+              <Fragment key={sec.id}>
+                {NAV.find((g) => g.ids[0] === sec.id) && <div className="set-group">{NAV.find((g) => g.ids[0] === sec.id)!.title}</div>}
+                <button type="button" tabIndex={-1} className={n === SECTION_OF[at] ? "on" : ""} title={sec.hint} onClick={() => setAt(FIRST_OF[n])}>
+                  <b>{sec.title}</b>
+                </button>
+              </Fragment>
             ))}
           </nav>
           <div className="set-page">
