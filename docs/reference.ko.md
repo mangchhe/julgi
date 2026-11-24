@@ -10,6 +10,7 @@
 
 - **간단한 허락은 대신 답하게 할 수 있다**(`autoAllow`, 기본은 꺼짐). `look`은 아무것도 바꾸지 않는 명령(git status/diff/log, ls, gh와 glab의 보기)을, `check`는 거기에 시험과 빌드를 더한다. 시험과 빌드는 프로젝트의 스크립트를 돌린다. 세션을 띄울 때 Claude Code의 허락 규칙으로 넘긴다. 파일 내용을 읽는 명령(cat, grep)은 들어 있지 않다. 원하면 `allowRules`에 적는다.
 - **`julgi` 명령은 묻지 않고 실행된다.** Julgi의 스킬이 전부 이 명령 하나를 부르기 때문이다.
+- **세션이 자기 티켓을 옮길 수 있다.** `julgi ticket move "<상태>"`는 그 세션에 이어진 Jira 티켓을 옮겨 달라고 Julgi에게 부탁한다. 호출은 Julgi가 하고, 세션은 토큰을 보지 못한다. 그 세션에 이어진 티켓에만 된다.
 - **`~/.julgi/grown`에 쓰는 것과 대화 기록(`~/.claude/projects`)·스킬 폴더를 읽는 것도 묻지 않는다.** 스킬을 만들고 다듬는 세션이 쓴다.
 - **선호 노트가 세션의 시스템 프롬프트에 붙는다**(`--append-system-prompt-file`). `brain`을 끄면 붙지 않는다.
 - **사용량 보기를 켜면 Claude Code의 로그인 토큰을 읽는다.** 키체인(맥 밖에서는 `~/.claude/.credentials.json`)에서 읽어 `api.anthropic.com/api/oauth/usage`에만 보내고, 어디에도 적지 않는다. 문서에 없는 주소라 어느 날 안 나올 수 있다. 기본은 꺼짐이다.
@@ -116,6 +117,7 @@
 | `progress.json` | 줄기마다 목표, 한 것, 남은 것, 막힌 것 |
 | `seen.json` | 마지막으로 Julgi를 본 때. 브리핑이 쓴다 |
 | `tickets.json` | 세션과 Jira 티켓의 연결 |
+| `session-tickets.tsv` | 세션마다 이어진 티켓과 그 티켓의 지금 Jira 상태. 세션의 julgi 명령이 읽는다 |
 | `jira-files/` | 열어 본 티켓에 붙은 그림. 세션이 읽을 수 있게 둔다 |
 | `bugs.json` | 한꺼번에 맡긴 버그들과 각각의 진행 |
 | `remote-token` | 폰용 화면의 토큰. 지우면 새로 만든다 |

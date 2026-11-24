@@ -28,6 +28,22 @@ rows() {
 mine() {
   awk -F'\t' -v id="$me" 'index("," $3 ",", "," id ",")' "$INDEX" 2>/dev/null | head -1
 }
+# 이 세션에 이어진 티켓과 지금 Jira 상태 한 줄. Julgi가 session-tickets.tsv에 적어 둔 것을 읽는다 (세션 ID, 키, 상태, 범주).
+# 이어진 티켓이 없으면 아무것도 찍지 않고 1을 돌려준다
+ticket_line() {
+  [ -n "$me" ] && [ -s "$ROOT/session-tickets.tsv" ] || return 1
+  awk -F'\t' -v id="$me" -v ko="$KO" '
+    $1 == id {
+      st = $3; note = ""
+      if ($4 == "done") note = (ko == 1 ? "끝남" : "finished")
+      else if ($3 == "") { st = (ko == 1 ? "상태 모름" : "status unknown"); note = (ko == 1 ? "Jira에서 확인하지 못했다" : "could not check Jira") }
+      else note = (ko == 1 ? "아직 안 끝남" : "not finished yet")
+      if (ko == 1) printf "이 세션의 티켓: %s · %s (%s)\n", $2, st, note
+      else printf "Ticket of this session: %s · %s (%s)\n", $2, st, note
+      found = 1
+    }
+    END { exit found ? 0 : 1 }' "$ROOT/session-tickets.tsv"
+}
 show_memory() {
   local thread session found=0
   thread=$(printf '%s' "$1" | cut -f1)
@@ -47,6 +63,8 @@ case "${1:-}" in
     [ -n "$line" ] || { say "(맞는 줄기가 없다)" "(no matching stem)"; exit 0; }
     printf '%s\n\n' "$(printf '%s' "$line" | cut -f6)"
     show_memory "$line"
+    # 내 줄기를 볼 때는 이어진 티켓의 지금 상태도 같이 보인다
+    [ -n "${2:-}" ] || ticket_line || true
     ;;
   note)
     shift
@@ -67,6 +85,22 @@ case "${1:-}" in
   done)
     printf '' | ask done ""
     say "이 일을 끝난 것으로 해 달라고 했다." "Asked Julgi to mark this work as done."
+    # 줄기를 끝내는 것과 Jira 티켓을 닫는 것은 다른 일이다. 티켓이 안 끝났으면 알려 준다
+    if ticket_line; then
+      awk -F'\t' -v id="$me" '$1 == id && $4 != "done" { found = 1 } END { exit found ? 0 : 1 }' "$ROOT/session-tickets.tsv" 2>/dev/null &&
+        say "줄기만 끝났다. Jira 티켓은 그대로다. 사용자가 티켓도 닫으라고 했으면: julgi ticket move \"<상태 이름>\" (모르면 사용자에게 묻는다). 닫지 않았으면 기억에 \"티켓 종료\"라고 적지 않는다." "Only the stem is finished. The Jira ticket is unchanged. If the user asked to close the ticket too: julgi ticket move \"<status name>\" (ask the user if unsure). Do not write \"ticket closed\" to memory unless it is."
+    fi
+    ;;
+  ticket)
+    need_me
+    if [ "${2:-}" = "move" ]; then
+      [ -n "${3:-}" ] || { say "쓰는 법: julgi ticket move \"<옮길 상태 이름>\"" "Usage: julgi ticket move \"<status name>\"" >&2; exit 1; }
+      ticket_line >/dev/null || { say "(이 세션에 이어진 티켓이 없다)" "(no ticket is tied to this session)"; exit 0; }
+      printf '%s\n' "$3" | ask ticketmove ""
+      say "티켓을 \"$3\"로 옮겨 달라고 했다. 몇 초 뒤 julgi ticket으로 바뀌었는지 확인한다. 그 이름의 전환이 없으면 바뀌지 않는다." "Asked Julgi to move the ticket to \"$3\". Check with julgi ticket in a few seconds. Nothing changes if there is no transition by that name."
+    else
+      ticket_line || say "(이 세션에 이어진 티켓이 없다)" "(no ticket is tied to this session)"
+    fi
     ;;
   brain)
     shift
@@ -163,7 +197,9 @@ julgi memory [글]           내 줄기의 기억, 또는 글에 맞는 줄기�
 julgi note "내용"           내 줄기 기억에 한 줄 적기
 julgi send <줄기|new> "말"  다른 줄기(또는 새 줄기)에 일을 넘기기
 julgi handoff               이 세션이 커졌을 때 새 세션으로 넘어가기
-julgi done                  이 일을 끝난 것으로 하기
+julgi done                  이 일을 끝난 것으로 하기 (Jira 티켓은 닫지 않는다)
+julgi ticket                이 세션에 이어진 티켓과 지금 Jira 상태
+julgi ticket move "상태"    그 티켓을 그 상태로 옮기기
 julgi brain [글]            브레인에서 찾기 (전에 알게 된 결정, 함정, 사실)
 julgi learn <종류> "제목" "본문"   브레인에 남기기 (종류: 결정, 함정, 사실)
 julgi fix <id> "본문"       틀린 브레인 노트 고치기
@@ -183,7 +219,9 @@ julgi memory [text]          my stem's memory, or the memory of the stem matchin
 julgi note "text"            write one line to my stem's memory
 julgi send <stem|new> "ask"  hand work to another stem (or a new one)
 julgi handoff                hand off to a new session when this one has grown too big
-julgi done                   mark this work as done
+julgi done                   mark this work as done (does not close the Jira ticket)
+julgi ticket                 the ticket tied to this session and its Jira status now
+julgi ticket move "status"   move that ticket to that status
 julgi brain [text]           search the brain (decisions, pitfalls, facts learned before)
 julgi learn <kind> "title" "body"   save to the brain (kind: decision, pitfall, fact)
 julgi fix <id> "body"        correct a wrong brain note

@@ -174,6 +174,7 @@ export default function App() {
   const [ticketLinks, setTicketLinks] = useState<Record<string, string>>({}); // 세션 ID → 티켓 키
   const [ticketDone, setTicketDone] = useState<Record<string, string>>({}); // 끝난(완료·거부) 티켓 키 → 상태 이름. 한 번 알린 것은 다시 알리지 않는다
   const doneRef = useRef<Record<string, string>>({});
+  const heldStatus = useRef<Record<string, { status: string; category: string }>>({}); // 내 목록에 없는 티켓의 지금 상태
   // 한꺼번에 맡긴 버그들. 다시 켜도 이어지게 bugs.json에 둔다
   const [bugJobs, setBugJobsState] = useState<BugJob[]>([]);
   const [bugStopped, setBugStopped] = useState(false);
@@ -1139,6 +1140,13 @@ export default function App() {
           const cwd = live.current.folders.find((f) => f.repo.length >= 4 && lower.includes(f.repo.toLowerCase()))?.cwd ?? (live.current.base || live.current.home);
           void dispatch({ kind: "new", cwd }, text, { rank: -1, by: target === "new" ? `"${from}"이 넘김` : `"${from}"이 넘김, "${target}" 줄기를 못 찾아 새로` }, false, true); // i18n-ok
         }
+      } else if (cmd === "ticketmove" && body) {
+        // 세션이 이어진 티켓을 옮겨 달라고 했다. 토큰은 Julgi만 갖고 있어서 여기서 한다
+        const ticket = ticketOfSession(sessionId);
+        if (ticket) {
+          record("티켓", tr`"${from}"이 ${ticket}을 ${body.slice(0, 40)}로 옮겨 달라고 함`, sessionId); // i18n-ok
+          void moveTicket(ticket, body.split("\n")[0].trim());
+        }
       } else if (cmd === "used" && body) {
         bump(body.split(/\s+/).filter((id) => live.current.notes.some((n) => n.id === id)), "read");
       } else if (cmd === "learn" && body) {
@@ -1622,12 +1630,19 @@ export default function App() {
     if (!quiet) say(tr`한 줄기로 묶었다 → ${name} (세션 ${sessions.length}개)`);
   };
   /** 줄기를 끝낸다. 목록에서 내려가고 ⌘K로는 계속 찾는다. 다시 누르거나 보내면 살아난다 */
+  /** 줄기를 새로 만들 때의 이름: 대화 기록의 제목 → 세션 이름(요약이 지은 이름, 칸의 라벨) → 이어진 티켓의 키와 제목 → 마지막에야 "줄기" */
+  const stemName = (sessionId: string) => {
+    const { byId, names, open, tickets } = live.current;
+    const ticket = ticketOfSession(sessionId);
+    const ticketName = ticket ? [ticket, tickets.find((t) => t.key === ticket)?.title].filter(Boolean).join(" ") : "";
+    return (byId.get(sessionId)?.title || names[sessionId] || open.find((o) => o.sessionId === sessionId)?.label || ticketName || tr("줄기")).slice(0, 80);
+  };
   const finishThread = (sessionId: string, quiet = false) => {
     const all = live.current.threads;
     const mine = all.find((t) => t.sessions.includes(sessionId));
     const next: Thread = mine
       ? { ...mine, done: !mine.done }
-      : { id: crypto.randomUUID(), name: live.current.byId.get(sessionId)?.title ?? tr("줄기"), sessions: [sessionId], created: Date.now(), done: true };
+      : { id: crypto.randomUUID(), name: stemName(sessionId), sessions: [sessionId], created: Date.now(), done: true };
     saveThreads([...all.filter((t) => t !== mine), next]);
     if (!next.done) {
       for (const o of live.current.open) endWhenIdle.current.delete(o.key);
@@ -2032,9 +2047,12 @@ export default function App() {
       if (threads.find((t) => t.sessions.includes(o.sessionId!))?.done) continue;
       held.set(key, o.sessionId);
     }
-    if (!held.size) return;
-    const ended = await invoke<Ticket[]>("jira_search", { conn: jiraConn(), jql: `key in (${[...held.keys()].join(", ")}) AND statusCategory = Done`, limit: 50 }).catch(() => []);
-    if (!ended.length) return;
+    if (!held.size) return writeSessionTickets();
+    // 내 티켓 목록(안 끝난 것, 내게 배정된 것)에 없는 티켓들의 지금 상태를 받는다. 끝난 것도, 남에게 배정된 것도 여기서 알게 된다
+    const found = await invoke<Ticket[]>("jira_search", { conn: jiraConn(), jql: `key in (${[...held.keys()].join(", ")})`, limit: 50 }).catch(() => []);
+    for (const t of found) heldStatus.current[t.key] = { status: t.status, category: t.statusCategory };
+    const ended = found.filter((t) => t.statusCategory === "done");
+    if (!ended.length) return writeSessionTickets();
     const next = { ...doneRef.current };
     for (const t of ended) {
       const sessionId = held.get(t.key);
@@ -2053,6 +2071,22 @@ export default function App() {
     doneRef.current = next;
     setTicketDone(next);
     void invoke("data_write", { name: "jira-done.json", text: JSON.stringify(next) });
+    writeSessionTickets();
+  };
+  /**
+   * 세션마다 이어진 티켓과 그 Jira 상태를 파일로 낸다(세션 ID, 키, 상태, 범주). 세션의 julgi 명령이 읽는다.
+   * 세션이 "티켓이 끝났다"는 말을 확인 없이 사실로 적지 않게, 끝내기 전에 지금 상태를 보여 주는 데 쓴다. 토큰은 세션에 주지 않는다
+   */
+  const writeSessionTickets = () => {
+    const rows: string[] = [];
+    for (const s of live.current.byId.values()) {
+      const key = ticketOfSession(s.id);
+      if (!key) continue;
+      const mineT = live.current.tickets.find((t) => t.key === key);
+      const st = mineT ? { status: mineT.status, category: mineT.statusCategory } : (heldStatus.current[key] ?? (doneRef.current[key] ? { status: doneRef.current[key], category: "done" } : { status: "", category: "" }));
+      rows.push([s.id, key, st.status.replace(/\s+/g, " "), st.category].join("\t"));
+    }
+    void invoke("data_write", { name: "session-tickets.tsv", text: rows.join("\n") + (rows.length ? "\n" : "") });
   };
   /** 이 티켓에 이어진 세션들, 최근에 쓴 것부터. 티켓 목록의 줄(ticketWork)과 같은 판정이다 */
   const sessionsOfTicket = (key: string) =>

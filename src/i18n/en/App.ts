@@ -193,4 +193,5 @@ export default {
   "{0} 진단을 보고 고치라고 함": "Read the diagnosis of {0} and told the session to fix it",
   "여기서부터 새 세션 · 위의 대화는 인계 글로 넘겨받았다": "New session from here · the conversation above was handed over as a brief",
   "\"{0}\"이 워크트리 {1}({2})에서 일한다. 변경과 코드 검토를 그 폴더 기준으로 본다": "\"{0}\" works in the worktree {1} ({2}). Changes and code review follow that folder",
+  "\"{0}\"이 {1}을 {2}로 옮겨 달라고 함": "\"{0}\" asked to move {1} to {2}",
 } as Record<string, string>;

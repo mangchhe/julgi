@@ -9,6 +9,7 @@ English · [한국어](reference.ko.md)
 Read this before you run it. Everything here can be turned off or narrowed in settings.
 
 - **The `julgi` command runs without asking.** Every Julgi skill calls this one command.
+- **A session can move its own ticket.** `julgi ticket move "<status>"` asks Julgi to transition the Jira ticket tied to that session. Julgi makes the call; the session never sees the token. It only works for the ticket the session is tied to.
 - **Writes to `~/.julgi/grown`, and reads of transcripts (`~/.claude/projects`) and skill folders, do not ask either.** Sessions that create and refine skills need them.
 - **A preference note is appended to each session's system prompt** (`--append-system-prompt-file`). Turn `brain` off and it is not attached.
 - **Usage display reads Claude Code's login token.** It reads it from the keychain and sends it only to `api.anthropic.com/api/oauth/usage`. This endpoint is undocumented and may stop working. Off by default.
@@ -114,6 +115,7 @@ Everything is a text file under `~/.julgi/`. Conversations are not here; Claude 
 | `progress.json` | Goal, done, left, blocked per stem |
 | `seen.json` | When you last looked at Julgi, for the briefing |
 | `tickets.json` | Which session belongs to which Jira ticket |
+| `session-tickets.tsv` | For each session, its ticket and the ticket's Jira status now. The session command reads it |
 | `jira-files/` | Images attached to tickets you opened, kept so sessions can read them |
 | `bugs.json` | Bugs handed over in bulk and where each one stands |
 | `remote-token` | Token for the phone view. Delete it to get a new one |
