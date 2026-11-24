@@ -348,7 +348,7 @@ export default function Settings({ onChange, onClose, remoteUrl, onConnect, onCo
   };
 
   return (
-    <div className="pal-back" onMouseDown={onClose}>
+    <div className="pal-back panel" onMouseDown={onClose}>
       <div className="pal settings" ref={box} tabIndex={-1} onKeyDown={onKey} onMouseDown={(e) => e.stopPropagation()}>
         <div className="set-body">
           <nav className="set-nav">

@@ -51,7 +51,7 @@ export default function Morning({ since, waits, news, told, stems, acts, onShow,
   const cls = () => "mo-row" + (n++ === at ? " on" : "");
   const quiet = !waits.length && !news.length && !told.length && !stems.length && !acts.length;
   return (
-    <div className="pal-back" onMouseDown={(e) => e.target === e.currentTarget && onClose()}>
+    <div className="pal-back panel" onMouseDown={(e) => e.target === e.currentTarget && onClose()}>
       <div className="mo" ref={box} tabIndex={-1} onKeyDown={onKey}>
         <div className="mo-head">
           <b>{tr`브리핑`}</b>

@@ -1455,3 +1455,20 @@ body.dragging .pane-body { pointer-events: none; }
 .side-foot button { display: inline-flex; align-items: center; gap: 6px; padding: 5px 9px; font: inherit; font-size: 12.5px; color: var(--muted); background: none; border: 0; border-radius: 7px; cursor: pointer; }
 .side-foot button:hover { color: var(--ink); background: var(--bg); }
 .side-foot svg { width: 14px; height: 14px; fill: none; stroke: currentColor; stroke-width: 1.4; stroke-linecap: round; }
+
+/* 위에 뜨는 화면은 전부 같은 틀이다: 가운데, 같은 테두리와 둥글기, 뒤는 흐리게.
+   보통 크기(설정, 내 차례, 한 일, 브리핑, 토큰)와 큰 크기(작업, 줄기) 둘뿐이다. 말을 치는 작은 상자(⌘L, ⌘K)만 위쪽에 뜬다 */
+.pal-back.panel, .pal-back.wide, .pal-back.us-back { align-items: center; padding: 0; }
+.pal-back > .settings, .pal-back > .qu, .pal-back > .history, .pal-back > .mo, .pal-back > .us { width: min(1080px, 94vw); height: min(760px, 88vh); max-height: none; border: 1px solid var(--line); border-radius: 14px; box-shadow: 0 24px 60px rgb(0 0 0 / 0.5); }
+.pal-back > .threads { width: min(1500px, 96vw); height: 92vh; max-height: none; border: 1px solid var(--line); border-radius: 14px; box-shadow: 0 24px 60px rgb(0 0 0 / 0.5); }
+.pal-back > .history .pal-list, .pal-back > .settings .pal-list { max-height: none; flex: 1; min-height: 0; }
+.pal-back.wk-back { z-index: 23; }
+.wk { inset: 4vh max(2vw, calc((100vw - 1500px) / 2)); border: 1px solid var(--line); border-radius: 14px; box-shadow: 0 24px 60px rgb(0 0 0 / 0.5); overflow: hidden; }
+/* 내 차례가 비었을 때 */
+.qu.empty { grid-template-columns: minmax(0, 1fr); }
+.qu.empty .qu-list, .qu.empty .qu-main { display: none; }
+.qu-empty { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; text-align: center; padding: 24px; }
+.qu-empty svg { width: 56px; height: 56px; fill: none; stroke: var(--ok); stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; opacity: 0.85; }
+.qu-empty b { font-size: 17px; }
+.qu-empty p { margin: 0; max-width: 420px; color: var(--muted); font-size: 13.5px; line-height: 1.6; }
+.qu-empty small { margin-top: 6px; color: var(--muted); font-size: 12px; }

@@ -33,4 +33,8 @@ export default {
   "⌘Enter 세션 열기": "⌘Enter open session",
   "↑↓ 고르기 · Enter job과 로그 보기 · Esc": "↑↓ pick · Enter jobs and log · Esc",
   "↑↓ 고르기 · Enter PR 화면 · Esc": "↑↓ pick · Enter PR view · Esc",
+  "나를 기다리는 것이 없다": "Nothing is waiting on me",
+  "세션 {0}개가 일하고 있다. 물음이나 정할 것이 생기면 여기에 올라온다.": "{0} sessions are working. A question or a decision will show up here.",
+  "세션이 물음을 남기거나, PR과 티켓에 일이 생기면 여기에 올라온다.": "When a session leaves a question, or a PR or ticket has news, it shows up here.",
+  "일 던지기": "Send work",
 } as Record<string, string>;

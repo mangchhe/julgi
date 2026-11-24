@@ -2850,7 +2850,8 @@ export default function App() {
         // 내 차례인 세션들과 마지막에 물은 말을 편다. 거기서 바로 답한다
         if (overlay === "queue") setOverlay(null);
         else if (live.current.open.some((o) => waiting(live.current.states[o.key]) || live.current.prNews[o.key]) || live.current.asks.length || Object.keys(live.current.mineNews).length || Object.keys(live.current.sleepNews).length || Object.keys(ticketNewsRef.current).length) setOverlay("queue");
-        else a.say(tr("내 차례인 세션이 없다"));
+        // 기다리는 것이 없어도 연다. 빈 화면이 "없다"는 것과 지금 몇 개가 일하는지를 알려 준다
+        else setOverlay("queue");
       }
       // 창만 닫아 메뉴 막대로 보낸다. 세션은 계속 돈다
       else if (cmd && e.shiftKey && e.code === "KeyW") void getCurrentWindow().hide();
@@ -3391,6 +3392,7 @@ export default function App() {
       )}
       {overlay === "queue" && (
         <Queue
+          busy={open.filter((o) => states[o.key]?.state === "run").length}
           rows={open
             .filter((o) => waiting(states[o.key]) || (prNews[o.key] && states[o.key]?.state !== "run"))
             .sort((a, b) => (states[a.key]?.since ?? Infinity) - (states[b.key]?.since ?? Infinity))
@@ -3548,6 +3550,7 @@ export default function App() {
           onClose={() => setOverlay(null)}
         />
       )}
+      {overlay === "work" && <div className="pal-back wk-back" onMouseDown={() => setOverlay(null)} />}
       {overlay === "work" && (
         <Work
           groups={workGroups()}

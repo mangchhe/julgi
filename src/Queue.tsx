@@ -11,6 +11,8 @@ import { md } from "./md";
 /** pr: 이 세션이 올린 PR. ⌥Enter로 PR 화면을 연다. state가 sleep이면 잠든 세션이다(고르면 깨운다) */
 export type Waiting = { key: string; name: string; repo: string; state: string; since: number; sessionId?: string; news?: string; pr?: PrTarget; /** 한꺼번에 맡긴 버그의 진단이 끝난 세션이면 그 티켓 키 */ bug?: string };
 type Props = {
+  /** 지금 일하는 중인 세션 수. 기다리는 것이 없을 때 보여 준다 */
+  busy?: number;
   rows: Waiting[];
   /** 나한테 온 리뷰 요청. 세션들 아래에 놓는다 */
   asks: ReviewAsk[];
@@ -53,7 +55,7 @@ const question = (reply: string) => {
  * 내 차례 (⌘J). 답을 기다리는 세션을 오래 기다린 순으로 놓고, 마지막에 무엇을 물었는지 보여 준다.
  * 여기서 바로 답을 쳐서 보내면 세션을 열어 읽고 돌아오는 왕복이 없다. 더 읽어야 하면 빈 채로 Enter를 눌러 연다
  */
-export default function Queue({ rows, asks, mine, tickets, loadTicket, runs = [], onRun, onTicket, onStartTicket, onView, onHand, onAnswer, onFixBug, onHoldBug, onOpen, onPr, onClose }: Props) {
+export default function Queue({ rows, asks, mine, tickets, loadTicket, runs = [], onRun, onTicket, onStartTicket, onView, onHand, onAnswer, onFixBug, onHoldBug, onOpen, onPr, onClose, busy = 0 }: Props) {
   // 답을 보낸 세션과 맡긴 리뷰는 상태가 바뀌기를 기다리지 않고 바로 뺀다
   const [gone, setGone] = useState<string[]>([]);
   const list = useMemo(() => rows.filter((r) => !gone.includes(r.key)), [rows, gone]);
@@ -157,7 +159,17 @@ export default function Queue({ rows, asks, mine, tickets, loadTicket, runs = []
 
   return (
     <div className="pal-back wide" onMouseDown={onClose}>
-      <div className="qu" ref={box} tabIndex={-1} onMouseDown={(e) => e.stopPropagation()} onKeyDown={onKey}>
+      <div className={"qu" + (total === 0 ? " empty" : "")} ref={box} tabIndex={-1} onMouseDown={(e) => e.stopPropagation()} onKeyDown={onKey}>
+        {total === 0 && (
+          <div className="qu-empty">
+            <svg viewBox="0 0 48 48" aria-hidden="true"><path d="M24 44V20M24 30c-7 0-11-4-11-10 7 0 11 4 11 10ZM24 24c0-8 4-12 11-12 0 8-4 12-11 12Z" /></svg>
+            <b>{tr`나를 기다리는 것이 없다`}</b>
+            <p>{busy > 0 ? tr`세션 ${busy}개가 일하고 있다. 물음이나 정할 것이 생기면 여기에 올라온다.` : tr`세션이 물음을 남기거나, PR과 티켓에 일이 생기면 여기에 올라온다.`}</p>
+            <small>
+              <kbd>⌘L</kbd> {tr`일 던지기`} · <kbd>⌘U</kbd> {tr`작업`} · <kbd>Esc</kbd> {tr`닫기`}
+            </small>
+          </div>
+        )}
         <div className="qu-list">
           {list.length > 0 && <div className="qu-head">{tr`내 차례`} {list.length}</div>}
           {list.map((r, i) => (
