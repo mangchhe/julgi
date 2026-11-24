@@ -1,6 +1,6 @@
 // node scripts/check-jira.mjs — Jira 화면 쪽 도우미(src/jira.ts)를 본다: ADF → 마크다운, 티켓 키 찾기, 새 소식 판정
 import assert from "node:assert";
-import { adfToMd, findKeys, keyOfUrl, setKnownKeys, slugOf, ticketNews, quietNews } from "../src/jira.ts";
+import { adfToMd, findKeys, keyOfUrl, setKnownKeys, slugOf, ticketNews, ticketNewsMeta, quietNews } from "../src/jira.ts";
 
 const doc = { type: "doc", content: [
   { type: "heading", attrs: { level: 2 }, content: [{ type: "text", text: "배경" }] },
@@ -36,6 +36,11 @@ assert.equal(quietNews(was, { ...t, by: [kim, lee] }, "someone, lee"), true);
 assert.equal(quietNews(was, { ...t, by: [kim, lee] }, "U2"), true);
 assert.equal(quietNews(was, { ...t, others: 3, by: [kim, bot, lee] }, ""), false);
 assert.equal(quietNews({ ...was, status: "To Do" }, { ...t, by: [kim, bot] }, ""), false);
+// 나를 @로 부른 댓글은 문구가 다르고, 속 내용에 표시가 남는다
+assert.equal(ticketNews(was, { ...t, title: "T", by: [kim, { ...lee, mention: true }] }, false), "@나 · Lee");
+assert.deepEqual(ticketNewsMeta(was, { ...t, title: "T", by: [kim, { ...lee, mention: true }] }), { title: "T", kind: "comment", count: 1, who: "Lee", mention: true });
+assert.deepEqual(ticketNewsMeta({ ...was, status: "To Do" }, { ...t, title: "T" }), { title: "T", kind: "status", was: "To Do" });
+assert.deepEqual(ticketNewsMeta(undefined, { ...t, title: "T" }), { title: "T", kind: "assigned" });
 assert.equal(slugOf("Restore coupon on cancel!"), "restore-coupon-on-cancel");
 assert.equal(slugOf("주문 취소"), "");
 console.log("jira ok");

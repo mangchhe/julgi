@@ -37,7 +37,7 @@ type Props = {
   /** 잠든 세션 가운데 PR에 일이 생긴 것: 세션 ID → 까닭과 PR */
   sleepNews: Record<string, { news: string; pr: PrTarget }>;
   /** 이 세션의 티켓과 그 상태 (Jira가 연결돼 있을 때) */
-  ticketOf: (key: string) => { key: string; status: string; news?: string; quiet?: boolean } | undefined;
+  ticketOf: (key: string) => { key: string; status: string; news?: string; quiet?: boolean; who?: string; mention?: boolean } | undefined;
   /** 작업 페이지 줄에 보일 숫자: 내 PR, 리뷰 요청, 새 소식 */
   work: { prs: number; asks: number; news: number };
   onWork: () => void;
@@ -131,6 +131,17 @@ export default function Sidebar({ open, items, threads, byId, states, tasks, cha
               <div className="row-body">
                 <div className="row-head">
                   <div className="row-title">{job ? `${job.repo} · ${job.ask.split("\n")[0].replace(/^배경:\s*/, "").slice(0, 40)}` : (threadOf(o.sessionId)?.name ?? s?.title ?? o.label)}</div>
+                  {/* 이어진 티켓에 새 소식이 있으면 제목 옆에 배지를 단다. 아랫줄은 길면 잘려서 놓치기 쉽다 */}
+                  {(() => {
+                    const tk = job ? undefined : ticketOf(o.key);
+                    if (!tk?.news || tk.quiet) return null;
+                    return (
+                      <span className={"tk-badge" + (tk.mention ? " mention" : "")} title={`${tk.key} · ${tk.news}`}>
+                        {tk.mention ? "@" : "💬"}
+                        {tk.who ? ` ${tk.who.split(",")[0].slice(0, 8)}` : ""}
+                      </span>
+                    );
+                  })()}
                   {/* 고정한 세션은 제목 오른쪽 끝에 핀을 단다 */}
                   {pinned.includes(o.key) && (
                     <svg className="pin-mark" viewBox="0 0 16 16" aria-label={tr`고정`}>

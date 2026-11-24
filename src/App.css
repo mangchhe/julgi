@@ -1353,3 +1353,26 @@ body.dragging .pane-body { pointer-events: none; }
 .ci-bones i { display: block; height: 30px; border-radius: 8px; background: var(--surface); animation: ci-pulse 1.2s ease-in-out infinite; }
 .ci-bones i:nth-child(2) { width: 82%; }
 .ci-bones i:nth-child(3) { width: 64%; }
+
+/* 세션에 이어진 티켓의 새 소식: 사이드바 제목 옆과 칸 머리의 배지. 나를 부른 댓글은 더 진하게 */
+.side .tk-badge { flex: none; margin-top: 1px; padding: 0 5px; border-radius: 999px; font-size: 10.5px; line-height: 16px; white-space: nowrap; color: var(--wait); background: color-mix(in srgb, var(--wait) 14%, transparent); }
+.side .tk-badge.mention { color: var(--bg); background: var(--wait); font-weight: 700; }
+.pane-right .tk-note { cursor: pointer; padding: 0 7px; border-radius: 999px; font-size: 11.5px; color: var(--wait); background: color-mix(in srgb, var(--wait) 14%, transparent); white-space: nowrap; max-width: 260px; overflow: hidden; text-overflow: ellipsis; }
+.pane-right .tk-note.mention { color: var(--bg); background: var(--wait); font-weight: 700; }
+
+/* ⌘J의 티켓 상세: 머리(키, 제목, 상태), 소식 한 줄, 그 소식의 본문, 단추 */
+.qu-ticket { display: flex; flex-direction: column; gap: 10px; }
+.qu-tk-head { display: flex; flex-direction: column; gap: 3px; }
+.qu-tk-head b { font-size: 14px; line-height: 1.4; }
+.qu-tk-head em { font-style: normal; font-family: ui-monospace, Menlo, monospace; font-size: 12px; color: var(--accent); }
+.qu-tk-head small, .qu-tk-comment small { font-size: 12px; color: var(--muted); }
+.qu-tk-news { width: fit-content; padding: 1px 9px; border-radius: 999px; font-size: 12px; font-weight: 600; color: var(--wait); background: color-mix(in srgb, var(--wait) 14%, transparent); }
+.qu-tk-news.mention { color: var(--bg); background: var(--wait); }
+.qu-tk-move { font-size: 13px; color: var(--muted); }
+.qu-tk-move b { color: var(--ink); }
+.qu-tk-comment { padding: 8px 10px; border: 1px solid var(--line); border-radius: 9px; background: var(--surface); font-size: 13px; }
+.qu-tk-comment .pr-text { margin-top: 4px; }
+.qu-more { margin-top: 4px; font: inherit; font-size: 12px; color: var(--accent); background: none; border: 0; padding: 0; cursor: pointer; }
+.qu-tk-acts { display: flex; gap: 6px; }
+.qu-tk-acts button { font: inherit; font-size: 12px; color: var(--ink); background: var(--surface); border: 1px solid var(--line); border-radius: 6px; padding: 3px 11px; cursor: pointer; }
+.qu-tk-acts button.primary { color: var(--accent); background: var(--accent-soft); border-color: var(--accent); }

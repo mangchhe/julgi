@@ -157,11 +157,24 @@ fn issue_url(conn: &Conn, key: &str) -> String {
     format!("{}/browse/{key}", conn.site.trim_end_matches('/'))
 }
 
+/// 댓글 본문이 나를 @로 부르는가. Cloud는 본문(ADF) 안 mention 노드의 attrs.id가 내 accountId이고, Server는 글에 [~이름]이 있다
+fn mentions_me(body: &Value, me: &str) -> bool {
+    if me.is_empty() {
+        return false;
+    }
+    match body {
+        Value::String(text) => text.contains(&format!("[~{me}]")) || text.contains(&format!("[~accountid:{me}]")),
+        Value::Array(list) => list.iter().any(|v| mentions_me(v, me)),
+        Value::Object(node) => (node.get("type").and_then(Value::as_str) == Some("mention") && node.get("attrs").and_then(|a| a["id"].as_str()) == Some(me)) || node.get("content").is_some_and(|c| mentions_me(c, me)),
+        _ => false,
+    }
+}
+
 /// 목록 한 줄 모양
 fn row(conn: &Conn, it: &Value, me: &str) -> Value {
     let f = &it["fields"];
     // 남이 단 댓글들의 작성자(순서대로). 개수가 others다. app은 봇 계정인지
-    let by: Vec<Value> = f["comment"]["comments"].as_array().into_iter().flatten().filter(|c| author_id(&c["author"]) != me).map(|c| json!({ "name": s(c, "/author/displayName"), "id": author_id(&c["author"]), "app": s(c, "/author/accountType") == "app" })).collect();
+    let by: Vec<Value> = f["comment"]["comments"].as_array().into_iter().flatten().filter(|c| author_id(&c["author"]) != me).map(|c| json!({ "name": s(c, "/author/displayName"), "id": author_id(&c["author"]), "app": s(c, "/author/accountType") == "app", "mention": mentions_me(&c["body"], me) })).collect();
     let others = by.len();
     json!({
         "by": by,
@@ -379,5 +392,20 @@ mod tests {
         assert_eq!(b["content"].as_array().unwrap().len(), 3);
         let srv = Conn { site: "https://x".into(), email: "e".into(), kind: "server".into() };
         assert_eq!(body_of(&srv, "a"), json!("a"));
+    }
+}
+
+#[cfg(test)]
+mod mention_tests {
+    use super::*;
+
+    #[test]
+    fn finds_my_mention_in_adf_and_wiki_text() {
+        let body = json!({ "type": "doc", "content": [{ "type": "paragraph", "content": [{ "type": "text", "text": "봐 주세요 " }, { "type": "mention", "attrs": { "id": "me-1", "text": "@Me" } }] }] });
+        assert!(mentions_me(&body, "me-1"));
+        assert!(!mentions_me(&body, "someone-else"));
+        assert!(!mentions_me(&json!({ "type": "doc", "content": [{ "type": "text", "text": "@me-1 처럼 글자로만 쓴 것" }] }), "me-1"));
+        assert!(mentions_me(&json!("확인 부탁 [~me-1]"), "me-1"));
+        assert!(!mentions_me(&body, ""));
     }
 }

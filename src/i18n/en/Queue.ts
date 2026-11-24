@@ -26,4 +26,11 @@ export default {
   "고쳐": "Fix it",
   "보류": "Hold",
   "내가 돌린 CI가 깨졌다 · Enter로 job과 로그를 본다": "A CI run you started failed · Enter to see the jobs and the log",
+  "더 보기": "Show more",
+  "세션 열기": "Open session",
+  "내가 돌린 CI가 깨졌다": "A CI run you started failed",
+  "↑↓ 고르기 · Enter 티켓 화면": "↑↓ pick · Enter ticket view",
+  "⌘Enter 세션 열기": "⌘Enter open session",
+  "↑↓ 고르기 · Enter job과 로그 보기 · Esc": "↑↓ pick · Enter jobs and log · Esc",
+  "↑↓ 고르기 · Enter PR 화면 · Esc": "↑↓ pick · Enter PR view · Esc",
 } as Record<string, string>;

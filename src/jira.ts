@@ -3,7 +3,7 @@ import { tr } from "./i18n.ts";
 
 export type JiraConn = { site: string; email: string; kind: string };
 /** 목록 한 줄 (Rust row) */
-export type Ticket = { key: string; url: string; title: string; status: string; statusCategory: string; type: string; priority: string; assignee: string; updated: string; others: number; by?: { name: string; id: string; app: boolean }[] };
+export type Ticket = { key: string; url: string; title: string; status: string; statusCategory: string; type: string; priority: string; assignee: string; updated: string; others: number; by?: { name: string; id: string; app: boolean; mention?: boolean }[] };
 /** 티켓 한 건 (Rust jira_view). description·comments.body는 Cloud면 ADF, Server면 글 */
 export type TicketFull = {
   key: string;
@@ -139,11 +139,26 @@ export function ticketNews(before: TicketSeen | undefined, now: Ticket, firstRun
   if (now.status !== before.status) return tr`상태 → ${now.status}`;
   if (now.others > before.others) {
     const n = now.others - before.others;
-    const names = [...new Set((now.by ?? []).slice(before.others).map((a) => a.name).filter(Boolean))];
+    const fresh = (now.by ?? []).slice(before.others);
+    const names = [...new Set(fresh.map((a) => a.name).filter(Boolean))];
     if (!names.length) return tr`새 코멘트 ${n}`;
-    return tr`새 코멘트 ${n} · ${names.length > 1 ? tr`${names[0]} 외 ${names.length - 1}명` : names[0]}`;
+    const who = names.length > 1 ? tr`${names[0]} 외 ${names.length - 1}명` : names[0];
+    // 나를 @로 부른 댓글은 따로 적는다. 그냥 달린 댓글보다 먼저 봐야 한다
+    return fresh.some((a) => a.mention) ? tr`@나 · ${who}` : tr`새 코멘트 ${n} · ${who}`;
   }
   return "";
+}
+
+/**
+ * 소식의 속 내용. 글(ticketNews)만으로는 알 수 없는 것을 담는다: 어떤 종류인지, 새 댓글이 몇 개인지와 누가 달았는지,
+ * 상태가 무엇에서 바뀌었는지, 나를 @로 불렀는지. title은 티켓이 목록에서 빠진 뒤에도 키 대신 보여 주려고 같이 둔다
+ */
+export type TicketNewsMeta = { title: string; kind: "assigned" | "status" | "comment"; count?: number; who?: string; was?: string; mention?: boolean };
+export function ticketNewsMeta(before: TicketSeen | undefined, now: Ticket): TicketNewsMeta {
+  if (!before) return { title: now.title, kind: "assigned" };
+  if (now.status !== before.status) return { title: now.title, kind: "status", was: before.status };
+  const fresh = (now.by ?? []).slice(before.others);
+  return { title: now.title, kind: "comment", count: Math.max(1, now.others - before.others), who: [...new Set(fresh.map((a) => a.name).filter(Boolean))].join(", "), mention: fresh.some((a) => a.mention) };
 }
 
 /**

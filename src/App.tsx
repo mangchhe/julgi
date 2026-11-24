@@ -28,7 +28,7 @@ import StartTicket, { promptOf } from "./StartTicket";
 import { parse as parseDiff } from "./CodeReview";
 import RunView from "./RunView";
 import { CiRun, CiState, ciLabel, ciLive, ciNews, ciOrder } from "./ci";
-import { TicketWork, firstKey, JiraConn, keyOfUrl, setKnownKeys, Ticket, TicketFull, TicketSeen, ticketNews, quietNews, BugJob, slugOf } from "./jira";
+import { TicketWork, firstKey, JiraConn, keyOfUrl, setKnownKeys, Ticket, TicketFull, TicketSeen, ticketNews, ticketNewsMeta, TicketNewsMeta, quietNews, BugJob, slugOf } from "./jira";
 import { prNo, isLab, newsOf, openPr, prOf, PrStatus, PrTarget, prUrl, repoName, ReviewAsk } from "./pr";
 import * as terms from "./terms";
 import { rank } from "./route";
@@ -160,16 +160,27 @@ export default function App() {
   useEffect(() => {
     void invoke<string | null>("data_read", { name: "jira-news.json" }).then((t) => {
       try {
-        if (t) setTicketNews((now) => ({ ...JSON.parse(t), ...now }));
+        // 예전 파일은 키 → 글만 들어 있다. 지금은 글(news)과 속 내용(meta)을 같이 둔다
+        const v = t ? JSON.parse(t) : {};
+        const old = v.news && typeof v.news === "object" ? v : { news: v, meta: {} };
+        setTicketNews((now) => ({ ...old.news, ...now }));
+        setTicketMeta((now) => ((metaRef.current = { ...(old.meta ?? {}), ...now }), metaRef.current));
       } catch {}
       newsLoaded.current = true;
     });
   }, []);
   useEffect(() => {
     // 조용히 받은 소식은 남기지 않는다. 다시 켜면 흐린 표시는 사라진다
-    if (newsLoaded.current) void invoke("data_write", { name: "jira-news.json", text: JSON.stringify(Object.fromEntries(Object.entries(ticketNewsMap).filter(([k]) => !ticketQuiet.has(k)))) });
+    if (!newsLoaded.current) return;
+    const keep = Object.keys(ticketNewsMap).filter((k) => !ticketQuiet.has(k));
+    void invoke("data_write", { name: "jira-news.json", text: JSON.stringify({ news: Object.fromEntries(keep.map((k) => [k, ticketNewsMap[k]])), meta: Object.fromEntries(keep.filter((k) => metaRef.current[k]).map((k) => [k, metaRef.current[k]])) }) });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ticketNewsMap]);
+  // 소식의 속 내용: 제목, 종류, 새 댓글 수와 작성자, 바뀌기 전 상태, 나를 불렀는지. ⌘J의 상세와 세션 배지가 쓴다
+  const [ticketMeta, setTicketMeta] = useState<Record<string, TicketNewsMeta>>({});
+  const metaRef = useRef<Record<string, TicketNewsMeta>>({});
+  /** 티켓을 봤다: 소식을 내린다 */
+  const seenTicket = (key?: string) => key && ticketNewsRef.current[key] && setTicketNews(({ [key]: _, ...rest }) => rest);
   const jiraSeen = useRef<Record<string, TicketSeen>>({});
   const [ticketLinks, setTicketLinks] = useState<Record<string, string>>({}); // 세션 ID → 티켓 키
   const [ticketDone, setTicketDone] = useState<Record<string, string>>({}); // 끝난(완료·거부) 티켓 키 → 상태 이름. 한 번 알린 것은 다시 알리지 않는다
@@ -2441,11 +2452,26 @@ export default function App() {
           else set.delete(t.key);
           return (quietRef.current = set);
         });
+        const meta = ticketNewsMeta(jiraSeen.current[t.key], t);
+        metaRef.current = { ...metaRef.current, [t.key]: meta };
+        setTicketMeta(metaRef.current);
         setTicketNews((old) => ({ ...old, [t.key]: news }));
         actions.current.ticketNotice(t, news, hush);
+        // 나를 부른 댓글은 Julgi를 보고 있어도 눈에 띄게 알린다
+        if (meta.mention) actions.current.say(`${t.key} · ${news} · ${t.title.slice(0, 50)}`, 9000);
       }
       jiraSeen.current = next;
       void invoke("data_write", { name: "jira-seen.json", text: JSON.stringify(next) });
+      // 소식이 걸린 채 내 목록에서 빠진 티켓(끝났거나 담당이 바뀜)을 따로 본다. 끝났으면 소식을 내린다:
+      // 여러 단계를 빠르게 옮겨 끝낸 티켓이 중간 상태의 소식을 단 채 남는 일을 막는다. 안 끝났으면 제목만 채워 둔다
+      const lost = Object.keys(ticketNewsRef.current).filter((k) => !list.some((t) => t.key === k) && /^[A-Z][A-Z0-9_]+-\d+$/.test(k));
+      if (lost.length) {
+        const found = await invoke<Ticket[]>("jira_search", { conn: jiraConn(), jql: `key in (${lost.join(", ")})`, limit: 50 }).catch(() => [] as Ticket[]);
+        const done = found.filter((t) => t.statusCategory === "done").map((t) => t.key);
+        if (done.length) setTicketNews((old) => Object.fromEntries(Object.entries(old).filter(([k]) => !done.includes(k))));
+        for (const t of found) if (!done.includes(t.key)) metaRef.current = { ...metaRef.current, [t.key]: { ...(metaRef.current[t.key] ?? { kind: "status" as const }), title: t.title } };
+        setTicketMeta(metaRef.current);
+      }
     };
     refreshTickets.current = (keys = false) => void poll(keys);
     const loop = () => void poll().finally(() => (timer = window.setTimeout(loop, config.jiraEveryMin * 60_000)));
@@ -2983,7 +3009,11 @@ export default function App() {
           current={current}
           shown={panes}
           loading={!ledger}
-          onShow={show}
+          onShow={(key) => {
+            // 세션을 열면 이어진 티켓의 소식도 본 것으로 친다
+            seenTicket(ticketOfSession(open.find((o) => o.key === key)?.sessionId));
+            show(key);
+          }}
           onClose={sleep}
           onOpenSession={(s) => (sleepNews[s.id] ? wake(s.id) : openSession(s))}
           onSearch={() => setOverlay("palette")}
@@ -2998,7 +3028,7 @@ export default function App() {
             const tk = ticketOfSession(open.find((o) => o.key === key)?.sessionId);
             if (!tk) return undefined;
             if (ticketDone[tk]) return { key: tk, status: "", news: tr`티켓 끝남 · ${ticketDone[tk]}` };
-            return { key: tk, status: tickets.find((t) => t.key === tk)?.status ?? "", news: ticketNewsMap[tk], quiet: ticketQuiet.has(tk) };
+            return { key: tk, status: tickets.find((t) => t.key === tk)?.status ?? "", news: ticketNewsMap[tk], quiet: ticketQuiet.has(tk), who: ticketMeta[tk]?.who, mention: ticketMeta[tk]?.mention };
           }}
           work={{ prs: minePrs.length, asks: asks.length, news: Object.keys(mineNews).length + Object.keys(prNews).length + Object.keys(sleepNews).length }}
           onWork={() => setOverlay("work")}
@@ -3044,6 +3074,11 @@ export default function App() {
                 finding={finding && focus === i}
                 handing={!!key && handing.includes(key)}
                 handed={!!key && !!handed[key]}
+                ticketNote={(() => {
+                  const tk = ticketOfSession(o?.sessionId);
+                  if (!tk || !ticketNewsMap[tk] || ticketQuiet.has(tk)) return undefined;
+                  return { text: `${tk} · ${ticketNewsMap[tk]}`, mention: !!ticketMeta[tk]?.mention, open: () => (setTicketShown(tk), seenTicket(tk)) };
+                })()}
                 ticketEnded={(() => {
                   const tk = ticketOfSession(o?.sessionId);
                   return tk && ticketDone[tk] && !threadOf(o?.sessionId)?.done ? tr`티켓 끝남 · ${ticketDone[tk]}` : undefined;
@@ -3139,8 +3174,12 @@ export default function App() {
           mine={Object.values(mineNews)}
           tickets={Object.entries(ticketNewsMap).filter(([key]) => !ticketQuiet.has(key)).map(([key, news]) => {
             const t = tickets.find((x) => x.key === key);
-            return { key, news, title: t?.title ?? key, url: t?.url ?? `${config.jiraSite}/browse/${key}` };
-          })}
+            // 목록에서 빠진 티켓(끝났거나 담당이 바뀜)도 소식을 받을 때 적어 둔 제목으로 보여 준다
+            return { key, news, title: t?.title ?? ticketMeta[key]?.title ?? key, url: t?.url ?? `${config.jiraSite}/browse/${key}`, meta: ticketMeta[key], session: sessionsOfTicket(key)[0]?.name };
+          })
+            // 나를 부른 댓글이 맨 위
+            .sort((a, b) => Number(!!b.meta?.mention) - Number(!!a.meta?.mention))}
+          loadTicket={(key) => invoke<TicketFull>("jira_view", { conn: jiraConn(), key })}
           onTicket={(key) => (setTicketShown(key), setTicketNews(({ [key]: _, ...rest }) => rest))}
           onStartTicket={(key) => {
             void invoke<TicketFull>("jira_view", { conn: jiraConn(), key }).then(beginTicket, (e) => say(String(e).slice(0, 100)));
