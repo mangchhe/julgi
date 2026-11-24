@@ -115,6 +115,12 @@ fn serve(server: Server, token: String) {
             let _ = request.respond(page);
             continue;
         }
+        // 앱 아이콘과 빈 화면의 그림. 정보가 없어 토큰 없이 준다 (홈 화면에 추가할 때 폰이 토큰 없이 받아 간다)
+        if path == "/icon.png" || path == "/mascot.png" {
+            let bytes: &[u8] = if path == "/icon.png" { include_bytes!("../assets/remote-icon.png") } else { include_bytes!("../assets/remote-mascot.png") };
+            let _ = request.respond(Response::from_data(bytes).with_header(Header::from_bytes("Content-Type", "image/png").unwrap()).with_header(Header::from_bytes("Cache-Control", "max-age=86400").unwrap()));
+            continue;
+        }
         let given = request.headers().iter().find(|h| h.field.equiv("x-julgi-token")).map(|h| h.value.as_str().to_owned()).or_else(|| param(&url, "t").map(str::to_owned));
         if given.as_deref() != Some(token.as_str()) {
             let _ = request.respond(json("{\"error\":\"token\"}".into(), 401));

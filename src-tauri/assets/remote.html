@@ -4,114 +4,181 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=resizes-content">
 <meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<meta name="theme-color" content="#f5f3ee" media="(prefers-color-scheme: light)">
-<meta name="theme-color" content="#0e0f12" media="(prefers-color-scheme: dark)">
+<meta name="apple-mobile-web-app-title" content="Julgi">
+<meta name="theme-color" content="#f4f2ec" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#0d0e11" media="(prefers-color-scheme: dark)">
+<link rel="apple-touch-icon" href="/icon.png">
+<link rel="icon" href="/icon.png">
 <title>Julgi</title>
 <style>
-/* 폰에서 보는 Julgi. 화면은 셋이다: 세션 목록, 세션 하나(마지막 답과 답 쓰는 칸), 새 일 던지기 */
-:root { --bg: #f5f3ee; --surface: #ffffff; --sunk: #ebe8e0; --ink: #1b1c20; --muted: #6b6d75; --line: #dedad0; --accent: #2f6fd0; --accent-soft: #e4edfb; --on-accent: #ffffff; --wait: #c2620c; --wait-soft: #fbeedd; --ok: #2c8a56; --bad: #b3261e; --shadow: 0 1px 2px rgb(0 0 0 / 0.06), 0 4px 14px rgb(0 0 0 / 0.05); color-scheme: light; }
-@media (prefers-color-scheme: dark) { :root { --bg: #0e0f12; --surface: #17191e; --sunk: #1f2228; --ink: #e9ebef; --muted: #8d919b; --line: #2a2d35; --accent: #7cb0ff; --accent-soft: #1a2a44; --on-accent: #0e0f12; --wait: #ffa24a; --wait-soft: #33240f; --ok: #6fd19c; --bad: #ff8f85; --shadow: 0 1px 2px rgb(0 0 0 / 0.4); color-scheme: dark; } }
+/* 폰에서 보는 Julgi. 아래 탭 셋(홈, 세션, 한 일)과 가운데의 새 일 단추. 세션 하나는 그 위로 밀려 올라오고, 새 일은 아래에서 올라오는 판이다 */
+:root {
+  --bg: #f4f2ec; --surface: #ffffff; --sunk: #ebe8e0; --ink: #17181c; --muted: #6a6c74; --faint: #9a9ca4; --line: #e2ded4;
+  --accent: #2a6bd1; --accent-soft: #e3ecfb; --on-accent: #ffffff; --wait: #c25e06; --wait-soft: #fcefdc; --ok: #24854f; --ok-soft: #dff3e7; --bad: #b3261e;
+  --shadow: 0 1px 2px rgb(20 20 30 / 0.05), 0 6px 20px rgb(20 20 30 / 0.06); --bar: 62px;
+}
+@media (prefers-color-scheme: dark) { :root {
+  --bg: #0d0e11; --surface: #17181d; --sunk: #20222a; --ink: #eceef2; --muted: #8f939d; --faint: #666a74; --line: #272a32;
+  --accent: #7fb2ff; --accent-soft: #18294a; --on-accent: #0d0e11; --wait: #ffa551; --wait-soft: #33230e; --ok: #5fd39a; --ok-soft: #10301f; --bad: #ff8a80;
+  --shadow: 0 1px 2px rgb(0 0 0 / 0.4), 0 8px 24px rgb(0 0 0 / 0.35);
+} }
 * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
 html, body { margin: 0; height: 100%; }
-body { background: var(--bg); color: var(--ink); font: 16px/1.55 -apple-system, "Apple SD Gothic Neo", system-ui, sans-serif; -webkit-text-size-adjust: 100%; overscroll-behavior-y: none; }
-button, textarea, select { font: inherit; color: inherit; }
-button { cursor: pointer; }
-.app { min-height: 100dvh; display: flex; flex-direction: column; padding: 0 max(16px, env(safe-area-inset-right, 0px)) 0 max(16px, env(safe-area-inset-left, 0px)); max-width: 640px; margin: 0 auto; }
-header { position: sticky; top: 0; z-index: 3; background: color-mix(in srgb, var(--bg) 88%, transparent); -webkit-backdrop-filter: blur(14px); backdrop-filter: blur(14px); display: flex; align-items: center; gap: 8px; padding: calc(10px + env(safe-area-inset-top, 0px)) 0 10px; margin: 0 -16px; padding-left: 16px; padding-right: 16px; }
-header .back { background: none; border: 0; padding: 6px 8px 6px 0; margin-left: -2px; font-size: 16px; color: var(--accent); display: flex; align-items: center; gap: 2px; }
-header .back svg { width: 20px; height: 20px; }
-.titles { flex: 1; min-width: 0; }
-.titles h1 { margin: 0; font-size: 20px; font-weight: 700; letter-spacing: -0.01em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.titles.small h1 { font-size: 16.5px; }
-.titles p { margin: 0; font-size: 12.5px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.live { width: 8px; height: 8px; border-radius: 50%; background: var(--ok); flex: none; }
-.live.off { background: var(--bad); }
-.stale { background: var(--surface); border: 1px solid var(--bad); color: var(--bad); border-radius: 12px; padding: 10px 14px; font-size: 14px; margin: 4px 0 10px; }
-main { flex: 1; display: flex; flex-direction: column; }
-#list { padding-bottom: calc(96px + env(safe-area-inset-bottom, 0px)); }
-.group { display: flex; align-items: baseline; gap: 6px; font-size: 12.5px; font-weight: 700; color: var(--muted); padding: 18px 4px 8px; }
-.group i { font-style: normal; font-weight: 500; }
-.group.mine { color: var(--wait); }
-.card { background: var(--surface); border-radius: 16px; box-shadow: var(--shadow); overflow: hidden; }
-.row { display: grid; grid-template-columns: 10px 1fr 16px; align-items: center; gap: 12px; width: 100%; text-align: left; background: none; border: 0; padding: 13px 14px; min-height: 60px; }
-.row + .row { border-top: 1px solid var(--line); }
-.row:active { background: var(--sunk); }
-.dot { width: 10px; height: 10px; border-radius: 50%; background: var(--line); }
-.row.mine .dot { background: var(--wait); }
-.row.run .dot { background: var(--accent); animation: pulse 1.6s ease-in-out infinite; }
-@keyframes pulse { 50% { opacity: 0.35; } }
-@media (prefers-reduced-motion: reduce) { .row.run .dot { animation: none; } }
-.row b { display: block; font-weight: 600; font-size: 16px; line-height: 1.35; overflow: hidden; text-overflow: ellipsis; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
-.row small { display: block; color: var(--muted); font-size: 13px; margin-top: 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.row small em { font-style: normal; color: var(--wait); font-weight: 600; }
-.row .go { width: 16px; height: 16px; color: var(--muted); opacity: 0.6; }
-.none { color: var(--muted); font-size: 15px; text-align: center; padding: 56px 20px; }
-.none b { display: block; color: var(--ink); font-size: 17px; margin-bottom: 4px; }
-details.acts { margin-top: 22px; }
-details.acts summary { list-style: none; font-size: 12.5px; font-weight: 700; color: var(--muted); padding: 6px 4px 8px; display: flex; align-items: center; gap: 6px; }
-details.acts summary::-webkit-details-marker { display: none; }
-details.acts summary::after { content: "›"; font-size: 16px; line-height: 1; transition: transform 0.15s; }
-details.acts[open] summary::after { transform: rotate(90deg); }
-.act { font-size: 13.5px; color: var(--muted); padding: 10px 14px; overflow-wrap: anywhere; }
-.act + .act { border-top: 1px solid var(--line); }
-.act i { font-style: normal; color: var(--ink); font-weight: 600; margin-right: 6px; }
-.fab { position: fixed; z-index: 4; right: max(16px, calc(50vw - 304px)); bottom: calc(18px + env(safe-area-inset-bottom, 0px)); background: var(--accent); color: var(--on-accent); border: 0; border-radius: 999px; padding: 14px 20px 14px 16px; font-size: 16px; font-weight: 700; display: flex; align-items: center; gap: 6px; box-shadow: 0 6px 20px rgb(0 0 0 / 0.22); }
-.fab svg { width: 20px; height: 20px; }
-.fab:active { transform: scale(0.97); }
-/* 세션 하나 */
-#one { padding-bottom: 8px; }
-.bubble { background: var(--surface); border-radius: 16px; box-shadow: var(--shadow); padding: 14px 16px; overflow-wrap: anywhere; font-size: 15.5px; }
-.bubble.wait-for { color: var(--muted); text-align: center; box-shadow: none; background: none; padding: 40px 16px; }
-.bubble p { margin: 0 0 10px; white-space: pre-wrap; }
-.bubble > :last-child { margin-bottom: 0; }
-.bubble ul { margin: 0 0 10px; padding-left: 20px; }
-.bubble h4 { margin: 12px 0 6px; font-size: 16px; }
-.bubble code { font: 13.5px/1.5 ui-monospace, "SF Mono", Menlo, monospace; background: var(--sunk); border-radius: 5px; padding: 1px 5px; }
-.bubble pre { margin: 0 0 10px; background: var(--sunk); border-radius: 10px; padding: 10px 12px; overflow-x: auto; }
-.bubble pre code { background: none; padding: 0; white-space: pre; }
-.bubble .more { display: block; width: 100%; background: none; border: 0; border-bottom: 1px solid var(--line); color: var(--accent); font-size: 14px; padding: 0 0 10px; margin-bottom: 10px; text-align: left; }
-.bubble .asked { margin-top: 12px; background: var(--wait-soft); border-radius: 12px; padding: 10px 12px; }
-.bubble .asked > :last-child { margin-bottom: 0; }
-.bubble .asked::before { content: attr(data-label); display: block; font-size: 12px; font-weight: 700; color: var(--wait); margin-bottom: 2px; }
-.spacer { flex: 1; min-height: 12px; }
-.composer { position: sticky; bottom: 0; z-index: 2; background: color-mix(in srgb, var(--bg) 92%, transparent); -webkit-backdrop-filter: blur(14px); backdrop-filter: blur(14px); margin: 0 -16px; padding: 8px 16px calc(10px + env(safe-area-inset-bottom, 0px)); }
-.quick { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 8px; scrollbar-width: none; }
-.quick::-webkit-scrollbar { display: none; }
-.quick button { flex: none; background: var(--surface); border: 1px solid var(--line); border-radius: 999px; padding: 7px 14px; font-size: 14.5px; }
-.quick button:active { background: var(--sunk); }
-.write { display: flex; align-items: flex-end; gap: 8px; background: var(--surface); border: 1px solid var(--line); border-radius: 22px; padding: 6px 6px 6px 16px; }
-.write:focus-within { border-color: var(--accent); }
-.write textarea { flex: 1; min-width: 0; border: 0; outline: 0; background: none; resize: none; font-size: 16px; line-height: 1.4; padding: 6px 0; max-height: 40dvh; }
-.send { flex: none; width: 36px; height: 36px; border-radius: 50%; border: 0; background: var(--accent); color: var(--on-accent); display: grid; place-items: center; }
-.send svg { width: 18px; height: 18px; }
-.send:disabled { background: var(--line); color: var(--muted); }
-/* 새 일 */
-#throw { gap: 12px; padding-top: 4px; }
-.field { background: var(--surface); border-radius: 16px; box-shadow: var(--shadow); padding: 12px 14px; display: flex; flex-direction: column; gap: 4px; }
-.field label { font-size: 12.5px; font-weight: 700; color: var(--muted); }
-.field select, .field textarea { width: 100%; border: 0; outline: 0; background: none; font-size: 16px; padding: 4px 0; }
-.field select { appearance: none; -webkit-appearance: none; background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='none' stroke='%23888' stroke-width='2'%3E%3Cpath d='m6 8 4 4 4-4'/%3E%3C/svg%3E") no-repeat right center / 20px; padding-right: 24px; }
-.field textarea { min-height: 140px; resize: none; }
-.big { background: var(--accent); border: 0; color: var(--on-accent); font-weight: 700; border-radius: 14px; padding: 14px; font-size: 16px; }
-.big:disabled { opacity: 0.45; }
-.hint { color: var(--muted); font-size: 13px; padding: 0 4px; }
-.toast { position: fixed; left: 50%; top: calc(14px + env(safe-area-inset-top, 0px)); transform: translateX(-50%); background: var(--ink); color: var(--bg); border-radius: 999px; padding: 9px 18px; font-size: 14.5px; font-weight: 600; z-index: 6; box-shadow: 0 6px 20px rgb(0 0 0 / 0.25); white-space: nowrap; }
+body { background: var(--bg); color: var(--ink); font: 16px/1.5 -apple-system, "SF Pro Text", "Apple SD Gothic Neo", system-ui, sans-serif; -webkit-text-size-adjust: 100%; overscroll-behavior-y: none; -webkit-font-smoothing: antialiased; }
+button, textarea, input { font: inherit; color: inherit; }
+button { cursor: pointer; border: 0; background: none; padding: 0; }
 [hidden] { display: none !important; }
+.app { max-width: 640px; margin: 0 auto; min-height: 100dvh; padding: 0 max(18px, env(safe-area-inset-right, 0px)) 0 max(18px, env(safe-area-inset-left, 0px)); }
+
+/* 위 막대: 화면 이름을 크게. 내리면 흐린 바탕으로 붙는다 */
+.top { position: sticky; top: 0; z-index: 5; margin: 0 -18px; padding: calc(12px + env(safe-area-inset-top, 0px)) 18px 10px; display: flex; align-items: center; gap: 10px; background: color-mix(in srgb, var(--bg) 86%, transparent); -webkit-backdrop-filter: saturate(1.6) blur(18px); backdrop-filter: saturate(1.6) blur(18px); }
+.top h1 { flex: 1; min-width: 0; margin: 0; font-size: 30px; font-weight: 800; letter-spacing: -0.02em; line-height: 1.15; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.top.small h1 { font-size: 17px; font-weight: 700; letter-spacing: -0.01em; text-align: center; }
+.top .back { display: flex; align-items: center; gap: 1px; color: var(--accent); font-size: 17px; padding: 6px 10px 6px 0; margin-left: -6px; }
+.top .back svg { width: 22px; height: 22px; }
+.top .side { width: 64px; flex: none; display: flex; justify-content: flex-end; }
+.conn { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 600; color: var(--muted); }
+.conn i { width: 8px; height: 8px; border-radius: 50%; background: var(--ok); box-shadow: 0 0 0 3px var(--ok-soft); }
+.conn.off i { background: var(--bad); box-shadow: none; }
+.banner { background: var(--surface); border: 1px solid var(--bad); color: var(--bad); border-radius: 14px; padding: 11px 14px; font-size: 14px; margin: 2px 0 12px; }
+
+.view { padding-bottom: calc(var(--bar) + 92px + env(safe-area-inset-bottom, 0px)); animation: in 0.18s ease-out; }
+@keyframes in { from { opacity: 0; transform: translateY(6px); } }
+@media (prefers-reduced-motion: reduce) { .view, .sheet, .pulse { animation: none !important; } }
+h2 { margin: 26px 2px 10px; font-size: 13px; font-weight: 700; color: var(--muted); letter-spacing: 0.01em; display: flex; align-items: baseline; gap: 6px; }
+h2 i { font-style: normal; font-weight: 500; color: var(--faint); }
+h2.mine { color: var(--wait); }
+.card { background: var(--surface); border-radius: 18px; box-shadow: var(--shadow); overflow: hidden; }
+
+/* 홈 맨 위의 요약: 지금 나를 기다리는 것이 몇 개인가 */
+.hero { padding: 18px 18px 16px; display: grid; grid-template-columns: 1fr auto; gap: 4px 12px; align-items: center; }
+.hero .big { font-size: 44px; font-weight: 800; letter-spacing: -0.03em; line-height: 1; color: var(--wait); font-variant-numeric: tabular-nums; }
+.hero.calm .big { color: var(--ok); }
+.hero .big, .hero .what { grid-column: 1; }
+.hero .what { font-size: 16px; font-weight: 700; margin-top: 6px; }
+.hero .rest { grid-column: 1 / -1; font-size: 13.5px; color: var(--muted); }
+.hero img { width: 72px; height: 72px; grid-row: 1 / 3; grid-column: 2; }
+.meters { grid-column: 1 / -1; display: grid; gap: 8px; margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--line); }
+.meter { display: grid; grid-template-columns: 74px 1fr 40px; align-items: center; gap: 10px; font-size: 12.5px; color: var(--muted); }
+.meter span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.meter b { font-weight: 700; color: var(--ink); text-align: right; font-variant-numeric: tabular-nums; }
+.meter i { height: 6px; border-radius: 3px; background: var(--sunk); overflow: hidden; display: block; }
+.meter i u { display: block; height: 100%; border-radius: 3px; background: var(--accent); }
+.meter.hot i u { background: var(--wait); }
+
+/* 나를 기다리는 세션: 무엇을 기다리는지까지 보인다 */
+.need { display: block; width: 100%; text-align: left; padding: 15px 16px; }
+.need + .need { border-top: 1px solid var(--line); }
+.need:active, .row:active { background: var(--sunk); }
+.need .name { display: flex; align-items: flex-start; gap: 10px; }
+.need .name b { flex: 1; min-width: 0; font-size: 16.5px; font-weight: 700; line-height: 1.35; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.need .meta { font-size: 13px; color: var(--muted); margin-top: 3px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.need .why { margin-top: 10px; background: var(--wait-soft); border-radius: 12px; padding: 9px 12px; font-size: 14.5px; line-height: 1.45; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+.pill { flex: none; font-size: 11.5px; font-weight: 700; border-radius: 999px; padding: 3px 9px; background: var(--sunk); color: var(--muted); white-space: nowrap; }
+.pill.mine { background: var(--wait-soft); color: var(--wait); }
+.pill.run { background: var(--accent-soft); color: var(--accent); }
+.row { display: grid; grid-template-columns: 10px 1fr auto; align-items: center; gap: 12px; width: 100%; text-align: left; padding: 13px 16px; min-height: 62px; }
+.row + .row { border-top: 1px solid var(--line); }
+.row b { display: block; font-weight: 600; font-size: 16px; line-height: 1.35; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.row small { display: block; color: var(--muted); font-size: 13px; margin-top: 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dot { width: 10px; height: 10px; border-radius: 50%; background: var(--line); }
+.dot.mine { background: var(--wait); }
+.dot.run { background: var(--accent); }
+.pulse { animation: pulse 1.6s ease-in-out infinite; }
+@keyframes pulse { 50% { opacity: 0.3; } }
+.chev { width: 16px; height: 16px; color: var(--faint); }
+.empty { text-align: center; color: var(--muted); font-size: 15px; padding: 44px 24px 20px; }
+.empty img { width: 132px; height: 132px; }
+.empty b { display: block; color: var(--ink); font-size: 18px; font-weight: 700; margin: 6px 0 4px; }
+.act { padding: 12px 16px; font-size: 14.5px; line-height: 1.45; overflow-wrap: anywhere; }
+.act + .act { border-top: 1px solid var(--line); }
+.act .kind { display: inline-block; font-size: 11.5px; font-weight: 700; border-radius: 6px; padding: 1px 7px; background: var(--sunk); color: var(--muted); margin-right: 8px; }
+.act small { display: block; color: var(--faint); font-size: 12px; margin-top: 3px; }
+.skel { height: 62px; border-radius: 18px; background: linear-gradient(90deg, var(--surface), var(--sunk), var(--surface)); background-size: 200% 100%; animation: skel 1.2s linear infinite; margin-top: 10px; }
+@keyframes skel { to { background-position: -200% 0; } }
+
+/* 아래 탭 막대와 가운데의 새 일 단추 */
+.tabs { position: fixed; z-index: 6; left: 0; right: 0; bottom: 0; padding: 0 max(10px, env(safe-area-inset-right, 0px)) env(safe-area-inset-bottom, 0px) max(10px, env(safe-area-inset-left, 0px)); background: color-mix(in srgb, var(--surface) 84%, transparent); -webkit-backdrop-filter: saturate(1.6) blur(22px); backdrop-filter: saturate(1.6) blur(22px); border-top: 1px solid var(--line); }
+.tabs nav { max-width: 640px; margin: 0 auto; height: var(--bar); display: grid; grid-template-columns: repeat(3, 1fr); align-items: center; }
+.tab { display: flex; flex-direction: column; align-items: center; gap: 3px; font-size: 10.5px; font-weight: 600; color: var(--faint); padding: 8px 0 6px; position: relative; }
+.tab svg { width: 24px; height: 24px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.tab.on { color: var(--accent); }
+.tab .badge { font-style: normal; position: absolute; top: 3px; left: calc(50% + 6px); min-width: 18px; height: 18px; border-radius: 9px; padding: 0 5px; background: var(--wait); color: #fff; font-size: 11px; font-weight: 800; line-height: 18px; text-align: center; }
+.plus { position: fixed; z-index: 7; right: max(18px, calc(50vw - 302px)); bottom: calc(var(--bar) + 16px + env(safe-area-inset-bottom, 0px)); height: 54px; padding: 0 20px 0 16px; border-radius: 27px; background: var(--accent); color: var(--on-accent); display: flex; align-items: center; gap: 8px; font-size: 16px; font-weight: 800; box-shadow: 0 8px 22px color-mix(in srgb, var(--accent) 45%, transparent); transition: transform 0.12s; }
+.plus:active { transform: scale(0.94); }
+.plus svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width: 2.4; stroke-linecap: round; }
+
+/* 세션 하나: 마지막 답과 답 쓰는 칸 */
+#one { padding-bottom: 0; min-height: calc(100dvh - 60px); display: flex; flex-direction: column; }
+.status { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--muted); padding: 0 2px 12px; min-width: 0; }
+.status span:last-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.bubble { background: var(--surface); border-radius: 18px 18px 18px 6px; box-shadow: var(--shadow); padding: 15px 17px; overflow-wrap: anywhere; font-size: 15.5px; line-height: 1.58; }
+.bubble.note { color: var(--muted); text-align: center; box-shadow: none; background: none; padding: 48px 16px; }
+.bubble p { margin: 0 0 11px; white-space: pre-wrap; }
+.bubble > :last-child { margin-bottom: 0; }
+.bubble ul { margin: 0 0 11px; padding-left: 20px; }
+.bubble li { margin-bottom: 3px; }
+.bubble h4 { margin: 14px 0 6px; font-size: 16.5px; }
+.bubble code { font: 13.5px/1.5 ui-monospace, "SF Mono", Menlo, monospace; background: var(--sunk); border-radius: 6px; padding: 1px 5px; }
+.bubble pre { margin: 0 0 11px; background: var(--sunk); border-radius: 12px; padding: 11px 13px; overflow-x: auto; -webkit-overflow-scrolling: touch; }
+.bubble pre code { background: none; padding: 0; white-space: pre; }
+.bubble .more { display: block; width: 100%; color: var(--accent); font-size: 14px; font-weight: 600; padding: 0 0 11px; margin-bottom: 11px; text-align: left; border-bottom: 1px solid var(--line); }
+.bubble .asked { margin-top: 13px; background: var(--wait-soft); border-radius: 13px; padding: 11px 13px; }
+.bubble .asked > :last-child { margin-bottom: 0; }
+.bubble .asked::before { content: attr(data-label); display: block; font-size: 12px; font-weight: 800; color: var(--wait); margin-bottom: 3px; }
+.grow { flex: 1; min-height: 14px; }
+.composer { position: sticky; bottom: 0; z-index: 4; margin: 0 -18px; padding: 10px 18px calc(10px + env(safe-area-inset-bottom, 0px)); background: color-mix(in srgb, var(--bg) 90%, transparent); -webkit-backdrop-filter: blur(18px); backdrop-filter: blur(18px); }
+.quick { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 9px; margin: 0 -18px; padding-left: 18px; padding-right: 18px; scrollbar-width: none; }
+.quick::-webkit-scrollbar { display: none; }
+.quick button, .chip { flex: none; background: var(--surface); border: 1px solid var(--line); border-radius: 999px; padding: 8px 15px; font-size: 14.5px; font-weight: 500; box-shadow: 0 1px 2px rgb(0 0 0 / 0.04); }
+.quick button:active, .chip:active { background: var(--sunk); }
+.chip.on { background: var(--accent); border-color: var(--accent); color: var(--on-accent); font-weight: 700; }
+.write { display: flex; align-items: flex-end; gap: 8px; background: var(--surface); border: 1px solid var(--line); border-radius: 24px; padding: 6px 6px 6px 17px; }
+.write:focus-within { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+.write textarea { flex: 1; min-width: 0; border: 0; outline: 0; background: none; resize: none; font-size: 16px; line-height: 1.4; padding: 7px 0; max-height: 38dvh; }
+.send { flex: none; width: 38px; height: 38px; border-radius: 50%; background: var(--accent); color: var(--on-accent); display: grid; place-items: center; transition: transform 0.12s, background 0.12s; }
+.send:active { transform: scale(0.92); }
+.send svg { width: 19px; height: 19px; }
+.send:disabled { background: var(--sunk); color: var(--faint); }
+
+/* 새 일: 아래에서 올라오는 판 */
+.veil { position: fixed; inset: 0; z-index: 8; background: rgb(0 0 0 / 0.42); animation: fade 0.18s ease-out; }
+@keyframes fade { from { opacity: 0; } }
+.sheet { position: fixed; z-index: 9; left: 0; right: 0; bottom: 0; max-width: 640px; margin: 0 auto; background: var(--bg); border-radius: 22px 22px 0 0; padding: 10px 18px calc(18px + env(safe-area-inset-bottom, 0px)); box-shadow: 0 -10px 40px rgb(0 0 0 / 0.25); animation: up 0.24s cubic-bezier(0.2, 0.8, 0.2, 1); max-height: 92dvh; overflow-y: auto; }
+@keyframes up { from { transform: translateY(100%); } }
+.sheet .grip { width: 38px; height: 5px; border-radius: 3px; background: var(--line); margin: 0 auto 12px; }
+.sheet .head { display: flex; align-items: center; margin-bottom: 14px; }
+.sheet .head b { flex: 1; font-size: 20px; font-weight: 800; letter-spacing: -0.01em; }
+.sheet .head button { color: var(--accent); font-size: 16px; padding: 4px 0 4px 12px; }
+.sheet label { display: block; font-size: 12.5px; font-weight: 700; color: var(--muted); margin: 0 2px 8px; }
+.places { display: flex; gap: 8px; overflow-x: auto; margin: 0 -18px 16px; padding: 0 18px 2px; scrollbar-width: none; }
+.places::-webkit-scrollbar { display: none; }
+.sheet textarea { display: block; width: 100%; min-height: 150px; border: 1px solid var(--line); outline: 0; background: var(--surface); border-radius: 16px; padding: 13px 15px; font-size: 16px; line-height: 1.5; resize: none; }
+.sheet textarea:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+.go { display: block; width: 100%; margin-top: 14px; background: var(--accent); color: var(--on-accent); font-weight: 800; font-size: 16.5px; border-radius: 16px; padding: 15px; transition: transform 0.12s, opacity 0.12s; }
+.go:active { transform: scale(0.985); }
+.go:disabled { opacity: 0.4; }
+.hint { color: var(--muted); font-size: 13px; text-align: center; margin-top: 10px; }
+.toast { position: fixed; left: 50%; top: calc(14px + env(safe-area-inset-top, 0px)); transform: translateX(-50%); background: var(--ink); color: var(--bg); border-radius: 999px; padding: 10px 19px; font-size: 14.5px; font-weight: 700; z-index: 12; box-shadow: 0 8px 24px rgb(0 0 0 / 0.3); white-space: nowrap; animation: in 0.18s ease-out; }
 </style>
 </head>
 <body>
 <div class="app">
-  <header>
+  <header class="top" id="top">
     <button type="button" id="back" class="back" hidden><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m12 4-6 6 6 6"/></svg><span id="back-text"></span></button>
-    <div class="titles" id="titles"><h1 id="title">Julgi</h1><p id="sub"></p></div>
-    <span class="live" id="live" role="img"></span>
+    <h1 id="title">Julgi</h1>
+    <div class="side"><span class="conn" id="conn"><i></i></span></div>
   </header>
-  <div id="stale" class="stale" hidden></div>
-  <main id="list"></main>
-  <main id="one" hidden>
+  <div id="banner" class="banner" hidden></div>
+  <main id="home" class="view"></main>
+  <main id="all" class="view" hidden></main>
+  <main id="acts" class="view" hidden></main>
+  <main id="one" class="view" hidden>
+    <div class="status" id="one-status"></div>
     <div class="bubble" id="one-reply"></div>
-    <div class="spacer"></div>
+    <div class="grow"></div>
     <form class="composer" id="answer">
       <div class="quick" id="quick"></div>
       <div class="write">
@@ -120,55 +187,68 @@ details.acts[open] summary::after { transform: rotate(90deg); }
       </div>
     </form>
   </main>
-  <main id="throw" hidden>
-    <form id="throw-form" style="display:contents">
-      <div class="field"><label for="throw-where" id="where-label"></label><select id="throw-where"></select></div>
-      <div class="field"><label for="throw-text" id="text-label"></label><textarea id="throw-text"></textarea></div>
-      <button type="submit" class="big" id="throw-send" disabled></button>
-      <div class="hint" id="throw-hint"></div>
-    </form>
-  </main>
 </div>
-<button type="button" class="fab" id="new"><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M10 4v12M4 10h12"/></svg><span id="new-text"></span></button>
+<div class="tabs" id="tabs">
+  <nav>
+    <button type="button" class="tab" data-tab="home"><svg viewBox="0 0 24 24"><path d="M4 11.5 12 5l8 6.5"/><path d="M6.5 10v8.5h11V10"/></svg><span id="tab-home"></span><i class="badge" id="badge" hidden></i></button>
+    <button type="button" class="tab" data-tab="all"><svg viewBox="0 0 24 24"><rect x="4" y="5" width="16" height="5" rx="1.5"/><rect x="4" y="14" width="16" height="5" rx="1.5"/></svg><span id="tab-all"></span></button>
+    <button type="button" class="tab" data-tab="acts"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/><path d="M12 7.5V12l3 2"/></svg><span id="tab-acts"></span></button>
+  </nav>
+</div>
+<button type="button" class="plus" id="new"><svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg><span id="new-text"></span></button>
+<div class="veil" id="veil" hidden></div>
+<form class="sheet" id="throw" hidden>
+  <div class="grip"></div>
+  <div class="head"><b id="throw-title"></b><button type="button" id="throw-close"></button></div>
+  <label id="where-label"></label>
+  <div class="places" id="places"></div>
+  <label for="throw-text" id="text-label"></label>
+  <textarea id="throw-text"></textarea>
+  <button type="submit" class="go" id="throw-send" disabled></button>
+  <div class="hint" id="throw-hint"></div>
+</form>
 <div class="toast" id="toast" role="status" hidden></div>
 <script>
 const $ = (id) => document.getElementById(id);
 // 글의 언어: 폰의 언어가 한국어면 한국어, 아니면 영어. 한국어 글이 원문이고 사전의 열쇠다. 값의 자리는 {0}
 const KO = /^ko/i.test(navigator.language || "");
 const EN = {
-  "목록으로": "Back to list", "목록": "List", "연결됨": "Connected", "연결 끊김": "Disconnected",
+  "뒤로": "Back", "연결됨": "Connected", "연결 끊김": "Offline",
+  "홈": "Home", "세션": "Sessions", "한 일": "Activity", "새 일": "New task", "닫기": "Close",
   "답 쓰기": "Write a reply", "이 세션에 보낼 답": "Reply to send to this session", "보내기": "Send",
-  "어디서": "Where", "시킬 일": "Task", "예: 로그인 실패 로그 원인 찾아줘": "e.g. Find the cause of the login failure logs",
+  "어디서": "Where", "시킬 일": "What to do", "예: 로그인 실패 로그 원인 찾아줘": "e.g. Find the cause of the login failure logs",
   "새 세션으로 던지기": "Send to a new session",
-  "고른 폴더에서 새 세션이 열리고, 답이 오면 목록의 내 차례로 올라온다.": "A new session opens in the chosen folder. When a reply arrives, it moves up to My turn in the list.",
-  "새 일": "New task", "묻는 말": "Question",
-  "방금": "just now", "{0}분 전": "{0}m ago", "{0}시간 전": "{0}h ago", "{0}일 전": "{0}d ago",
+  "고른 폴더에서 새 세션이 열리고, 답이 오면 홈에 올라온다.": "A new session opens in the chosen folder. Its reply shows up on Home.",
+  "묻는 말": "Question", "방금": "just now", "{0}분 전": "{0}m ago", "{0}시간 전": "{0}h ago", "{0}일 전": "{0}d ago",
   "응, 진행해": "Yes, go ahead", "계속해": "Continue", "아니, 멈춰": "No, stop", "다시 설명해 줘": "Explain again",
   "앞의 {0}줄 더 보기": "Show {0} earlier lines", "읽는 중": "Loading",
   "일하는 중이다. 답이 오면 여기에 뜬다.": "Working. The reply will appear here.",
   "마지막 답을 읽지 못했다.": "Could not read the last reply.", "읽지 못했다.": "Could not read it.",
   "맥의 Julgi가 {0}부터 응답하지 않는다.": "Julgi on the Mac stopped responding {0}.",
   "맥의 Julgi에서 아직 상태를 받지 못했다.": "No status from Julgi on the Mac yet.",
-  "내 차례 {0}": "My turn {0}", "기다리는 세션 없음": "No sessions waiting", "일하는 중 {0}": "Working {0}",
-  "세션": "Session", "이 세션은 닫혔다": "This session is closed",
-  "내 차례": "My turn", "일하는 중": "Working", "열려 있음": "Open", "확인이 필요함": "Needs confirmation",
+  "나를 기다리는 세션": "sessions waiting on me", "나를 기다리는 것이 없다": "Nothing is waiting on me",
+  "일하는 중 {0}": "{0} working", "열려 있음 {0}": "{0} open", "봇이 오늘 {0}번 대신 답함": "bots answered {0} times today",
+  "내 차례": "My turn", "일하는 중": "Working", "열려 있음": "Open", "확인이 필요함": "Needs confirmation", "답을 기다림": "Waiting for my reply",
+  "이 세션은 닫혔다": "This session is closed",
   "열려 있는 세션이 없다": "No open sessions", "새 일을 던지면 맥에서 세션이 열린다.": "Send a new task and a session opens on the Mac.",
-  "Julgi가 방금 한 일 {0}": "What Julgi just did {0}",
+  "세션이 물음을 남기면 여기에 올라온다.": "When a session leaves a question, it shows up here.",
+  "Julgi가 알아서 한 일": "What Julgi did on its own", "아직 한 일이 없다": "Nothing yet",
   "토큰이 맞지 않는다. 맥의 Julgi 설정(⌘,)에 나온 주소로 다시 연다.": "The token does not match. Reopen with the address shown in Julgi's settings (⌘,) on the Mac.",
   "보냈다": "Sent", "보내지 못했다": "Could not send",
   "던졌다. 곧 세션이 열린다": "Sent. A session will open soon", "던지지 못했다": "Could not send",
 };
 const T = (ko, ...vals) => ((KO ? ko : EN[ko]) ?? ko).replace(/\{(\d+)\}/g, (_, i) => String(vals[i] ?? ""));
 document.documentElement.lang = KO ? "ko" : "en";
-$("back").setAttribute("aria-label", T("목록으로")); $("back-text").textContent = T("목록");
-$("live").setAttribute("aria-label", T("연결됨"));
+$("back").setAttribute("aria-label", T("뒤로")); $("back-text").textContent = T("뒤로");
+$("tab-home").textContent = T("홈"); $("tab-all").textContent = T("세션"); $("tab-acts").textContent = T("한 일");
+$("new-text").textContent = T("새 일");
 $("answer-text").placeholder = T("답 쓰기"); $("answer-text").setAttribute("aria-label", T("이 세션에 보낼 답"));
 $("answer-send").setAttribute("aria-label", T("보내기"));
+$("throw-title").textContent = T("새 일"); $("throw-close").textContent = T("닫기");
 $("where-label").textContent = T("어디서"); $("text-label").textContent = T("시킬 일");
 $("throw-text").placeholder = T("예: 로그인 실패 로그 원인 찾아줘");
 $("throw-send").textContent = T("새 세션으로 던지기");
-$("throw-hint").textContent = T("고른 폴더에서 새 세션이 열리고, 답이 오면 목록의 내 차례로 올라온다.");
-$("new-text").textContent = T("새 일");
+$("throw-hint").textContent = T("고른 폴더에서 새 세션이 열리고, 답이 오면 홈에 올라온다.");
 // 토큰은 주소로 받아 이 브라우저에도 둔다. 주소에서는 지우지 않는다: 홈 화면에 추가한 아이콘은
 // 저장 공간이 따로라서, 주소에 토큰이 남아 있어야 그 아이콘으로 다시 들어올 수 있다
 let token = new URLSearchParams(location.search).get("t") || "";
@@ -177,14 +257,17 @@ const api = (path, body) => fetch(path, { method: body ? "POST" : "GET", headers
 const ago = (ms) => { const s = Math.max(0, (Date.now() - ms) / 1000); return s < 60 ? T("방금") : s < 3600 ? T("{0}분 전", Math.floor(s / 60)) : s < 86400 ? T("{0}시간 전", Math.floor(s / 3600)) : T("{0}일 전", Math.floor(s / 86400)); };
 const el = (tag, cls, text) => { const n = document.createElement(tag); if (cls) n.className = cls; if (text !== undefined) n.textContent = text; return n; };
 const store = { get: (k) => { try { return sessionStorage.getItem(k) || ""; } catch (e) { return ""; } }, set: (k, v) => { try { v ? sessionStorage.setItem(k, v) : sessionStorage.removeItem(k); } catch (e) {} } };
-let state = { sessions: [], folders: [], acts: [], at: 0 };
-let view = "list", picked = "", shownFor = "", whole = false;
+let state = null; // 처음 받기 전에는 뼈대만 그린다
+let view = "home", picked = "", shownFor = "", whole = false, where = "";
 let toastTimer = 0;
 const toast = (text) => { $("toast").textContent = text; $("toast").hidden = false; clearTimeout(toastTimer); toastTimer = setTimeout(() => ($("toast").hidden = true), 2200); };
 const mine = (s) => s.state === "wait" || s.state === "ask";
 const busy = (s) => s.state === "run" || s.state === "hold";
-const GO = '<svg class="go" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m8 4 6 6-6 6"/></svg>';
+const kindOf = (s) => (mine(s) ? "mine" : busy(s) ? "run" : "");
+const CHEV = '<svg class="chev" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m8 4 6 6-6 6"/></svg>';
 const QUICK = [T("응, 진행해"), T("계속해"), T("아니, 멈춰"), T("다시 설명해 줘")];
+const metaOf = (s) => [s.repo, s.since ? ago(s.since) : "", s.changed].filter(Boolean).join(" · ");
+const pill = (s) => el("span", "pill " + kindOf(s), s.state === "ask" ? T("확인이 필요함") : s.label || T("열려 있음"));
 
 /** 답 글을 화면에 쓸 조각으로: 코드 울타리, 제목, 목록, 문단. 글자는 전부 textContent로만 넣는다 */
 function inline(node, text) {
@@ -241,80 +324,127 @@ function loadReply(s) {
   const first = !shownFor.startsWith(s.key + "|");
   shownFor = stamp;
   const box = $("one-reply");
-  if (first) { box.className = "bubble wait-for"; box.textContent = T("읽는 중"); }
+  if (first) { box.className = "bubble note"; box.textContent = T("읽는 중"); }
   if (!s.id) return;
   api("/api/reply?id=" + encodeURIComponent(s.id)).then(({ text }) => {
     if (picked !== s.key) return;
-    if (!text) { box.className = "bubble wait-for"; box.textContent = busy(s) ? T("일하는 중이다. 답이 오면 여기에 뜬다.") : T("마지막 답을 읽지 못했다."); return; }
+    if (!text) { box.className = "bubble note"; box.textContent = busy(s) ? T("일하는 중이다. 답이 오면 여기에 뜬다.") : T("마지막 답을 읽지 못했다."); return; }
     paintReply(text);
     if (first) window.scrollTo(0, document.body.scrollHeight);
-  }, () => { shownFor = ""; if (first) { box.className = "bubble wait-for"; box.textContent = T("읽지 못했다."); } });
+  }, () => { shownFor = ""; if (first) { box.className = "bubble note"; box.textContent = T("읽지 못했다."); } });
 }
-const metaOf = (s) => [s.repo, s.since ? ago(s.since) : "", s.changed].filter(Boolean).join(" · ");
 
+const TABS = ["home", "all", "acts"];
 function show(next, key, fromHistory) {
   if (view === "one" && picked) store.set("draft:" + picked, $("answer-text").value);
-  view = next; picked = key || ""; shownFor = ""; whole = false;
-  if (!fromHistory) { const hash = view === "list" ? "" : view === "one" ? "#s=" + encodeURIComponent(picked) : "#new"; if (view === "list") history.replaceState(null, "", location.pathname + location.search); else history.pushState(null, "", location.pathname + location.search + hash); }
-  $("list").hidden = view !== "list"; $("one").hidden = view !== "one"; $("throw").hidden = view !== "throw";
-  $("back").hidden = view === "list"; $("new").hidden = view !== "list";
-  $("titles").classList.toggle("small", view !== "list");
-  if (view === "throw") {
-    $("throw-where").replaceChildren(...state.folders.map((f) => { const o = el("option", "", f.repo); o.value = f.cwd; return o; }));
-    const last = store.get("where"); if (last && state.folders.some((f) => f.cwd === last)) $("throw-where").value = last;
+  const sheet = next === "throw";
+  if (!sheet) { view = next; picked = key || ""; shownFor = ""; whole = false; }
+  if (!fromHistory) {
+    const hash = sheet ? "#new" : view === "one" ? "#s=" + encodeURIComponent(picked) : view === "home" ? "" : "#" + view;
+    const url = location.pathname + location.search + hash;
+    // 탭 사이는 기록을 쌓지 않는다. 세션 하나와 새 일만 뒤로 가기로 닫힌다
+    if (sheet || view === "one") history.pushState(null, "", url); else history.replaceState(null, "", url);
   }
-  if (view === "one") { $("answer-text").value = store.get("draft:" + picked); grow($("answer-text")); $("answer-send").disabled = !$("answer-text").value.trim(); $("quick").replaceChildren(...QUICK.map((q) => { const b = el("button", "", q); b.type = "button"; b.addEventListener("click", () => { const t = $("answer-text"); t.value = q; grow(t); $("answer-send").disabled = false; t.focus(); }); return b; })); }
+  $("throw").hidden = $("veil").hidden = !sheet;
+  if (sheet) { paintPlaces(); setTimeout(() => $("throw-text").focus(), 260); return; }
+  for (const id of [...TABS, "one"]) $(id).hidden = view !== id;
+  $("back").hidden = view !== "one"; $("tabs").hidden = $("new").hidden = view === "one";
+  $("top").classList.toggle("small", view === "one");
+  for (const b of document.querySelectorAll(".tab")) b.classList.toggle("on", b.dataset.tab === view);
+  if (view === "one") {
+    $("answer-text").value = store.get("draft:" + picked); grow($("answer-text")); $("answer-send").disabled = !$("answer-text").value.trim();
+    $("quick").replaceChildren(...QUICK.map((q) => { const b = el("button", "", q); b.type = "button"; b.addEventListener("click", () => send(q)); return b; }));
+  }
   paint();
   window.scrollTo(0, 0);
 }
+function paintPlaces() {
+  const folders = (state && state.folders) || [];
+  const last = store.get("where");
+  if (!folders.some((f) => f.cwd === where)) where = folders.some((f) => f.cwd === last) ? last : (folders[0] || {}).cwd || "";
+  $("places").replaceChildren(...folders.map((f) => { const b = el("button", "chip" + (f.cwd === where ? " on" : ""), f.repo); b.type = "button"; b.addEventListener("click", () => { where = f.cwd; paintPlaces(); }); return b; }));
+  $("throw-send").disabled = !$("throw-text").value.trim() || !where;
+}
 
+const rowOf = (s) => {
+  const b = el("button", "row"); b.type = "button";
+  const text = el("span"); text.append(el("b", "", s.name), el("small", "", metaOf(s)));
+  b.append(el("span", "dot " + kindOf(s) + (busy(s) ? " pulse" : "")), text, pill(s));
+  b.addEventListener("click", () => show("one", s.key));
+  return b;
+};
+const section = (title, cls, rows, make) => {
+  if (!rows.length) return [];
+  const head = el("h2", cls, title); head.append(el("i", "", String(rows.length)));
+  const card = el("div", "card"); card.append(...rows.map(make));
+  return [head, card];
+};
+function paintHome() {
+  const all = state.sessions, waiting = all.filter(mine), running = all.filter(busy);
+  const hero = el("div", "card hero" + (waiting.length ? "" : " calm"));
+  hero.append(el("div", "big", waiting.length ? String(waiting.length) : "0"));
+  if (!waiting.length) { const img = el("img"); img.src = "/mascot.png"; img.alt = ""; hero.append(img); }
+  hero.append(el("div", "what", waiting.length ? T("나를 기다리는 세션") : T("나를 기다리는 것이 없다")));
+  const rest = [running.length ? T("일하는 중 {0}", running.length) : "", T("열려 있음 {0}", all.length), state.botRuns ? T("봇이 오늘 {0}번 대신 답함", state.botRuns) : ""].filter(Boolean).join(" · ");
+  hero.append(el("div", "rest", rest));
+  if (state.usage && state.usage.length) {
+    const meters = el("div", "meters");
+    for (const u of state.usage.slice(0, 3)) {
+      const m = el("div", "meter" + (u.used >= 80 ? " hot" : "")); const bar = el("i"); const fill = el("u"); fill.style.width = Math.min(100, Math.max(0, u.used)) + "%"; bar.append(fill);
+      m.append(el("span", "", u.name), bar, el("b", "", Math.round(u.used) + "%")); meters.append(m);
+    }
+    hero.append(meters);
+  }
+  const nodes = [hero];
+  nodes.push(...section(T("내 차례"), "mine", waiting, (s) => {
+    const b = el("button", "need"); b.type = "button";
+    const name = el("div", "name"); name.append(el("b", "", s.name)); name.insertAdjacentHTML("beforeend", CHEV);
+    b.append(name, el("div", "meta", [s.state === "ask" ? T("확인이 필요함") : T("답을 기다림"), metaOf(s)].join(" · ")));
+    if (s.why) b.append(el("div", "why", s.why));
+    b.addEventListener("click", () => show("one", s.key));
+    return b;
+  }));
+  nodes.push(...section(T("일하는 중"), "", running, rowOf));
+  if (!all.length) { const none = el("div", "empty"); none.append(el("b", "", T("열려 있는 세션이 없다")), document.createTextNode(T("새 일을 던지면 맥에서 세션이 열린다."))); nodes.push(none); }
+  else if (!waiting.length && !running.length) nodes.push(el("div", "empty", T("세션이 물음을 남기면 여기에 올라온다.")));
+  $("home").replaceChildren(...nodes);
+}
+function paintAll() {
+  const s = state.sessions;
+  const nodes = [...section(T("내 차례"), "mine", s.filter(mine), rowOf), ...section(T("일하는 중"), "", s.filter(busy), rowOf), ...section(T("열려 있음"), "", s.filter((x) => !mine(x) && !busy(x)), rowOf)];
+  if (!s.length) { const none = el("div", "empty"); const img = el("img"); img.src = "/mascot.png"; img.alt = ""; none.append(img, el("b", "", T("열려 있는 세션이 없다")), document.createTextNode(T("새 일을 던지면 맥에서 세션이 열린다."))); nodes.push(none); }
+  $("all").replaceChildren(...nodes);
+}
+function paintActs() {
+  const acts = state.acts || [];
+  const nodes = [];
+  if (acts.length) {
+    const card = el("div", "card"); card.style.marginTop = "6px";
+    for (const a of acts) { const row = el("div", "act"); row.append(el("span", "kind", a.kind), document.createTextNode(a.text), el("small", "", ago(a.at))); card.append(row); }
+    nodes.push(card);
+  } else nodes.push(el("div", "empty", T("아직 한 일이 없다")));
+  $("acts").replaceChildren(...nodes);
+}
 function paint() {
-  const old = Date.now() - state.at > 12000;
-  $("live").classList.toggle("off", old);
-  $("live").setAttribute("aria-label", old ? T("연결 끊김") : T("연결됨"));
-  if (!$("stale").dataset.auth) { $("stale").hidden = !old; if (old) $("stale").textContent = state.at ? T("맥의 Julgi가 {0}부터 응답하지 않는다.", ago(state.at)) : T("맥의 Julgi에서 아직 상태를 받지 못했다."); }
-  const waiting = state.sessions.filter(mine).length, running = state.sessions.filter(busy).length;
-  if (view === "list") { $("title").textContent = "Julgi"; $("sub").textContent = state.sessions.length ? [waiting ? T("내 차례 {0}", waiting) : T("기다리는 세션 없음"), running ? T("일하는 중 {0}", running) : ""].filter(Boolean).join(" · ") : ""; document.title = waiting ? `(${waiting}) Julgi` : "Julgi"; }
-  if (view === "throw") { $("title").textContent = T("새 일"); $("sub").textContent = ""; }
+  const old = !state || Date.now() - state.at > 12000;
+  $("conn").classList.toggle("off", old);
+  $("conn").setAttribute("aria-label", old ? T("연결 끊김") : T("연결됨"));
+  if (!$("banner").dataset.auth) { $("banner").hidden = !state || !old; if (state && old) $("banner").textContent = state.at ? T("맥의 Julgi가 {0}부터 응답하지 않는다.", ago(state.at)) : T("맥의 Julgi에서 아직 상태를 받지 못했다."); }
+  $("title").textContent = view === "home" ? "Julgi" : view === "all" ? T("세션") : view === "acts" ? T("한 일") : "";
+  if (!state) { if (view !== "one") $(view).replaceChildren(el("div", "skel"), el("div", "skel"), el("div", "skel")); return; }
+  const waiting = state.sessions.filter(mine).length;
+  $("badge").hidden = !waiting; $("badge").textContent = String(waiting);
+  document.title = waiting ? `(${waiting}) Julgi` : "Julgi";
   if (view === "one") {
     const s = state.sessions.find((x) => x.key === picked);
     $("title").textContent = s ? s.name : T("세션");
-    $("sub").textContent = s ? [s.label, metaOf(s)].filter(Boolean).join(" · ") : T("이 세션은 닫혔다");
+    $("one-status").replaceChildren(...(s ? [pill(s), el("span", "", metaOf(s))] : [el("span", "", T("이 세션은 닫혔다"))]));
     if (s) loadReply(s);
-    return;
-  }
-  if (view !== "list") return;
-  const groups = [[T("내 차례"), mine, "mine"], [T("일하는 중"), busy, "run"], [T("열려 있음"), (s) => !mine(s) && !busy(s), ""]];
-  const nodes = [];
-  for (const [title, test, cls] of groups) {
-    const rows = state.sessions.filter(test);
-    if (!rows.length) continue;
-    const head = el("div", "group " + cls, title); head.append(el("i", "", String(rows.length))); nodes.push(head);
-    const card = el("div", "card");
-    for (const s of rows) {
-      const b = el("button", "row " + cls); b.type = "button";
-      const text = el("span"); const small = el("small");
-      if (s.state === "ask") small.append(el("em", "", T("확인이 필요함")), document.createTextNode(" · "));
-      small.append(document.createTextNode(metaOf(s)));
-      text.append(el("b", "", s.name), small);
-      b.append(el("span", "dot"), text); b.insertAdjacentHTML("beforeend", GO);
-      b.addEventListener("click", () => show("one", s.key));
-      card.append(b);
-    }
-    nodes.push(card);
-  }
-  if (!state.sessions.length) { const none = el("div", "none"); none.append(el("b", "", T("열려 있는 세션이 없다")), document.createTextNode(T("새 일을 던지면 맥에서 세션이 열린다."))); nodes.push(none); }
-  if (state.acts && state.acts.length) {
-    const box = el("details", "acts"); box.open = store.get("acts") === "1";
-    box.addEventListener("toggle", () => store.set("acts", box.open ? "1" : ""));
-    box.append(el("summary", "", T("Julgi가 방금 한 일 {0}", state.acts.length)));
-    const card = el("div", "card");
-    for (const a of state.acts) { const row = el("div", "act"); row.append(el("i", "", a.kind), document.createTextNode(a.text + " · " + ago(a.at))); card.append(row); }
-    box.append(card); nodes.push(box);
-  }
-  $("list").replaceChildren(...nodes);
+  } else if (view === "home") paintHome();
+  else if (view === "all") paintAll();
+  else paintActs();
 }
-const pull = () => api("/api/state").then((s) => { delete $("stale").dataset.auth; if (s && s.sessions) state = s; paint(); }, (code) => { if (code === 401) { $("stale").dataset.auth = "1"; $("stale").hidden = false; $("live").classList.add("off"); $("stale").textContent = T("토큰이 맞지 않는다. 맥의 Julgi 설정(⌘,)에 나온 주소로 다시 연다."); } else paint(); });
+const pull = () => api("/api/state").then((s) => { delete $("banner").dataset.auth; if (s && s.sessions) state = s; paint(); }, (code) => { if (code === 401) { $("banner").dataset.auth = "1"; $("banner").hidden = false; $("conn").classList.add("off"); $("banner").textContent = T("토큰이 맞지 않는다. 맥의 Julgi 설정(⌘,)에 나온 주소로 다시 연다."); } else paint(); });
 
 const grow = (t) => { t.style.height = "auto"; t.style.height = t.scrollHeight + "px"; };
 function send(text) {
@@ -325,19 +455,29 @@ function send(text) {
 }
 $("answer-text").addEventListener("input", (e) => { grow(e.target); $("answer-send").disabled = !e.target.value.trim(); });
 $("answer").addEventListener("submit", (e) => { e.preventDefault(); send($("answer-text").value.trim()); });
-$("throw-text").addEventListener("input", (e) => ($("throw-send").disabled = !e.target.value.trim()));
-$("throw-form").addEventListener("submit", (e) => {
+$("throw-text").addEventListener("input", (e) => ($("throw-send").disabled = !e.target.value.trim() || !where));
+$("throw").addEventListener("submit", (e) => {
   e.preventDefault();
-  const text = $("throw-text").value.trim(), where = $("throw-where").value;
+  const text = $("throw-text").value.trim();
   if (!text || !where) return;
   $("throw-send").disabled = true; store.set("where", where);
   api("/api/new", { target: where, text }).then(() => { $("throw-text").value = ""; toast(T("던졌다. 곧 세션이 열린다")); history.back(); }, () => { toast(T("던지지 못했다")); $("throw-send").disabled = false; });
 });
 $("back").addEventListener("click", () => history.back());
+$("throw-close").addEventListener("click", () => history.back());
+$("veil").addEventListener("click", () => history.back());
 $("new").addEventListener("click", () => show("throw"));
-// 폰의 뒤로 가기(스와이프)가 목록으로 돌아가게, 화면을 주소의 # 뒤에 적는다
-const route = () => { const h = location.hash; if (h.startsWith("#s=")) show("one", decodeURIComponent(h.slice(3)), true); else if (h === "#new") show("throw", "", true); else show("list", "", true); };
+for (const b of document.querySelectorAll(".tab")) b.addEventListener("click", () => show(b.dataset.tab));
+// 폰의 뒤로 가기(스와이프)가 세션 하나와 새 일 판을 닫게, 화면을 주소의 # 뒤에 적는다
+const route = () => {
+  const h = location.hash;
+  if (h === "#new") return show("throw", "", true);
+  $("throw").hidden = $("veil").hidden = true;
+  if (h.startsWith("#s=")) show("one", decodeURIComponent(h.slice(3)), true);
+  else show(TABS.includes(h.slice(1)) ? h.slice(1) : view === "one" ? "home" : view, "", true);
+};
 window.addEventListener("popstate", route);
+paint();
 pull().then(route, route);
 setInterval(pull, 3000);
 document.addEventListener("visibilitychange", () => { if (!document.hidden) pull(); });

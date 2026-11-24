@@ -1519,6 +1519,8 @@ export default function App() {
   const [load, setLoad] = useState<Record<string, [number, number]>>({});
   const loadRef = useRef<{ at: number; rows: Record<string, [number, number]>; sleptAt: number }>({ at: 0, rows: {}, sleptAt: 0 });
   const [usage, setUsage] = useState<{ name: string; used: number; resets: number }[] | null>(null);
+  const usageRef = useRef(usage);
+  usageRef.current = usage;
   const [usageWhy, setUsageWhy] = useState("");
   const [loadOpen, setLoadOpen] = useState(false);
   const readLoad = () =>
@@ -1559,11 +1561,11 @@ export default function App() {
       .map((o) => {
         const st = states[o.key];
         const ch = changesRef.current[o.cwd];
-        return { key: o.key, id: o.sessionId, name: nameOf(o.key), repo: repoOf(o.cwd), state: st?.state ?? "", label: STATE_LABEL[st?.state ?? ""] ?? tr("열려 있음"), since: st?.since ?? 0, changed: ch && ch.by === o.sessionId && ch.files ? tr`파일 ${ch.files} +${ch.adds} −${ch.dels}` : "" };
+        return { key: o.key, id: o.sessionId, name: nameOf(o.key), repo: repoOf(o.cwd), state: st?.state ?? "", label: STATE_LABEL[st?.state ?? ""] ?? tr("열려 있음"), since: st?.since ?? 0, why: (o.sessionId && triaged.current[o.sessionId]?.since === st?.since && triaged.current[o.sessionId]?.why) || "", changed: ch && ch.by === o.sessionId && ch.files ? tr`파일 ${ch.files} +${ch.adds} −${ch.dels}` : "" };
       })
       .sort((a, b) => a.since - b.since);
     const places = [...(base ? [{ repo: tr`기본 폴더 · ${repoOf(base)}`, cwd: base }] : []), ...folders.slice(0, 40).map((f) => ({ repo: f.repo, cwd: f.cwd }))];
-    void invoke("remote_publish", { state: JSON.stringify({ at: Date.now(), sessions, folders: places, acts: acts.slice(-10).reverse().map((a) => ({ at: a.at, kind: a.kind, text: a.text.slice(0, 140) })) }) });
+    void invoke("remote_publish", { state: JSON.stringify({ at: Date.now(), sessions, folders: places, acts: acts.slice(-30).reverse().map((a) => ({ at: a.at, kind: tr(a.kind), text: a.text.slice(0, 160) })), usage: config.usage ? (usageRef.current ?? []).map((u) => ({ name: u.name, used: u.used })) : [], botRuns: acts.filter((a) => a.kind === "대신 답함" && new Date(a.at).toDateString() === new Date().toDateString()).length }) }); // i18n-ok
   };
   const setConfig = (key: keyof typeof config, value: string | number | boolean) => {
     Object.assign(config, { [key]: value });
