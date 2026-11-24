@@ -9,6 +9,7 @@ import { CORE, MORE } from "./Help";
 import { getLang, resolveLang, tr } from "./i18n";
 import { argoHost, argoLoginCommand } from "./argo";
 import { Bot } from "./triageAsk.ts";
+import BotFace, { faceSeed, shrinkImage } from "./BotFace";
 
 type Key = keyof typeof config;
 type Props = {
@@ -466,6 +467,10 @@ export default function Settings({ onChange, onClose, remoteUrl, onConnect, onCo
                           return (
                             <div key={b.id} className={"set-bot" + (b.on ? " on" : "")}>
                               <div className="set-bot-head">
+                                <label className="set-bot-face" title={tr("누르면 얼굴 그림을 고른다. ⌥를 누른 채 누르면 그림을 빼고 Julgi가 그리는 다른 얼굴로 바꾼다")} onClick={(e) => e.altKey && (e.preventDefault(), put({ image: undefined, face: Math.floor(Math.random() * 1e6) }))}>
+                                  <BotFace seed={b.face ?? faceSeed(b.id)} size={36} image={b.image} />
+                                  <input type="file" accept="image/*" tabIndex={-1} hidden onChange={(e) => e.target.files?.[0] && void shrinkImage(e.target.files[0]).then((image) => put({ image })).catch(() => {})} />
+                                </label>
                                 <input tabIndex={-1} className="set-bot-name" value={b.name} placeholder={tr("봇 이름")} spellCheck={false} onChange={(e) => put({ name: e.target.value })} />
                                 <span className="set-note">{tr`${b.runs}번 답함`}</span>
                                 <button type="button" tabIndex={-1} className={"set-toggle" + (b.on ? " on" : "")} onClick={() => put({ on: !b.on })}>

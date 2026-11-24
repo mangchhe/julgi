@@ -10,7 +10,8 @@ export const triagePrompt = (said: string, reply: string, bots: string[] = []) =
   `사용자가 시킨 말:\n${said.slice(0, 600)}\n\n에이전트의 마지막 답(끝부분):\n${reply.slice(-2800)}\n${bots.length ? `\n등록된 봇 (번호. 상황):\n${bots.map((when, i) => `${i + 1}. ${when.slice(0, 300)}`).join("\n")}\n` : ""}`;
 
 /** 봇: 세션이 답을 끝냈을 때 그 답이 when의 상황이면 Julgi가 say를 대신 보낸다 */
-export type Bot = { id: string; name: string; when: string; say: string; on: boolean; runs: number };
+/** face: 얼굴을 그리는 씨앗 숫자. 없으면 id에서 낸다. image가 있으면 그 그림을 쓴다 */
+export type Bot = { id: string; name: string; when: string; say: string; on: boolean; runs: number; face?: number; /** 내가 고른 얼굴 그림 (작게 줄인 data URL) */ image?: string };
 /** 처음에 넣어 두는 봇. 둘 다 꺼 둔다. 이름과 글은 설정에서 고친다 */
 export const DEFAULT_BOTS: Bot[] = [
   { id: "go", name: "진행 물음에 답하기", when: "에이전트가 스스로 내놓은 다음 단계나 방금 설명한 계획을 그대로 진행해도 되는지만 묻고 멈췄다", say: "응, 진행해. 푸시, 머지, 배포, 삭제처럼 되돌리기 어려운 일은 하기 전에 물어봐.", on: false, runs: 0 },

@@ -231,4 +231,5 @@ export default {
   "이 말을 보낸다": "send this",
   "예: 커밋해 줘": "e.g. commit it",
   "+ 봇 더하기": "+ Add a bot",
+  "누르면 얼굴 그림을 고른다. ⌥를 누른 채 누르면 그림을 빼고 Julgi가 그리는 다른 얼굴로 바꾼다": "Click to choose a picture for the face. ⌥-click removes it and switches to another face drawn by Julgi",
 } as Record<string, string>;
