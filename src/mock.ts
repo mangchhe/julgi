@@ -145,7 +145,7 @@ async function invoke(cmd: string, args: Record<string, unknown> = {}): Promise<
     case "glab_status":
       return [true, ""];
     case "repo_slug":
-      return "example/acme-api";
+      return flags.has("lab") ? "gitlab:gitlab.com/acme/acme-api" : "example/acme-api";
     case "pr_view":
       return JSON.stringify({
         number: 1852, title: "쿠폰 여러 장일 때 환불액 1원 어긋남 수정", body: "## 무엇을\n쿠폰마다 따로 반올림한 뒤 더한다.\n\n## 확인\n- RefundCalculatorTest 추가", author: { login: "me" },
@@ -194,10 +194,20 @@ async function invoke(cmd: string, args: Record<string, unknown> = {}): Promise<
       const run = (id: string, title: string, name: string, branch: string, state: string, min: number) => ({ repo: args.repo, id, title, name, branch, state, started: new Date(Date.now() - (min + 4) * 60_000).toISOString(), at: new Date(Date.now() - min * 60_000).toISOString(), url: `https://github.com/${args.repo}/actions/runs/${id}` });
       return String(args.repo).endsWith("acme-api") ? [run("9001", "쿠폰 여러 장일 때 환불액 1원 어긋남 수정", "Deploy", "main", "run", 0), run("9000", "쿠폰 여러 장일 때 환불액 1원 어긋남 수정", "CI", "main", "fail", 6), run("8990", "정산 배치 재시도 간격을 설정으로", "Deploy", "main", "ok", 190)] : [];
     }
-    case "ci_jobs":
+    case "ci_jobs": {
+      // 읽는 데 걸리는 시간을 흉내 낸다. 기억해 둔 것은 이 기다림 없이 바로 뜬다
+      await new Promise((r) => setTimeout(r, 900));
+      if (flags.has("lab")) {
+        const ago = (sec: number) => new Date(Date.now() - sec * 1000).toISOString();
+        const j = (id: string, name: string, stage: string, state: string, from: number, to: number) => ({ id, name, stage, state, started: from ? ago(from) : "", finished: to ? ago(to) : "" });
+        return args.id === "9000"
+          ? [j("1", "lint", "check", "ok", 600, 560), j("2", "typecheck", "check", "ok", 600, 540), j("3", "unit-test", "test", "fail", 540, 380), j("4", "integration-test", "test", "ok", 540, 330), j("5", "build-image", "build", "skip", 0, 0), j("6", "deploy-staging", "deploy", "skip", 0, 0), j("7", "deploy-production", "deploy", "skip", 0, 0)]
+          : [j("1", "lint", "check", "ok", 400, 360), j("2", "typecheck", "check", "ok", 400, 350), j("3", "unit-test", "test", "ok", 350, 250), j("4", "integration-test", "test", "ok", 350, 200), j("5", "build-image", "build", "ok", 200, 140), j("6", "deploy-staging", "deploy", args.id === "9001" ? "run" : "ok", 140, args.id === "9001" ? 0 : 60), j("7", "deploy-production", "deploy", args.id === "9001" ? "queued" : "ok", args.id === "9001" ? 0 : 60, args.id === "9001" ? 0 : 20)];
+      }
       return args.id === "9000"
         ? [{ id: "1", name: "lint", stage: "", state: "ok", started: new Date(Date.now() - 600_000).toISOString(), finished: new Date(Date.now() - 560_000).toISOString() }, { id: "2", name: "test", stage: "Run tests", state: "fail", started: new Date(Date.now() - 560_000).toISOString(), finished: new Date(Date.now() - 380_000).toISOString() }, { id: "3", name: "build", stage: "", state: "skip", started: "", finished: "" }]
         : [{ id: "1", name: "build", stage: "", state: "ok", started: new Date(Date.now() - 240_000).toISOString(), finished: new Date(Date.now() - 150_000).toISOString() }, { id: "2", name: "deploy-staging", stage: "", state: "run", started: new Date(Date.now() - 140_000).toISOString(), finished: "" }, { id: "3", name: "deploy-production", stage: "", state: "queued", started: "", finished: "" }];
+    }
     case "ci_log":
       return "RefundCalculatorTest > 쿠폰 두 개가 겹쳐도 1원이 어긋나지 않는다 FAILED\n    org.opentest4j.AssertionFailedError: expected: <9334> but was: <9333>\n        at RefundCalculatorTest.kt:14\n\n42 tests completed, 1 failed\n\nFAILURE: Build failed with an exception.\n* What went wrong:\nExecution failed for task ':test'.\n##[error]Process completed with exit code 1.";
     case "worktree_add":

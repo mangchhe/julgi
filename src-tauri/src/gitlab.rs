@@ -73,8 +73,20 @@ pub fn status() -> (bool, String) {
     (true, user)
 }
 
+/// 그 호스트에 로그인한 계정. 호스트마다 한 번만 묻고 기억한다 (물을 때마다 0.4초쯤 걸린다). 못 받았으면 기억하지 않고 다음에 다시 묻는다
 pub(crate) fn me(host: &str) -> String {
-    api(host, "GET", "user", &[]).ok().and_then(|u| u["username"].as_str().map(str::to_owned)).unwrap_or_default()
+    static KNOWN: std::sync::OnceLock<std::sync::Mutex<std::collections::HashMap<String, String>>> = std::sync::OnceLock::new();
+    let known = KNOWN.get_or_init(Default::default);
+    if let Some(name) = known.lock().ok().and_then(|m| m.get(host).cloned()) {
+        return name;
+    }
+    let name = api(host, "GET", "user", &[]).ok().and_then(|u| u["username"].as_str().map(str::to_owned)).unwrap_or_default();
+    if !name.is_empty() {
+        if let Ok(mut m) = known.lock() {
+            m.insert(host.to_owned(), name.clone());
+        }
+    }
+    name
 }
 
 fn text(v: &Value, p: &str) -> String {

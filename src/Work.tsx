@@ -3,6 +3,7 @@ import { tr } from "./i18n";
 import { Fragment, ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import { BugJob, CATEGORY, Ticket, TicketWork } from "./jira";
 import { CiRun, ciLabel, ciLive } from "./ci";
+import { prefetchRun } from "./RunView";
 import PrView from "./PrView";
 import { ago } from "./model";
 import { openUrl } from "@tauri-apps/plugin-opener";
@@ -85,6 +86,13 @@ export default function Work({ groups, ticketGroups = [], loadTickets, ticketPan
   const navCount = allCount + (runs ? 1 : 0);
   const [runAt, setRunAt] = useState(startRun ?? "");
   const run = runsOn ? (runs!.find((r) => r.url === runAt) ?? runs![0]) : undefined;
+  // 곧 볼 실행의 job을 미리 받아 둔다: 고른 것의 위아래 둘씩. 실행 묶음을 열기 전에도 맨 위 것은 받아 둔다
+  useEffect(() => {
+    if (!runs?.length) return;
+    const at = run ? runs.findIndex((r) => r.url === run.url) : 0;
+    for (const d of runsOn ? [1, -1, 2, -2] : [0]) prefetchRun(runs[at + d]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [run?.url, runsOn, runs?.length]);
   const tgroup = groupAt >= groups.length ? ticketGroups[groupAt - groups.length] : undefined;
   const group = tgroup ? undefined : groups[Math.min(groupAt, groups.length - 1)];
   const [picked, setPicked] = useState<string | null>(null);
