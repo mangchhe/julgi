@@ -45,6 +45,10 @@ Change them in `⌘,`; they apply at once and are saved to `~/.julgi/config.json
 | `lang` | `auto` | Interface language. `auto` follows the system (Korean if the system is Korean, otherwise English), or `en`, `ko`. Applies after restart |
 | `theme` | `ink` | Colors. `navy`, `graphite`, `forest`, `plum`, `sand`, `tokyo-night`, `catppuccin`, `dracula`, `nord`, `paper` |
 | `thinking` | `balanced` | Level of the judgment models. `light` (all Haiku), `balanced`, `deep` |
+| `termPad`, `termLine`, `cursorStyle`, `cursorBlink` | 8, 115, `block`, on | Terminal padding (px), line height (%), cursor shape (`block`, `bar`, `underline`) and blink |
+| `dimOthers` | 0 | How much to dim panes you are not typing in (%) |
+| `winOpacity`, `winBlur` | 100, on | Window opacity (%) and blur of what shows through. The first time you go below 100, restart for terminal backgrounds to show through too |
+| `bgShow`, `bgBlur` | 25, 0 | How much the background photo (`background.txt`) shows (%) and its blur (px) |
 | `hotTokens` | 150000 | Sessions larger than this are handed off to a fresh session before sending |
 | `sleepHours` | 3 | Put sessions idle this long to sleep. 0 disables |
 | `autoFill` | on | Bring sessions waiting on you into panes and fit the pane count |
@@ -124,6 +128,7 @@ Everything is a text file under `~/.julgi/`. Conversations are not here; Claude 
 | `run-seen.json` | Last known state of my CI runs, to notice when one finishes |
 | `argo-seen.json` | Last known sync and health of linked Argo CD apps, to notice a change for the worse |
 | `bots.json` | Registered bots: name, face, the situation each watches for, the message it sends, how often it answered |
+| `background.txt` | The background photo, scaled down and stored as text |
 | `triage.json` | For each finished reply, whether it needed you and why |
 | `progress.json` | Goal, done, left, blocked per stem |
 | `seen.json` | When you last looked at Julgi, for the briefing |

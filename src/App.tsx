@@ -2,7 +2,7 @@ import Hint from "./Hint";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { getCurrentWebview } from "@tauri-apps/api/webview";
-import { getCurrentWindow } from "@tauri-apps/api/window";
+import { Effect, EffectState, getCurrentWindow } from "@tauri-apps/api/window";
 import { listen } from "@tauri-apps/api/event";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import Help from "./Help";
@@ -17,7 +17,7 @@ import Send, { RouteNote, Target } from "./Send";
 import Settings from "./Settings";
 import { findings, measure, Review, Route } from "./review";
 import Threads from "./Threads";
-import { applyTheme } from "./themes";
+import { applyTheme, themeOf } from "./themes";
 import { CHECK_SYSTEM, CORRECT_SYSTEM, prefsText, CAND_SYSTEM, Candidate as SkillCandidate, formatNote, indexLine, indexText, LEARN_SYSTEM, Note, parseNote, BRIEF_SYSTEM, MAP_SYSTEM, mapDomains, mapItems, recallText, stale, Stats, statOf, SWEEP_SYSTEM, TIDY_SYSTEM } from "./brain";
 import Sidebar from "./Sidebar";
 import PrView from "./PrView";
@@ -79,6 +79,12 @@ type Verdict = { same: boolean; why: string };
 /** 인계 글을 이만큼 기다려도 안 오면 갈아타기를 그만둔다 */
 const HANDOFF_TIMEOUT_MS = 5 * 60_000;
 
+/** 설정 파일을 다 읽었는가. 세션을 다시 띄우는 일이 이것을 기다린다 */
+const configLoaded = (() => {
+  let done = () => {};
+  const promise = new Promise<void>((resolve) => (done = resolve));
+  return { promise, done };
+})();
 type Layout = { open: Open[]; panes: (string | null)[]; widths?: number[]; pinned?: string[]; focus: number; fontSize: number; sidebar: boolean };
 
 /** 세션 목록이 달라졌는지 가리는 표시: 세션마다 바뀌면 달라지는 값들과 일감 목록 */
@@ -429,6 +435,21 @@ export default function App() {
     terms.setLook({ lineHeight: config.termLine / 100, cursorStyle: ["bar", "underline"].includes(config.cursorStyle) ? (config.cursorStyle as "bar" | "underline") : "block", cursorBlink: config.cursorBlink });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [look]);
+  const [winOpacity, winBlur] = [config.winOpacity, config.winBlur];
+  useEffect(() => {
+    const on = winOpacity < 100;
+    document.documentElement.classList.toggle("glass", on);
+    document.documentElement.style.setProperty("--win-alpha", `${winOpacity}%`);
+    terms.setGlass(on);
+    // 비치는 뒤쪽을 흐리게: macOS의 창 효과. 꺼져 있거나 창이 꽉 차 있으면 걷는다
+    const win = getCurrentWindow();
+    // 뒤가 실제로 비쳐 보이는 재질을 쓴다: 어두운 테마는 어두운 유리(HUD), 밝은 테마는 밝은 유리(팝오버).
+    // "창 바탕" 재질은 뒤를 비추지 않고 회색으로 덮어서 창이 그냥 허옇게만 된다
+    const [r, g, b] = [1, 3, 5].map((i) => parseInt(themeOf(config.theme).bg.slice(i, i + 2), 16));
+    const light = r * 0.299 + g * 0.587 + b * 0.114 > 128;
+    void (on && winBlur ? win.setEffects({ effects: [light ? Effect.Popover : Effect.HudWindow], state: EffectState.Active }) : win.clearEffects()).catch(() => {});
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [winOpacity, winBlur, config.theme]);
   useEffect(() => {
     const root = document.documentElement.style;
     root.setProperty("--bg-show", String(bgShow / 100));
@@ -2068,14 +2089,18 @@ export default function App() {
         }
         resumedOnce.current.add(once);
         terms.send(o.key, "\r");
+        // 물음이 닫히면 그 자리가 비는데, 다음 확인을 기다리지 않고 바로 채운다
+        for (const ms of [500, 1000]) setTimeout(() => !/Resume this conversation\?/.test(terms.text(o.key, 60)) && terms.settle(o.key), ms);
         record("허용", tr`"${nameOf(o.key).slice(0, 40)}"을 다시 띄우며 "이어서 할까"라는 물음에 이어 간다고 대신 답함`, o.sessionId); // i18n-ok
       }
     for (const o of open) {
       if (!o.sessionId) continue;
       const st = states[o.key];
       // 서 있는 세션은 입력 칸 아래에 남은 빈 줄을 지난 줄로 채운다. 일하는 중이거나 허락을 묻는 창이 떠 있을 때는 건드리지 않는다
-      // 막 띄운 세션은 "이어서 할까" 물음이 떠 있을 수 있으니, 그 물음이 지나간 뒤(띄우고 15초 뒤)부터 본다
-      if (st ? (st.state === "wait" || st.state === "told" || st.state === "idle") && now - st.since > 2000 : terms.age(o.key) > 15_000) terms.settle(o.key);
+      // 막 띄운 세션은 "이어서 할까" 물음이 떠 있을 수 있다. 그 물음이 화면에 있는 동안은 두고, 사라지면 바로 채운다.
+      // 띄운 지 2분이 넘으면 화면을 읽지 않고 채운다(화면 읽기는 싸지 않다)
+      const fresh = !st && terms.age(o.key) < 120_000;
+      if (st ? (st.state === "wait" || st.state === "told" || st.state === "idle") && now - st.since > 2000 : terms.age(o.key) > 3000 && !(fresh && /Resume this conversation\?/.test(terms.text(o.key, 60)))) terms.settle(o.key);
       // 세션이 스스로 갈아타 달라고 했으면 그 답이 끝난 뒤에 한다
       if (wantHandoff.current.has(o.key) && (waiting(st) || replied(st))) {
         wantHandoff.current.delete(o.key);
@@ -2957,6 +2982,8 @@ export default function App() {
     void invoke<string | null>("config_load").then((json) => {
       try {
         if (json) Object.assign(config, JSON.parse(json));
+        // 터미널의 투명한 바탕은 터미널을 만들 때 정해진다. 세션을 띄우기 전에 알려 둔다
+        terms.setGlass(config.winOpacity < 100);
         applyTheme(config.theme);
         applyRemote();
         readUsage();
@@ -2966,7 +2993,8 @@ export default function App() {
         // 설정 파일이 깨졌으면 기본값으로 돈다
       }
       void invoke<string>("default_dir", { path: config.defaultDir || null }).then((dir) => setBase(dir ?? ""));
-    });
+      configLoaded.done();
+    }, () => configLoaded.done());
     void invoke<string | null>("data_read", { name: "activity.jsonl" }).then((text) => {
       const rows = (text ?? "").split("\n").filter(Boolean).slice(-MAX_ACTS);
       setActs(rows.flatMap((line) => {
@@ -3181,6 +3209,8 @@ export default function App() {
           // 없거나 깨졌으면 전부 내가 연 것으로 본다
         }
       }, () => {})
+      // 설정을 읽은 뒤에 세션을 띄운다. 터미널의 투명한 바탕 같은 것은 만들 때 정해진다
+      .then(() => configLoaded.promise)
       .then(() => Promise.all([invoke<string | null>("layout_load"), invoke<string | null>("data_read", { name: "threads.json" }).catch(() => null)]))
       .then(([json, threadText]) => {
       setRestored(true);

@@ -263,4 +263,8 @@ export default {
   "클수록 사진이 진하게 보이고 글자는 읽기 어려워진다": "Higher shows more of the photo and makes text harder to read",
   "사진 흐림": "Photo blur",
   "사진을 뭉개서 글자가 더 잘 읽히게 한다. 0이면 또렷하게 둔다": "Blur the photo so text reads better. 0 keeps it sharp",
+  "창 불투명도": "Window opacity",
+  "100%면 지금처럼 꽉 찬 바탕이다. 낮추면 창 뒤의 바탕화면과 다른 창이 비친다. 글자는 그대로 진하다. 100%에서 처음 낮출 때는 Julgi를 다시 켜야 터미널 바탕까지 비친다": "100% is a solid background as now. Lower lets the desktop and other windows behind show through. Text stays solid. The first time you go below 100%, restart Julgi for the terminal backgrounds to show through too",
+  "비치는 뒤쪽 흐리게": "Blur what shows through",
+  "창을 비치게 했을 때 뒤에 보이는 것을 흐리게 뭉갠다. 끄면 뒤가 또렷하게 보인다": "When the window shows through, blur what is behind it. Off keeps it sharp",
 } as Record<string, string>;

@@ -44,6 +44,11 @@ type Entry = {
 const pool = new Map<string, Entry>();
 let nextId = 1;
 let fontSize = 13;
+/** 창을 비치게 했는가. 켜면 터미널이 제 바탕을 칠하지 않고 뒤(창의 바탕)를 비친다 */
+let glass = false;
+/** 터미널에 넘길 색. 비치게 했으면 바탕만 투명하게 바꾼다 */
+// 바탕색은 그대로 두고 알파만 0으로 한다. 검정(#00000000)으로 하면 흐린 글자 뒤에 검은 네모가 남는다
+const themed = (): ITheme => (glass && /^#[0-9a-f]{6}$/i.test(theme.background ?? "") ? { ...theme, background: theme.background + "00" } : theme);
 /** 꾸미기 설정에서 오는 터미널 모양 */
 let look: { lineHeight: number; cursorStyle: "block" | "bar" | "underline"; cursorBlink: boolean } = { lineHeight: 1.15, cursorStyle: "block", cursorBlink: true };
 /** 마우스를 올린 링크의 글자색과 바탕색. 테마의 강조색과 그 옅은 색 */
@@ -105,7 +110,8 @@ export function create(spec: TermSpec) {
     cursorStyle: look.cursorStyle,
     scrollback: 20000,
     allowProposedApi: true,
-    theme,
+    allowTransparency: glass,
+    theme: themed(),
     // Claude Code는 PR·파일 경로를 터미널 하이퍼링크(OSC 8)로 보낸다. 기본 처리는 file://을 버리고 http도 웹뷰에서 못 연다
     linkHandler: { activate: openLink, allowNonHttpProtocols: true, hover: (_e, _text, range) => light(range), leave: () => unlight() },
   });
@@ -224,6 +230,31 @@ export function park(container: HTMLElement) {
 }
 
 /**
+ * 창을 비치게 했을 때, 흐린 글자나 밑줄처럼 꾸밈만 있는 칸 뒤에 터미널 부품이 꽉 찬 바탕색 네모를 그리는 것을 막는다.
+ * 부품은 꾸밈이 하나라도 있는 칸에 바탕색을 늘 불투명하게 칠한다(바탕색이 기본이어도). Claude Code는 흐린 글자를 많이 써서 네모가 줄줄이 남는다.
+ * 그 칠하는 함수를 한 번 감싸서, 바탕색이 기본인 칸은 투명하게 둔다. 부품의 안쪽을 만진다: 모양이 다르면 아무것도 하지 않는다
+ */
+let rectsPatched = false;
+function clearRects(gl: WebglAddon) {
+  if (rectsPatched) return;
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const rects = (gl as any)._renderer?._rectangleRenderer?.value;
+    const proto = rects && Object.getPrototypeOf(rects);
+    if (!proto || typeof proto._updateRectangle !== "function") return;
+    const draw = proto._updateRectangle;
+    // 0x4000000: 뒤집힌 칸, 0x3000000: 바탕색을 따로 정한 칸. 둘 다 아니면 바탕은 기본색이다
+    proto._updateRectangle = function (this: unknown, vertices: { attributes: Float32Array }, offset: number, fg: number, bg: number, ...rest: unknown[]) {
+      draw.call(this, vertices, offset, fg, bg, ...rest);
+      if (glass && !(fg & 0x4000000) && (bg & 0x3000000) === 0) vertices.attributes[offset + 7] = 0;
+    };
+    rectsPatched = true;
+  } catch {
+    // 못 감싸면 네모가 남을 뿐이다
+  }
+}
+
+/**
  * 그래픽 가속(WebGL)으로 그리게 한다. 가속이 없으면 스크롤이 눈에 띄게 느리다.
  * 브라우저는 한 창에서 쓸 수 있는 가속 자리가 정해져 있어서(열여섯쯤), 터미널을 많이 열어 두면 오래된 것부터 자리를 잃는다.
  * 잃으면 느린 기본 그리기로 내려가는데, 그대로 두지 않고 그 터미널을 다시 칸에 올릴 때 자리를 다시 얻는다
@@ -238,6 +269,8 @@ function accelerate(entry: Entry) {
     });
     entry.term.loadAddon(gl);
     entry.gl = gl;
+    clearRects(gl);
+    setTimeout(() => clearRects(gl), 0);
   } catch {
     // 가속이 안 되면 기본 그리기로 돈다
   }
@@ -356,7 +389,15 @@ export const age = (key: string) => Date.now() - (pool.get(key)?.startedAt ?? 0)
 export function setTheme(next: ITheme, link?: { fg: string; bg: string }) {
   theme = next;
   if (link) linkColor = link;
-  for (const entry of pool.values()) entry.term.options.theme = next;
+  for (const entry of pool.values()) entry.term.options.theme = themed();
+}
+
+/**
+ * 창을 비치게 했는지 알려 둔다. 앞으로 만드는 터미널에만 먹는다:
+ * 터미널이 바탕을 투명하게 그릴지는 만들 때 정해져서, 이미 떠 있는 터미널은 Julgi를 다시 켜야 바뀐다
+ */
+export function setGlass(on: boolean) {
+  glass = on;
 }
 
 /** 열려 있는 터미널과 앞으로 열 터미널의 줄 간격과 커서를 바꾼다 */

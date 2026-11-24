@@ -1505,3 +1505,9 @@ body.dragging .pane-body { pointer-events: none; }
 .set-bg { display: inline-flex; align-items: center; gap: 8px; }
 .set-bg img { width: 72px; height: 44px; object-fit: cover; border-radius: 6px; border: 1px solid var(--line); }
 .set-bg label.set-toggle { cursor: pointer; }
+/* 창을 비치게: 맨 아래 층들만 반투명하게 칠한다. 위에 뜨는 화면(모달, 목록)은 그대로 꽉 찬 바탕이다 */
+:root.glass, :root.glass body, :root.glass #root { background: transparent; }
+:root.glass .app { background: color-mix(in srgb, var(--bg) var(--win-alpha, 100%), transparent); }
+:root.glass .side, :root.glass .status, :root.glass .topbar { background: color-mix(in srgb, var(--surface) var(--win-alpha, 100%), transparent); }
+/* 터미널 부품은 글자 뒤에 검은 층(.xterm-viewport)을 하나 깔아 둔다. 창을 비치게 했으면 그 층도 비운다 */
+:root.glass .xterm .xterm-viewport { background-color: transparent !important; }

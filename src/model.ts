@@ -317,6 +317,9 @@ export const config = {
   cursorStyle: "block",
   cursorBlink: true,
   dimOthers: 0,
+  // 창의 불투명도(%). 100이면 지금처럼 꽉 찬 바탕이고, 낮추면 뒤의 바탕화면이 비친다. winBlur: 비치는 뒤쪽을 흐리게
+  winOpacity: 100,
+  winBlur: true,
   // 배경 사진(~/.julgi/background.txt)이 비치는 정도(%)와 흐림(px)
   bgShow: 25,
   bgBlur: 0,

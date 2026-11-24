@@ -44,6 +44,10 @@
 | `lang` | `auto` | 화면 글의 언어. `auto`는 시스템이 한국어면 한국어, 아니면 영어. `en`, `ko`. 다시 켜야 적용된다 |
 | `theme` | `ink` | 화면 색. `navy`, `graphite`, `forest`, `plum`, `sand`, `tokyo-night`, `catppuccin`, `dracula`, `nord`, `paper` |
 | `thinking` | `balanced` | 판단 모델의 수준. `light`(전부 Haiku), `balanced`, `deep` |
+| `termPad`, `termLine`, `cursorStyle`, `cursorBlink` | 8, 115, `block`, 켬 | 터미널의 안쪽 여백(px), 줄 간격(%), 커서 모양(`block`, `bar`, `underline`)과 깜빡임 |
+| `dimOthers` | 0 | 지금 치고 있지 않은 칸을 어둡게 하는 정도(%) |
+| `winOpacity`, `winBlur` | 100, 켬 | 창의 불투명도(%)와 비치는 뒤쪽 흐림. 100에서 처음 낮출 때는 다시 켜야 터미널 바탕까지 비친다 |
+| `bgShow`, `bgBlur` | 25, 0 | 배경 사진(`background.txt`)이 비치는 정도(%)와 흐림(px) |
 | `hotTokens` | 150000 | 이보다 큰 세션에 보낼 때는 갈아탄 뒤 보낸다 |
 | `sleepHours` | 3 | 이 시간 넘게 쉰 세션을 재운다. 0이면 안 재운다 |
 | `autoFill` | 켜짐 | 내 차례인 세션을 칸에 올리고 칸 수를 맞춘다 |
@@ -126,6 +130,7 @@
 | `run-seen.json` | 내 CI 실행의 지난 상태. 끝난 것을 알아채는 데 쓴다 |
 | `argo-seen.json` | 이어진 Argo CD 앱의 지난 sync와 health. 나빠진 것을 알아채는 데 쓴다 |
 | `bots.json` | 등록된 봇: 이름, 얼굴, 지켜보는 상황, 보내는 말, 답한 횟수 |
+| `background.txt` | 배경 사진. 줄인 그림이 글로 담겨 있다 |
 | `triage.json` | 끝난 답마다 내가 필요했는지와 그 이유 |
 | `progress.json` | 줄기마다 목표, 한 것, 남은 것, 막힌 것 |
 | `seen.json` | 마지막으로 Julgi를 본 때. 브리핑이 쓴다 |

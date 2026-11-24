@@ -100,6 +100,8 @@ const SECTIONS: { id: string; title: string; hint: string; needs?: "jira" | "arg
       { kind: "pick", key: "cursorStyle", label: tr("커서 모양"), note: tr("터미널에서 글자를 치는 자리의 모양"), options: [["block", tr("네모")], ["bar", tr("세로줄")], ["underline", tr("밑줄")]] },
       { kind: "toggle", key: "cursorBlink", label: tr("커서 깜빡임"), note: tr("끄면 커서가 깜빡이지 않고 켜져 있다") },
       { kind: "number", key: "dimOthers", label: tr("안 쓰는 칸 어둡게"), note: tr("칸이 여럿일 때 지금 치고 있지 않은 칸을 이만큼 어둡게 한다. 0이면 그대로다"), step: 10, min: 0, max: 60, show: (n) => `${n}%` },
+      { kind: "number", key: "winOpacity", label: tr("창 불투명도"), note: tr("100%면 지금처럼 꽉 찬 바탕이다. 낮추면 창 뒤의 바탕화면과 다른 창이 비친다. 글자는 그대로 진하다. 100%에서 처음 낮출 때는 Julgi를 다시 켜야 터미널 바탕까지 비친다"), step: 5, min: 40, max: 100, show: (n) => `${n}%` },
+      { kind: "toggle", key: "winBlur", label: tr("비치는 뒤쪽 흐리게"), note: tr("창을 비치게 했을 때 뒤에 보이는 것을 흐리게 뭉갠다. 끄면 뒤가 또렷하게 보인다") },
       { kind: "bg", label: tr("배경 사진"), note: tr("내 사진을 터미널 칸들의 바탕에 깐다. 사진은 줄여서 ~/.julgi/background.txt 에 두고 밖으로 보내지 않는다. 글자는 그대로 두고 바탕에만 비치게 겹쳐 그린다") },
       { kind: "number", key: "bgShow", label: tr("사진이 비치는 정도"), note: tr("클수록 사진이 진하게 보이고 글자는 읽기 어려워진다"), step: 5, min: 5, max: 80, show: (n) => `${n}%` },
       { kind: "number", key: "bgBlur", label: tr("사진 흐림"), note: tr("사진을 뭉개서 글자가 더 잘 읽히게 한다. 0이면 또렷하게 둔다"), step: 2, min: 0, max: 30, show: (n) => `${n}px` },
