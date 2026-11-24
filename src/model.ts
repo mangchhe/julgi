@@ -303,6 +303,8 @@ export const config = {
   // Claude Code의 전체 화면 그리기를 쓸 것인가. 끄면(기본) 지난 대화가 터미널의 스크롤 기록에 남는다.
   // 찾기(⌘F), 경로 ⌘클릭, 내 말 사이 건너뛰기(⌘↑↓), 갈아탈 때 화면 이어 붙이기가 모두 그 기록을 쓴다
   claudeFullscreen: false,
+  // 오래 쉰 큰 세션을 다시 띄울 때 Claude Code가 묻는 "Resume this conversation?"에 이어 간다고 대신 답한다
+  autoResume: true,
   bugParallel: 3,
   /** 오래 자리를 비웠다 돌아오면 브리핑을 띄운다 */
   morning: true,

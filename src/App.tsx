@@ -305,6 +305,7 @@ export default function App() {
   const noted = useRef<Record<string, number>>({}); // 세션 → 요약을 남긴 때의 대화 기록 시각
   const noting = useRef(new Set<string>());
   const trustedOnce = useRef(new Set<string>()); // 폴더 믿음 물음에 대신 답해 준 터미널
+  const resumedOnce = useRef(new Set<string>()); // "이어서 할까" 물음에 대신 답한 칸
   // 마지막으로 알린 세션. macOS는 어느 알림을 눌렀는지 알려 주지 않아서, 알린 뒤 곧 창이 앞으로 오면 알림을 눌렀다고 보고 그 세션을 띄운다
   const notified = useRef<{ key: string; at: number } | null>(null);
   const wantHandoff = useRef(new Set<string>()); // 세션이 스스로 갈아타 달라고 한 것. 답이 끝나면 한다
@@ -1844,6 +1845,27 @@ export default function App() {
       terms.send(o.key, "\r");
       record("허용", tr`${o.cwd.replace(live.current.home, "~")} 폴더를 믿는다고 대신 답함`, o.sessionId); // i18n-ok
     }
+    // 오래 쉰 큰 세션을 다시 띄우면 Claude Code가 "Resume this conversation?"을 묻는다. 세션을 다시 연 것은 이어 가겠다는 뜻이라
+    // "1. Resume"에 대신 답한다. 안 그러면 재웠다 깨울 때마다 그 물음에서 멈춰 서 있다
+    if (config.autoResume)
+      for (const o of open) {
+        // 재웠다 다시 띄우면 터미널이 새로 생긴다. 띄울 때마다 한 번씩 답하게 터미널 번호까지 묶어 기억한다
+        const once = `${o.key}#${terms.idOf(o.key)}`;
+        if (!o.sessionId || states[o.key] || resumedOnce.current.has(once) || !terms.opened(o.key)) continue;
+        const lines = terms.text(o.key).split("\n");
+        if (!lines.some((line) => /Resume this conversation\?/.test(line))) continue;
+        const yes = lines.findIndex((line) => /\b1\.\s+Resume\b/.test(line));
+        const at = lines.findIndex((line) => /❯/.test(line) && /\b[12]\.\s+(Resume|Start a new conversation)/.test(line));
+        if (yes < 0 || at < 0) continue;
+        // 화살표가 "Resume"에 가 있는 걸 본 다음에만 Enter를 누른다
+        if (yes !== at) {
+          terms.send(o.key, (yes > at ? "\x1b[B" : "\x1b[A").repeat(Math.abs(yes - at)));
+          continue;
+        }
+        resumedOnce.current.add(once);
+        terms.send(o.key, "\r");
+        record("허용", tr`"${nameOf(o.key).slice(0, 40)}"을 다시 띄우며 "이어서 할까"라는 물음에 이어 간다고 대신 답함`, o.sessionId); // i18n-ok
+      }
     for (const o of open) {
       if (!o.sessionId) continue;
       const st = states[o.key];

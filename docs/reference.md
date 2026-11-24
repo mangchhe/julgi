@@ -17,6 +17,7 @@ Read this before you run it. Everything here can be turned off or narrowed in se
 - **Phone view opens one port** (default 4747). It accepts only the Tailscale range (100.64.0.0/10) and this Mac, and the token in the URL (`~/.julgi/remote-token`) must match. Off by default.
 - **Sessions can read the repos on the map without asking** (a `Read` permission passed through `--settings`). Editing another repo still asks.
 - **Julgi answers the "do you trust this folder" prompt for some folders**: the default folder, folders in `autoTrust`, and repos you named through `mapRoot` or `repos`.
+- **Julgi answers "Resume this conversation?" with resume** when it reopens a session (`autoResume`). Reopening a session means continuing it; without this a session put to sleep and woken again stops at that prompt each time.
 - **Drawing the map fetches from remotes.** Only clean repos on their default branch are fast-forwarded (`mapFetch`).
 - **Finished replies are read by a small model** (`triage`) to decide whether you are needed. The end of the reply and your last message are sent through `claude -p`.
 - **Judgment calls go out through `claude -p`**, text only, no tools, no transcript kept. Briefings and second reads include the diff; preference extraction includes what you said.
@@ -60,6 +61,7 @@ Change them in `⌘,`; they apply at once and are saved to `~/.julgi/config.json
 | `triage` | on | Read each finished reply and bring the session to My turn only when there is something to decide or answer |
 | `longRunMin` | 30 | Notify once when one request has been running this many minutes. 0 disables |
 | `claudeFullscreen` | off | Let Claude Code use its fullscreen renderer. Off keeps the conversation in the terminal scrollback, which find (`⌘F`), `⌘`-click on paths and `⌘↑`/`⌘↓` rely on. Applies to sessions opened afterwards |
+| `autoResume` | on | When a large, long-idle session is reopened, answer Claude Code's "Resume this conversation?" with resume |
 | `morning`, `morningHours` | on, 6 | Show the briefing when you come back after this many hours away |
 | `autoAllow`, `allowRules` | `off`, none | Commands let through without asking: `look`, `check`, plus your own prefixes or rules |
 | `notify` | on | Notify when it becomes my turn and the window is not focused |

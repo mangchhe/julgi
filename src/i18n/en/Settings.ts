@@ -175,4 +175,6 @@ export default {
   "열려 있거나 최근에 쓴 세션의 레포에서 내가 돌린 CI를 읽어 ⌘U의 \"실행\"에 모은다. 끝나면 알리고, 깨진 것은 ⌘J에 올린다. gh와 glab으로 읽는다": "Reads the CI runs you started in the repos of open or recently used sessions and lists them under \"Runs\" in ⌘U. You are notified when one finishes, and failed ones come up in ⌘J. Read through gh and glab",
   "Claude Code의 전체 화면 그리기": "Claude Code fullscreen rendering",
   "켜면 Claude Code가 화면을 직접 관리한다. 지난 대화가 터미널의 스크롤 기록에 남지 않아 ⌘F 찾기, 경로 ⌘클릭, ⌘↑↓로 내 말 건너뛰기가 지금 보이는 화면에서만 된다. 새로 여는 세션부터 적용된다": "When on, Claude Code manages the screen itself. Past conversation is not kept in the terminal scrollback, so ⌘F find, ⌘-click on paths and ⌘↑↓ between your messages only work on what is on screen. Applies to sessions opened from now on",
+  "다시 띄울 때 \"이어서 할까\"에 대신 답하기": "Answer \"resume this conversation?\" when reopening",
+  "오래 쉰 큰 세션을 다시 띄우면 Claude Code가 이어서 할지 새로 시작할지 묻는다. 켜 두면 이어 간다고 대신 답한다. 큰 세션을 이어 가면 다음 말을 보낼 때 사용량이 그만큼 든다": "When a large session that has been idle for long is reopened, Claude Code asks whether to resume or start a new conversation. When on, Julgi answers resume for you. Resuming a large session uses that much of your limit on the next message",
 } as Record<string, string>;
