@@ -2048,6 +2048,9 @@ export default function App() {
     for (const o of open) {
       if (!o.sessionId) continue;
       const st = states[o.key];
+      // 서 있는 세션은 입력 칸 아래에 남은 빈 줄을 지난 줄로 채운다. 일하는 중이거나 허락을 묻는 창이 떠 있을 때는 건드리지 않는다
+      // 막 띄운 세션은 "이어서 할까" 물음이 떠 있을 수 있으니, 그 물음이 지나간 뒤(띄우고 15초 뒤)부터 본다
+      if (st ? (st.state === "wait" || st.state === "told" || st.state === "idle") && now - st.since > 2000 : terms.age(o.key) > 15_000) terms.settle(o.key);
       // 세션이 스스로 갈아타 달라고 했으면 그 답이 끝난 뒤에 한다
       if (wantHandoff.current.has(o.key) && (waiting(st) || replied(st))) {
         wantHandoff.current.delete(o.key);

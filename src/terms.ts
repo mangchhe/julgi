@@ -358,7 +358,7 @@ export function setFontSize(size: number) {
  * "아래로 몇 줄"로 움직이는데, 그 줄이 없으면 맨 아래에서 막혀 커서가 한 줄 위로 어긋난다.
  * 줄과 커서를 같이 내리므로 프로그램이 아는 상대 위치는 그대로다. xterm의 안쪽 값을 만진다: 모양이 다르면 아무것도 하지 않는다
  */
-export function settleBuffer(term: Terminal, added: number): number {
+export function settleBuffer(term: Terminal, added: number, keep = 0): number {
   try {
     const active = term.buffer.active;
     if (active.type !== "normal" || active.baseY === 0 || added <= 0) return 0;
@@ -367,10 +367,11 @@ export function settleBuffer(term: Terminal, added: number): number {
       if ((active.getLine(active.baseY + y)?.translateToString(true) ?? "") !== "") break;
       blank++;
     }
-    const n = Math.min(blank, active.baseY, added);
+    // keep: 맨 아래에 남겨 둘 빈 줄 수. Claude Code는 상태 줄 아래 빈 줄 하나까지 제 화면으로 친다
+    const n = Math.min(blank - keep, active.baseY, added);
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const buf = (term as any)._core?.buffer;
-    if (!n || !buf || typeof buf.ybase !== "number" || typeof buf.y !== "number" || typeof buf.lines?.pop !== "function" || buf.lines.length !== buf.ybase + term.rows) return 0;
+    if (n <= 0 || !buf || typeof buf.ybase !== "number" || typeof buf.y !== "number" || typeof buf.lines?.pop !== "function" || buf.lines.length !== buf.ybase + term.rows) return 0;
     const atBottom = buf.ydisp === buf.ybase;
     for (let i = 0; i < n; i++) buf.lines.pop();
     buf.ybase -= n;
@@ -383,6 +384,16 @@ export function settleBuffer(term: Terminal, added: number): number {
   } catch {
     return 0;
   }
+}
+
+/**
+ * 답을 기다리며 서 있는 세션의 입력 칸 아래에 남은 빈 줄을 지난 줄로 채운다.
+ * Claude Code가 아래쪽 화면을 줄이면(명령 목록이나 물음 창을 닫을 때, 일하는 동안 보이던 줄이 사라질 때) 창 크기를 안 바꿔도 빈 줄이 남는다.
+ * 맨 아래 한 줄은 남긴다: Claude Code가 상태 줄 아래 빈 줄 하나까지 제 화면으로 쳐서, 그 줄까지 없애면 커서가 한 줄 위로 어긋난다
+ */
+export function settle(key: string) {
+  const entry = pool.get(key);
+  if (entry?.opened) settleBuffer(entry.term, Infinity, 1);
 }
 
 /** 칸 크기에 터미널을 맞춘다. 줄 수가 늘었으면 xterm이 아래에 붙인 빈 줄만큼 지난 줄을 끌어내린다 */
