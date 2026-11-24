@@ -1511,3 +1511,11 @@ body.dragging .pane-body { pointer-events: none; }
 :root.glass .side, :root.glass .status, :root.glass .topbar { background: color-mix(in srgb, var(--surface) var(--win-alpha, 100%), transparent); }
 /* 터미널 부품은 글자 뒤에 검은 층(.xterm-viewport)을 하나 깔아 둔다. 창을 비치게 했으면 그 층도 비운다 */
 :root.glass .xterm .xterm-viewport { background-color: transparent !important; }
+/* 설정: 딸린 줄은 들여 쓰고 왼쪽에 줄을 그어 위 줄에 묶인 것을 보인다 */
+.set-card .set-row.child { position: relative; padding-left: 40px; }
+.set-card .set-row.child::before { content: ""; position: absolute; left: 22px; top: 0; bottom: 0; width: 2px; background: var(--line); }
+.set-card .set-row.child .set-label { font-size: 13px; }
+.set-share { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 8px; }
+.set-share label.set-toggle { cursor: pointer; }
+.set-share-in { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 8px; flex-basis: 100%; font-size: 12.5px; }
+.set-share .set-note { flex-basis: 100%; text-align: right; }

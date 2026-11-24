@@ -108,6 +108,14 @@ What the connections use:
 - **Jira**: REST directly. The API token is kept only in the macOS keychain (`julgi-jira`) and is never passed on a command line.
 - All three poll on an interval rather than receive webhooks. Julgi has no server to receive them.
 
+## Sharing a setup
+
+Settings are all text files under `~/.julgi`, so you can move that folder or keep it in your dotfiles. To share with someone else, export from `⌘,` → Settings files.
+
+- **Export** writes one file, `~/.julgi/share/julgi-setup.json`, and copies it to the clipboard. It holds looks, ways of working and bots.
+- **Left out**: things tied to your machine and company (folders, connections, ticket and deploy settings, the hotkey, language), settings that loosen permissions (`skipPermissions`, `autoAllow`, `allowRules`), the background photo, and bots' own pictures and counts.
+- **Import** reads a file, shows the values that differ and the new bots first, and changes nothing until you press Apply. The items above are dropped even if the file has them. Imported bots arrive switched off.
+
 ## Files
 
 Everything is a text file under `~/.julgi/`. Conversations are not here; Claude Code keeps them in `~/.claude/`.

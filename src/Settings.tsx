@@ -9,6 +9,7 @@ import { CORE, MORE } from "./Help";
 import { getLang, resolveLang, tr } from "./i18n";
 import { argoHost, argoLoginCommand } from "./argo";
 import { Bot } from "./triageAsk.ts";
+import { setupDiff, setupOf } from "./setup";
 import BotFace, { ARTS, faceOf, freeFace, shrinkImage } from "./BotFace";
 
 type Key = keyof typeof config;
@@ -35,7 +36,9 @@ type Props = {
   onBots: (next: Bot[]) => void;
 };
 
-type Row =
+/** under: 이 줄은 바로 위 줄에 딸린 줄이다. 들여 그리고, 위 줄이 꺼져 있으면(함수가 false) 감춘다 */
+type Row = { under?: (s: { bg: boolean }) => boolean } & RowKind;
+type RowKind =
   | { kind: "theme"; label: string; note: string }
   | { kind: "number"; key: Key; label: string; note: string; step: number; min: number; max: number; show: (n: number) => string }
   | { kind: "toggle"; key: Key; label: string; note: string }
@@ -48,6 +51,7 @@ type Row =
   | { kind: "argo"; label: string; note: string }
   | { kind: "bots"; label: string; note: string }
   | { kind: "bg"; label: string; note: string }
+  | { kind: "share"; label: string; note: string }
   | { kind: "keys"; label: string; note: string };
 
 /** 배경으로 쓸 사진을 긴 쪽 2560px 안으로 줄여 JPEG로 만든다. 원본을 그대로 두면 켤 때마다 수십 MB를 읽게 된다 */
@@ -77,14 +81,14 @@ const SECTIONS: { id: string; title: string; hint: string; needs?: "jira" | "arg
     { kind: "pick", key: "lang", label: tr("언어"), note: tr("화면 글의 언어. 바꾸면 옆에 뜨는 단추로 Julgi를 다시 켜서 적용한다. 열려 있던 세션은 그대로 이어진다"), options: [["auto", tr("시스템 따름")], ["en", "English"], ["ko", "한국어"]] }, // i18n-ok
     { kind: "number", key: "recentDays", label: tr("목록에 보이는 기간"), note: tr("이보다 오래 안 쓴 잠든 세션은 목록에서 빼고 ⌘K로만 찾는다"), step: 1, min: 1, max: 90, show: (n) => tr`${n}일` },
     { kind: "pick", key: "scriptShow", label: tr("스크립트가 돌린 세션"), note: tr("사람이 연 것이 아니라 스크립트나 SDK가 돌린 세션(claude -p 같은 것)을 목록에 어떻게 둘지 정한다. \"묶어서\"는 맨 아래 한 줄로 접어 두고, \"숨기기\"는 빼고 ⌘K로만 찾는다. 섞지 않는 동안에는 요약과 줄기 묶기 같은 Julgi의 자동 작업도 이 세션들을 건너뛴다"), options: [["group", tr("묶어서")], ["hide", tr("숨기기")], ["mix", tr("섞어서")]] },
-    { kind: "text", key: "scriptEntry", label: tr("스크립트 세션을 가리는 값"), note: tr("Claude Code는 대화 기록에 세션을 연 길(entrypoint)을 적는다. 터미널에서 열면 cli, 스크립트나 SDK가 돌리면 sdk-cli다. 그 값이 여기 적은 글로 시작하면 스크립트가 돌린 세션으로 본다. 쉼표로 여럿 적는다"), hint: "sdk" },
+    { under: () => config.scriptShow !== "mix", kind: "text", key: "scriptEntry", label: tr("스크립트 세션을 가리는 값"), note: tr("Claude Code는 대화 기록에 세션을 연 길(entrypoint)을 적는다. 터미널에서 열면 cli, 스크립트나 SDK가 돌리면 sdk-cli다. 그 값이 여기 적은 글로 시작하면 스크립트가 돌린 세션으로 본다. 쉼표로 여럿 적는다"), hint: "sdk" },
     { kind: "toggle", key: "usage", label: tr("Claude 사용량 보기"), note: tr("아래 상태 줄에 5시간 창과 주간 한도를 얼마나 썼는지 보여 준다. 켜면 Claude Code의 로그인 토큰을 키체인에서 읽어 Anthropic의 사용량 주소에만 보낸다(처음에 키체인이 허락을 묻는다). 문서에 없는 주소라 어느 날 안 나올 수 있다") },
       { kind: "toggle", key: "triage", label: tr("할 일이 있을 때만 부르기"), note: tr("세션이 답을 끝내면 작은 모델이 마지막 답을 읽는다. 내가 정하거나 답할 것이 있으면 내 차례로 올리고 알린다. 끝냈다고 보고만 한 것은 \"보고함\"으로 조용히 두고 브리핑(⌘⇧B)에서 모아 보여 준다. 판정하지 못하면 내 차례로 올린다") },
       { kind: "toggle", key: "autoResume", label: tr("다시 띄울 때 \"이어서 할까\"에 대신 답하기"), note: tr("오래 쉰 큰 세션을 다시 띄우면 Claude Code가 이어서 할지 새로 시작할지 묻는다. 켜 두면 이어 간다고 대신 답한다. 큰 세션을 이어 가면 다음 말을 보낼 때 사용량이 그만큼 든다") },
       { kind: "toggle", key: "claudeFullscreen", label: tr("Claude Code의 전체 화면 그리기"), note: tr("켜면 Claude Code가 화면을 직접 관리한다. 지난 대화가 터미널의 스크롤 기록에 남지 않아 ⌘F 찾기, 경로 ⌘클릭, ⌘↑↓로 내 말 건너뛰기가 지금 보이는 화면에서만 된다. 새로 여는 세션부터 적용된다") },
       { kind: "number", key: "longRunMin", label: tr("오래 도는 일 알리기"), note: tr("한 번 시킨 일이 이만큼 넘게 돌고 있으면 한 번 알린다. 0이면 알리지 않는다"), step: 10, min: 0, max: 240, show: (n) => (n ? tr`${n}분` : tr("끔")) },
       { kind: "toggle", key: "morning", label: tr("돌아오면 브리핑"), note: tr("한동안 Julgi를 안 보다가 돌아오면 나를 기다리는 것, PR과 티켓에 생긴 일, 하던 일이 어디까지 왔는지, 그동안 Julgi가 한 일을 한 화면으로 보여 준다. ⌘⇧B로 언제든 연다") },
-      { kind: "number", key: "morningHours", label: tr("브리핑을 띄우는 간격"), note: tr("이만큼 넘게 안 봤을 때만 띄운다"), step: 1, min: 1, max: 72, show: (n) => tr`${n}시간` },
+      { under: () => config.morning, kind: "number", key: "morningHours", label: tr("브리핑을 띄우는 간격"), note: tr("이만큼 넘게 안 봤을 때만 띄운다"), step: 1, min: 1, max: 72, show: (n) => tr`${n}시간` },
       { kind: "toggle", key: "notify", label: tr("알림"), note: tr("Julgi 창을 안 보고 있을 때 세션이 답을 끝내거나 확인을 물으면 macOS 알림을 띄운다") },
     { kind: "toggle", key: "confirmClose", label: tr("닫기 전에 묻기"), note: tr("⌘W나 ×로 세션을 닫을 때 한 번 묻는다") },
     { kind: "key", key: "hotkey", label: tr("창 꺼내기 키"), note: tr("어느 앱에서든 Julgi 창을 꺼내고 다시 넣는 키. Enter를 누른 뒤 쓸 키 조합을 누른다. Backspace면 쓰지 않는다") },
@@ -101,10 +105,10 @@ const SECTIONS: { id: string; title: string; hint: string; needs?: "jira" | "arg
       { kind: "toggle", key: "cursorBlink", label: tr("커서 깜빡임"), note: tr("끄면 커서가 깜빡이지 않고 켜져 있다") },
       { kind: "number", key: "dimOthers", label: tr("안 쓰는 칸 어둡게"), note: tr("칸이 여럿일 때 지금 치고 있지 않은 칸을 이만큼 어둡게 한다. 0이면 그대로다"), step: 10, min: 0, max: 60, show: (n) => `${n}%` },
       { kind: "number", key: "winOpacity", label: tr("창 불투명도"), note: tr("100%면 지금처럼 꽉 찬 바탕이다. 낮추면 창 뒤의 바탕화면과 다른 창이 비친다. 글자는 그대로 진하다. 100%에서 처음 낮출 때는 Julgi를 다시 켜야 터미널 바탕까지 비친다"), step: 5, min: 40, max: 100, show: (n) => `${n}%` },
-      { kind: "toggle", key: "winBlur", label: tr("비치는 뒤쪽 흐리게"), note: tr("창을 비치게 했을 때 뒤에 보이는 것을 흐리게 뭉갠다. 끄면 뒤가 또렷하게 보인다") },
+      { under: () => config.winOpacity < 100, kind: "toggle", key: "winBlur", label: tr("비치는 뒤쪽 흐리게"), note: tr("창을 비치게 했을 때 뒤에 보이는 것을 흐리게 뭉갠다. 끄면 뒤가 또렷하게 보인다") },
       { kind: "bg", label: tr("배경 사진"), note: tr("내 사진을 터미널 칸들의 바탕에 깐다. 사진은 줄여서 ~/.julgi/background.txt 에 두고 밖으로 보내지 않는다. 글자는 그대로 두고 바탕에만 비치게 겹쳐 그린다") },
-      { kind: "number", key: "bgShow", label: tr("사진이 비치는 정도"), note: tr("클수록 사진이 진하게 보이고 글자는 읽기 어려워진다"), step: 5, min: 5, max: 80, show: (n) => `${n}%` },
-      { kind: "number", key: "bgBlur", label: tr("사진 흐림"), note: tr("사진을 뭉개서 글자가 더 잘 읽히게 한다. 0이면 또렷하게 둔다"), step: 2, min: 0, max: 30, show: (n) => `${n}px` },
+      { under: (s) => s.bg, kind: "number", key: "bgShow", label: tr("사진이 비치는 정도"), note: tr("클수록 사진이 진하게 보이고 글자는 읽기 어려워진다"), step: 5, min: 5, max: 80, show: (n) => `${n}%` },
+      { under: (s) => s.bg, kind: "number", key: "bgBlur", label: tr("사진 흐림"), note: tr("사진을 뭉개서 글자가 더 잘 읽히게 한다. 0이면 또렷하게 둔다"), step: 2, min: 0, max: 30, show: (n) => `${n}px` },
     ],
   },
   {
@@ -132,7 +136,7 @@ const SECTIONS: { id: string; title: string; hint: string; needs?: "jira" | "arg
     { kind: "toggle", key: "judgeMerges", label: tr("같은 일 알아서 합치기"), note: tr("두 세션이 같은 일이라고 모델이 판정하면 묻지 않고 한 줄기로 묶는다") },
     { kind: "toggle", key: "brain", label: tr("브레인"), note: tr("줄기 기억에서 일이 끝나도 남길 것(결정, 함정, 사실)을 추려 담고, 새 일을 열 때 관련된 것을 붙인다. ⌘G에서 본다") },
     { kind: "toggle", key: "autoLead", label: tr("알아서 조율하기"), note: tr("⌘L로 던진 일이 레포 두 곳 넘게 걸치면 새 세션을 조율자로 세운다. 조율자는 일감으로 나눠 레포마다 다른 세션에 맡기고 결과를 모은다") },
-    { kind: "toggle", key: "taskWorktree", label: tr("일감은 따로 딴 폴더에서"), note: tr("일감을 맡은 세션은 레포의 작업 폴더가 아니라 Julgi가 만든 워크트리(브랜치 julgi/일감번호)에서 일한다. 고친 것이 없으면 끝난 뒤 지운다") },
+    { under: () => config.autoLead, kind: "toggle", key: "taskWorktree", label: tr("일감은 따로 딴 폴더에서"), note: tr("일감을 맡은 세션은 레포의 작업 폴더가 아니라 Julgi가 만든 워크트리(브랜치 julgi/일감번호)에서 일한다. 고친 것이 없으면 끝난 뒤 지운다") },
     { kind: "toggle", key: "growSkills", label: tr("스킬 알아서 만들고 가꾸기"), note: tr("되풀이해서 시킨 일은 스킬로 만들고(한 주에 하나), 자주 쓰는 내 스킬은 쓰인 기록에 비추어 다듬는다(한 주에 하나, 옛 글은 ~/.julgi/skill-history에 남는다). 링크로 건 스킬과 레포의 스킬은 건드리지 않는다") },
     ],
   },
@@ -150,7 +154,7 @@ const SECTIONS: { id: string; title: string; hint: string; needs?: "jira" | "arg
     hint: tr("세션이 고친 코드를 읽어 주는 것"),
     rows: [
     { kind: "toggle", key: "brief", label: tr("바뀐 것 브리핑"), note: tr("세션이 코드를 고치면 무엇을 왜 바꿨는지, 파일별로 한 줄, 눈여겨볼 곳을 요약해 둔다. ⌘I와 \"바뀐 것 보기\"에 나온다") },
-    { kind: "toggle", key: "check", label: tr("내가 보기 전에 걸러 읽기"), note: tr("브리핑 뒤에 더 큰 모델이 세션의 설명 없이 변경만 읽고, 틀렸거나 틀릴 수 있는 곳을 짚는다(버그·위험·의문). ⌘E 위쪽에 나오고 한 번에 세션에 넘겨 확인시킬 수 있다. 15줄이 안 되는 변경에는 하지 않는다") },
+    { under: () => config.brief, kind: "toggle", key: "check", label: tr("내가 보기 전에 걸러 읽기"), note: tr("브리핑 뒤에 더 큰 모델이 세션의 설명 없이 변경만 읽고, 틀렸거나 틀릴 수 있는 곳을 짚는다(버그·위험·의문). ⌘E 위쪽에 나오고 한 번에 세션에 넘겨 확인시킬 수 있다. 15줄이 안 되는 변경에는 하지 않는다") },
     ],
   },
   {
@@ -190,12 +194,12 @@ const SECTIONS: { id: string; title: string; hint: string; needs?: "jira" | "arg
     hint: tr("챙길 PR과 CI, 확인 주기"),
     rows: [
       { kind: "pick", key: "prWatch", label: tr("챙길 PR"), note: tr("정한 주기마다 PR을 보고 CI가 깨지거나 남이 코멘트를 달거나 리뷰를 받거나 머지되면 알린다. 세션이 올린 PR은 그 세션을 내 차례로 올리고, 나머지 내 PR은 ⌘J의 \"내 PR\"에 넣는다"), options: [["mine", tr("내 PR 전부")], ["session", tr("세션이 올린 PR만")], ["off", tr("끔")]] },
-      { kind: "number", key: "prEveryMin", label: tr("PR 확인 주기"), note: tr("세션 줄의 PR과 내 PR을 이만큼마다 본다. 짧을수록 알림이 빨리 온다"), step: 1, min: 1, max: 30, show: (n) => tr`${n}분` },
-      { kind: "number", key: "askEveryMin", label: tr("리뷰 요청 확인 주기"), note: tr("나한테 온 리뷰 요청을 이만큼마다 본다"), step: 1, min: 1, max: 60, show: (n) => tr`${n}분` },
+      { under: () => config.prWatch !== "off", kind: "number", key: "prEveryMin", label: tr("PR 확인 주기"), note: tr("세션 줄의 PR과 내 PR을 이만큼마다 본다. 짧을수록 알림이 빨리 온다"), step: 1, min: 1, max: 30, show: (n) => tr`${n}분` },
+      { under: () => config.prWatch !== "off", kind: "toggle", key: "wakeOnPr", label: tr("잠든 세션 깨우기"), note: tr("최근 세션이 남긴 PR은 세션이 잠들어 있어도 챙긴다. 켜면 그 PR에 일이 생길 때 세션을 바로 깨워 둔다(세션 하나가 메모리를 0.3–1GB 쓴다). 끄면 알리고 ⌘J의 내 차례에 올려 두기만 하고, 고르면 그때 깨운다") },
       { kind: "toggle", key: "reviewAsks", label: tr("리뷰 요청"), note: tr("정한 주기마다 나한테 리뷰를 부탁한 PR을 보고 ⌘J의 \"리뷰 요청\"에 넣는다. 새로 오면 알린다") },
+      { under: () => config.reviewAsks, kind: "number", key: "askEveryMin", label: tr("리뷰 요청 확인 주기"), note: tr("나한테 온 리뷰 요청을 이만큼마다 본다"), step: 1, min: 1, max: 60, show: (n) => tr`${n}분` },
       { kind: "toggle", key: "refreshOnFocus", label: tr("돌아오면 바로 보기"), note: tr("다른 앱에 있다 Julgi 창으로 돌아오면 PR과 리뷰 요청을 기다리지 않고 바로 다시 본다") },
       { kind: "number", key: "prViewRefreshSec", label: tr("PR 화면 새로 읽기"), note: tr("PR 화면을 열어 둔 동안 이만큼마다 새로 읽어 남이 단 코멘트와 CI를 들인다. 끄면 r을 누를 때만 읽는다"), step: 10, min: 0, max: 300, show: (n) => (n ? tr`${n}초` : tr("끔")) },
-      { kind: "toggle", key: "wakeOnPr", label: tr("잠든 세션 깨우기"), note: tr("최근 세션이 남긴 PR은 세션이 잠들어 있어도 챙긴다. 켜면 그 PR에 일이 생길 때 세션을 바로 깨워 둔다(세션 하나가 메모리를 0.3–1GB 쓴다). 끄면 알리고 ⌘J의 내 차례에 올려 두기만 하고, 고르면 그때 깨운다") },
       { kind: "toggle", key: "ciWatch", label: tr("내가 돌린 CI 실행 보기"), note: tr("열려 있거나 최근에 쓴 세션의 레포에서 내가 돌린 CI를 읽어 ⌘U의 \"실행\"에 모은다. 끝나면 알리고, 깨진 것은 ⌘J에 올린다. gh와 glab으로 읽는다") },
     ],
   },
@@ -206,7 +210,7 @@ const SECTIONS: { id: string; title: string; hint: string; needs?: "jira" | "arg
     needs: "jira",
     rows: [
       { kind: "pick", key: "jiraWatch", label: tr("챙길 티켓"), note: tr("정한 주기마다 내게 배정된 티켓을 보고 새로 배정되거나 상태가 바뀌거나 남이 코멘트를 달면 알리고 ⌘J에 넣는다"), options: [["mine", tr("내게 배정된 것")], ["off", tr("끔")]] },
-      { kind: "number", key: "jiraEveryMin", label: tr("티켓 확인 주기"), note: tr("내 티켓을 이만큼마다 본다"), step: 1, min: 1, max: 60, show: (n) => tr`${n}분` },
+      { under: () => config.jiraWatch !== "off", kind: "number", key: "jiraEveryMin", label: tr("티켓 확인 주기"), note: tr("내 티켓을 이만큼마다 본다"), step: 1, min: 1, max: 60, show: (n) => tr`${n}분` },
       { kind: "text", key: "jiraStartTransition", label: tr("시작할 때 옮길 상태"), note: tr("이 티켓으로 시작할 때 이 상태로 옮길지 묻는다. 비우면 묻지 않는다. Jira가 연결돼 있으면 그 Jira의 상태 이름에서 고른다"), hint: "In Progress", statuses: true, category: "indeterminate" },
       { kind: "text", key: "jiraPrTransition", label: tr("PR 올리면 옮길 상태"), note: tr("티켓과 이어진 세션이 PR을 올리면 이 상태로 옮길지 묻는다"), hint: "In Review", statuses: true, category: "indeterminate" },
       { kind: "text", key: "jiraMergeTransition", label: tr("머지되면 옮길 상태"), note: tr("그 PR이 머지되면 이 상태로 옮길지 묻는다"), hint: "Done", statuses: true, category: "done" },
@@ -222,11 +226,11 @@ const SECTIONS: { id: string; title: string; hint: string; needs?: "jira" | "arg
     needs: "argo",
     rows: [
       { kind: "toggle", key: "argoWatch", label: tr("Argo CD 배포 상태 보기"), note: tr("열려 있거나 최근에 쓴 세션의 레포에 이어진 앱을 ⌘U의 \"배포\"에 모으고, 나빠지면 알린다") },
-      { kind: "text", key: "argoApps", label: tr("레포 → Argo CD 앱"), note: tr("앱을 레포에 직접 잇는다. 적어 두면 소스나 이미지 이름으로 잇는 기본 판정보다 먼저다. 앱 이름 패턴에 *를 쓰거나 /정규식/으로 적고, 쉼표로 여럿을 적는다"), hint: "acme-api=acme-api-*, acme-shop=/^shop-(dev|prod)$/" },
-      { kind: "text", key: "argoEnvLabel", label: tr("환경 이름으로 쓸 라벨"), note: tr("비우면 앱의 env, environment 라벨, 없으면 네임스페이스, 그것도 없으면 클러스터 이름을 쓴다"), hint: "tier" },
-      { kind: "text", key: "argoTagCommit", label: tr("이미지 태그 → 커밋"), note: tr("태그에서 커밋을 꺼낼 정규식. 캡처 그룹 1이 커밋이다. 비우면 태그 안의 16진수 조각을 git으로 확인해서 찾는다"), hint: "^[0-9]+\\.([0-9a-f]+)$" },
-      { kind: "text", key: "argoTagParam", label: tr("이미지 태그 파라미터 이름"), note: tr("배포 이력에서 그 배포의 이미지 태그를 찾을 때, 태그를 담은 Helm 파라미터(또는 values의 키) 이름을 가리는 정규식. 비우면 image.tag처럼 마지막 마디가 tag인 이름을 본다"), hint: "(^|\\.)(tag|version)$" },
-      { kind: "number", key: "argoLagMin", label: tr("OutOfSync가 이만큼 이어지면 알리기"), note: tr("배포가 어긋난 채로 이 시간이 넘으면 한 번 알린다. 0이면 알리지 않는다"), step: 5, min: 0, max: 120, show: (n) => (n ? tr`${n}분` : tr("끔")) },
+      { under: () => config.argoWatch, kind: "text", key: "argoApps", label: tr("레포 → Argo CD 앱"), note: tr("앱을 레포에 직접 잇는다. 적어 두면 소스나 이미지 이름으로 잇는 기본 판정보다 먼저다. 앱 이름 패턴에 *를 쓰거나 /정규식/으로 적고, 쉼표로 여럿을 적는다"), hint: "acme-api=acme-api-*, acme-shop=/^shop-(dev|prod)$/" },
+      { under: () => config.argoWatch, kind: "text", key: "argoEnvLabel", label: tr("환경 이름으로 쓸 라벨"), note: tr("비우면 앱의 env, environment 라벨, 없으면 네임스페이스, 그것도 없으면 클러스터 이름을 쓴다"), hint: "tier" },
+      { under: () => config.argoWatch, kind: "text", key: "argoTagCommit", label: tr("이미지 태그 → 커밋"), note: tr("태그에서 커밋을 꺼낼 정규식. 캡처 그룹 1이 커밋이다. 비우면 태그 안의 16진수 조각을 git으로 확인해서 찾는다"), hint: "^[0-9]+\\.([0-9a-f]+)$" },
+      { under: () => config.argoWatch, kind: "text", key: "argoTagParam", label: tr("이미지 태그 파라미터 이름"), note: tr("배포 이력에서 그 배포의 이미지 태그를 찾을 때, 태그를 담은 Helm 파라미터(또는 values의 키) 이름을 가리는 정규식. 비우면 image.tag처럼 마지막 마디가 tag인 이름을 본다"), hint: "(^|\\.)(tag|version)$" },
+      { under: () => config.argoWatch, kind: "number", key: "argoLagMin", label: tr("OutOfSync가 이만큼 이어지면 알리기"), note: tr("배포가 어긋난 채로 이 시간이 넘으면 한 번 알린다. 0이면 알리지 않는다"), step: 5, min: 0, max: 120, show: (n) => (n ? tr`${n}분` : tr("끔")) },
     ],
   },
   {
@@ -235,6 +239,14 @@ const SECTIONS: { id: string; title: string; hint: string; needs?: "jira" | "arg
     hint: tr("폰으로 보기"),
     rows: [
     { kind: "toggle", key: "remote", label: tr("폰에서 보기"), note: tr("Tailscale 망 안에서만 열리는 작은 웹 화면을 띄운다. 폰에서 내 차례인 세션에 답하고 새 일을 던진다. 켜면 아래에 주소가 나온다(누르면 복사). 주소에 든 토큰을 아는 기기만 들어온다") },
+    ],
+  },
+  {
+    id: "설정 파일", // i18n-ok
+    title: tr("설정 파일"),
+    hint: tr("어디에 있고, 어떻게 나누나"),
+    rows: [
+      { kind: "share", label: tr("내 설정 내보내기와 가져오기"), note: tr("설정은 전부 ~/.julgi 아래의 글 파일이다. config.json 에는 기본값에서 바꾼 것만 적히고, 봇은 bots.json 에, 배경 사진은 background.txt 에 있다. 이 폴더를 그대로 옮기거나 dotfiles 로 관리해도 된다. 내보내기는 남과 나눌 수 있는 것만 한 파일(julgi-setup.json)로 모은다: 생김새, 일하는 방식, 봇. 내 컴퓨터와 회사에 딸린 것(폴더, 연결, 티켓과 배포 설정)과 허락을 푸는 설정은 넣지 않는다. 가져올 때 봇은 꺼진 채로 들어온다") },
     ],
   },
 ];
@@ -251,7 +263,7 @@ const NAV: { title: string; ids: string[] }[] = [
   { title: tr("기본"), ids: ["화면", "꾸미기", "세션"] },
   { title: tr("Julgi가 하는 일"), ids: ["알아서 하는 일", "봇", "코드 검토", "점검과 모델", "지도"] },
   { title: tr("밖의 서비스"), ids: ["연결", "PR", "티켓", "배포"] },
-  { title: tr("그 밖"), ids: ["밖에서", "keys"] },
+  { title: tr("그 밖"), ids: ["밖에서", "설정 파일", "keys"] },
 ];
 // i18n-on
 /** 계정을 연결하는 묶음의 자리 */
@@ -353,6 +365,29 @@ export default function Settings({ onChange, onClose, remoteUrl, onConnect, onCo
     }
   };
 
+  /** 딸린 줄은 위 줄이 켜져 있을 때만 보인다 */
+  const shown = (i: number) => ROWS[i].under?.({ bg: !!bg }) ?? true;
+  // 내보내기와 가져오기: 나눌 수 있는 값만 다룬다
+  const [shareNote, setShareNote] = useState("");
+  const [incoming, setIncoming] = useState<{ values: [Key, string | number | boolean][]; bots: Bot[] } | null>(null);
+  const exportSetup = async () => {
+    const text = JSON.stringify(setupOf(config, bots), null, 1);
+    const path = await invoke<string>("data_write", { name: "share/julgi-setup.json", text }).catch(() => "");
+    await navigator.clipboard.writeText(text).catch(() => {});
+    setShareNote(path ? tr`${path.replace(/^\/Users\/[^/]+/, "~")} 에 썼고, 클립보드에도 복사했다` : tr("클립보드에 복사했다"));
+  };
+  const readSetup = (text: string) => {
+    const found = setupDiff(text, config, bots);
+    setShareNote(found ? "" : tr("Julgi 설정 파일이 아니다"));
+    setIncoming(found);
+  };
+  const applySetup = () => {
+    if (!incoming) return;
+    for (const [key, value] of incoming.values) onChange(key, value);
+    if (incoming.bots.length) onBots([...bots, ...incoming.bots]);
+    setShareNote(tr`값 ${incoming.values.length}개를 바꾸고 봇 ${incoming.bots.length}개를 더했다`);
+    setIncoming(null);
+  };
   const onKey = (e: React.KeyboardEvent) => {
     const typing = e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement;
     const row = ROWS[at];
@@ -376,7 +411,11 @@ export default function Settings({ onChange, onClose, remoteUrl, onConnect, onCo
       return set(row.key, [...mods, e.code].join("+"));
     }
     if (e.key === "ArrowDown" || e.key === "ArrowUp") {
-      setAt((at + (e.key === "ArrowDown" ? 1 : -1) + ROWS.length) % ROWS.length);
+      // 감춰진 줄(위 줄이 꺼져 있는 딸린 줄)은 건너뛴다
+      let next = at;
+      do next = (next + (e.key === "ArrowDown" ? 1 : -1) + ROWS.length) % ROWS.length;
+      while (!shown(next) && next !== at);
+      setAt(next);
       if (typing) box.current?.focus();
     } else if (typing) {
       if (e.key === "Enter") box.current?.focus();
@@ -427,8 +466,8 @@ export default function Settings({ onChange, onClose, remoteUrl, onConnect, onCo
             )}
             <div className="set-card">
               {ROWS.map((row, i) =>
-                SECTION_OF[i] !== SECTION_OF[at] ? null : (
-                <div key={`${row.label}-${i}`} className={"set-row" + (i === at ? " on" : "") + (row.kind === "keys" ? " keys" : "") + (row.kind === "theme" || row.kind === "bots" ? " stack" : "")} onClick={() => setAt(i)}>
+                SECTION_OF[i] !== SECTION_OF[at] || !shown(i) ? null : (
+                <div key={`${row.label}-${i}`} className={"set-row" + (i === at ? " on" : "") + (row.kind === "keys" ? " keys" : "") + (row.kind === "theme" || row.kind === "bots" ? " stack" : "") + (row.under ? " child" : "")} onClick={() => setAt(i)}>
                   {row.kind === "keys" && <kbd className="set-kbd">{row.label}</kbd>}
                   <div className="set-label">
                     {row.kind !== "keys" && row.label}
@@ -504,6 +543,35 @@ export default function Settings({ onChange, onClose, remoteUrl, onConnect, onCo
                             {tr("연결하기")}
                           </button>
                         )}
+                      </span>
+                    )}
+                    {row.kind === "share" && (
+                      <span className="set-share" onClick={(e) => e.stopPropagation()}>
+                        <button type="button" tabIndex={-1} className="set-toggle" onClick={() => void exportSetup()}>
+                          {tr("내보내기")}
+                        </button>
+                        <label className="set-toggle">
+                          {tr("가져오기")}
+                          <input type="file" accept=".json,application/json" tabIndex={-1} hidden onChange={(e) => (e.target.files?.[0] && void e.target.files[0].text().then(readSetup), (e.target.value = ""))} />
+                        </label>
+                        {incoming && (
+                          <span className="set-share-in">
+                            <span>
+                              {incoming.values.length || incoming.bots.length
+                                ? tr`바뀌는 값 ${incoming.values.length}개${incoming.values.length ? ": " + incoming.values.slice(0, 8).map(([k]) => k).join(", ") + (incoming.values.length > 8 ? " …" : "") : ""} · 새 봇 ${incoming.bots.length}개`
+                                : tr("지금 설정과 다른 것이 없다")}
+                            </span>
+                            {(incoming.values.length > 0 || incoming.bots.length > 0) && (
+                              <button type="button" tabIndex={-1} className="set-toggle yes" onClick={applySetup}>
+                                {tr("적용")}
+                              </button>
+                            )}
+                            <button type="button" tabIndex={-1} className="set-toggle" onClick={() => setIncoming(null)}>
+                              {tr("취소")}
+                            </button>
+                          </span>
+                        )}
+                        {shareNote && <span className="set-note">{shareNote}</span>}
                       </span>
                     )}
                     {row.kind === "bg" && (
