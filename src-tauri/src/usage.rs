@@ -32,22 +32,40 @@ fn token() -> Option<String> {
     value.get("claudeAiOauth")?.get("accessToken")?.as_str().map(str::to_owned)
 }
 
-#[tauri::command(async)]
-pub fn claude_usage() -> Result<Vec<Limit>, String> {
+/// Claude Code의 로그인으로 Anthropic의 주소 하나를 읽는다
+fn get(url: &str) -> Result<Vec<u8>, String> {
     let token = token().ok_or_else(|| say("Claude Code의 로그인 정보를 읽지 못했다", "Could not read the Claude Code login"))?;
     // 토큰이 프로세스 목록에 보이지 않게 명령줄이 아니라 표준 입력으로 넘긴다
     let mut child = Command::new("curl")
-        .args(["-s", "-m", "12", "-K", "-", "https://api.anthropic.com/api/oauth/usage"])
+        .args(["-s", "-m", "12", "-K", "-", url])
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .stderr(Stdio::null())
         .spawn()
         .map_err(|e| e.to_string())?;
     if let Some(mut stdin) = child.stdin.take() {
-        let _ = write!(stdin, "header = \"Authorization: Bearer {token}\"\nheader = \"anthropic-beta: oauth-2025-04-20\"\nheader = \"Accept: application/json\"\n");
+        let _ = write!(stdin, "header = \"Authorization: Bearer {token}\"\nheader = \"anthropic-beta: oauth-2025-04-20\"\nheader = \"anthropic-version: 2023-06-01\"\nheader = \"Accept: application/json\"\n");
     }
-    let out = child.wait_with_output().map_err(|e| e.to_string())?;
-    let value: Value = serde_json::from_slice(&out.stdout).map_err(|_| say("사용량 답을 읽지 못했다", "Could not read the usage response"))?;
+    Ok(child.wait_with_output().map_err(|e| e.to_string())?.stdout)
+}
+
+/// 이 로그인으로 쓸 수 있는 모델들: (id, 보이는 이름). 최근 것이 앞에 온다. 봇마다 모델을 고를 때 후보로 쓴다
+#[tauri::command(async)]
+pub fn claude_models() -> Result<Vec<(String, String)>, String> {
+    let value: Value = serde_json::from_slice(&get("https://api.anthropic.com/v1/models?limit=100")?).map_err(|_| say("모델 목록을 읽지 못했다", "Could not read the model list"))?;
+    Ok(value
+        .get("data")
+        .and_then(Value::as_array)
+        .into_iter()
+        .flatten()
+        .filter_map(|m| Some((m.get("id")?.as_str()?.to_owned(), m.get("display_name").and_then(Value::as_str).unwrap_or("").to_owned())))
+        .collect())
+}
+
+#[tauri::command(async)]
+pub fn claude_usage() -> Result<Vec<Limit>, String> {
+    let out = get("https://api.anthropic.com/api/oauth/usage")?;
+    let value: Value = serde_json::from_slice(&out).map_err(|_| say("사용량 답을 읽지 못했다", "Could not read the usage response"))?;
     let Some(map) = value.as_object() else { return Err(say("사용량 답의 모양이 다르다", "The usage response has an unexpected shape")) };
     let mut limits = Vec::new();
     // 새 모양: limits 목록에 한도가 하나씩 들어 있다 (세션 창, 주간 전체, 모델별 주간)

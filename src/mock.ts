@@ -51,6 +51,8 @@ async function invoke(cmd: string, args: Record<string, unknown> = {}): Promise<
       return "http://macbook.tail1a2b3c.ts.net:4747/?t=0123456789abcdef0123456789abcdef";
     case "term_load":
       return Object.fromEntries([1, 2, 3, 4, 5, 6].map((id) => [id, [260_000 + id * 61_000, id === 1 ? 14.2 : 0.1]]));
+    case "claude_models":
+      return [["claude-opus-5-5", "Claude Opus 5.5"], ["claude-sonnet-5-5", "Claude Sonnet 5.5"], ["claude-haiku-5-5", "Claude Haiku 5.5"]];
     case "claude_usage":
       return [
         { name: "5시간", used: 24, resets: Math.floor(Date.now() / 1000) + 8820 },

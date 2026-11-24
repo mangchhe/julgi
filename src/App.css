@@ -1442,7 +1442,13 @@ body.dragging .pane-body { pointer-events: none; }
 .set-bot label > span { padding-top: 6px; }
 .set-bot textarea, .set-bot input { font: inherit; font-size: 13px; color: var(--ink); background: var(--bg); border: 1px solid var(--line); border-radius: 6px; padding: 5px 8px; resize: vertical; }
 .set-bot .set-bot-face { display: block; padding: 0; border: 0; background: none; cursor: pointer; line-height: 0; flex: none; }
-.set-bot label.set-bot-up { display: inline-flex; align-items: center; gap: 0; font-size: 12px; padding: 5px 10px; border: 1px solid var(--line); border-radius: 7px; cursor: pointer; flex: none; background: var(--bg); }
+.set-bot label.set-bot-up { display: inline-flex; align-items: center; gap: 0; font-size: 12px; padding: 5px 10px; border: 1px solid var(--line); border-radius: 7px; cursor: pointer; flex: none; background: var(--bg); color: var(--ink); }
+.set-bot-faces { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; padding: 8px; border: 1px solid var(--line); border-radius: 9px; background: var(--bg); }
+.set-bot-faces > button { padding: 4px; line-height: 0; border: 2px solid transparent !important; border-radius: 12px; background: none !important; cursor: pointer; }
+.set-bot-faces > button:hover { border-color: var(--line) !important; }
+.set-bot-faces > button.on { border-color: var(--accent) !important; }
+.set-bot-faces .set-bot-up { margin-left: 6px; }
+.set-bot .set-bot-model { font: inherit; font-size: 12px; color: var(--ink); background: var(--bg); border: 1px solid var(--line); border-radius: 7px; padding: 5px 8px; max-width: 170px; flex: none; }
 .pane-empty img { margin-bottom: 10px; }
 .set-card .set-row.stack > .set-value:has(.set-bots) { max-width: none; }
 .set-bot:not(.on) .set-bot-face { opacity: 0.55; }
@@ -1474,3 +1480,12 @@ body.dragging .pane-body { pointer-events: none; }
 .qu-empty b { font-size: 17px; }
 .qu-empty p { margin: 0; max-width: 420px; color: var(--muted); font-size: 13.5px; line-height: 1.6; }
 .qu-empty small { margin-top: 6px; color: var(--muted); font-size: 12px; }
+.set-card .set-bot-head .set-bot-name { width: 120px; }
+.set-card .set-bot-head .set-bot-job { width: auto; }
+/* 봇 카드 머리의 칸들은 높이, 테두리, 바탕을 하나로 맞춘다 */
+.set-card .set-bot-head > input, .set-card .set-bot-head > select, .set-card .set-bot-head > button.set-toggle { height: 32px; box-sizing: border-box; padding: 0 10px; font-size: 13px; line-height: 30px; color: var(--ink); background: var(--bg); border: 1px solid var(--line); border-radius: 7px; outline: none; }
+.set-card .set-bot-head > input:focus, .set-card .set-bot-head > select:focus { border-color: var(--accent); }
+.set-card .set-bot-head > select.set-bot-model { -webkit-appearance: none; appearance: none; max-width: 180px; padding-right: 26px; color: var(--muted); cursor: pointer; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 10 6'%3E%3Cpath d='M1 1l4 4 4-4' fill='none' stroke='%238499ab' stroke-width='1.4' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 9px center; background-size: 9px; }
+.set-card .set-bot-head > button.set-toggle { padding: 0 12px; }
+.set-card .set-bot-head > .set-note { white-space: nowrap; }
+.set-card .set-bot-head > input.set-bot-job { color: color-mix(in srgb, var(--ink) 70%, var(--muted)); }

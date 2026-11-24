@@ -232,7 +232,11 @@ export default {
   "이 말을 보낸다": "send this",
   "예: 커밋해 줘": "e.g. commit it",
   "+ 봇 더하기": "+ Add a bot",
-  "누르면 다른 얼굴로 바꾼다": "Click for another face",
   "내 그림을 얼굴로 쓴다": "Use my own picture as the face",
-  "그림": "Picture",
+  "판단 모델 따름": "Follow judgment model",
+  "얼굴 고르기": "Choose a face",
+  "이 봇의 상황을 가릴 모델": "The model that judges this bot's situation",
+  "늘 최신": "Always the latest",
+  "버전을 정해서": "A fixed version",
+  "내 그림…": "My picture…",
 } as Record<string, string>;

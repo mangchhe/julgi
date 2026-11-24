@@ -9,7 +9,7 @@ import { CORE, MORE } from "./Help";
 import { getLang, resolveLang, tr } from "./i18n";
 import { argoHost, argoLoginCommand } from "./argo";
 import { Bot } from "./triageAsk.ts";
-import BotFace, { faceOf, nextFace, shrinkImage } from "./BotFace";
+import BotFace, { ARTS, faceOf, freeFace, shrinkImage } from "./BotFace";
 
 type Key = keyof typeof config;
 type Props = {
@@ -104,7 +104,9 @@ const SECTIONS: { id: string; title: string; hint: string; needs?: "jira" | "arg
     id: "봇", // i18n-ok
     title: tr("봇"),
     hint: tr("세션이 답을 끝냈을 때 정해 둔 상황이면 대신 답한다"),
-    rows: [{ kind: "bots", label: tr("등록된 봇"), note: tr("봇 하나는 \"이런 상황이면 이 말을 보낸다\"이다. 세션이 답을 끝내면 작은 모델이 그 답을 읽고, 켜 둔 봇의 상황에 꼭 들어맞을 때만 그 봇의 말을 세션에 대신 보낸다. 여러 안 가운데 고르라는 물음, 내가 줄 정보를 기다리는 물음, 푸시·머지·배포·삭제처럼 되돌리기 어려운 일을 묻는 물음에는 어느 봇도 답하지 않는다. 한 세션에 연달아 세 번까지만 보내고, 보낸 것은 ⌘Y에 \"대신 답함\"으로 남는다. \"할 일이 있을 때만 부르기\"가 켜져 있어야 한다") }],
+    rows: [
+      { kind: "bots", label: tr("등록된 봇"), note: tr("봇 하나는 \"이런 상황이면 이 말을 보낸다\"이다. 세션이 답을 끝내면 작은 모델이 그 답을 읽고, 켜 둔 봇의 상황에 꼭 들어맞을 때만 그 봇의 말을 세션에 대신 보낸다. 여러 안 가운데 고르라는 물음, 내가 줄 정보를 기다리는 물음, 푸시·머지·배포·삭제처럼 되돌리기 어려운 일을 묻는 물음에는 어느 봇도 답하지 않는다. 한 세션에 연달아 세 번까지만 보내고, 보낸 것은 ⌘Y에 \"대신 답함\"으로 남는다. \"할 일이 있을 때만 부르기\"가 켜져 있어야 한다") },
+    ],
   },
   {
     id: "코드 검토", // i18n-ok
@@ -240,6 +242,14 @@ export default function Settings({ onChange, onClose, remoteUrl, onConnect, onCo
   // Jira가 연결돼 있으면 그 Jira의 상태 이름을 읽어 "옮길 상태" 칸에서 고르게 한다. 워크플로가 프로젝트마다 달라서
   // 목록은 전체 상태이고, 실제로 옮길 수 있는지는 그 티켓의 지금 상태에 달려 있다
   const [statuses, setStatuses] = useState<{ name: string; category: string }[]>([]);
+  // 봇: 얼굴을 고르는 중인 봇, 그리고 이 로그인으로 쓸 수 있는 모델들 (봇 탭을 처음 열 때 한 번 읽는다)
+  const [facing, setFaceOf] = useState("");
+  const [models, setModels] = useState<[string, string][]>([]);
+  const onBotsTab = SECTIONS[SECTION_OF[at]]?.id === "봇"; // i18n-ok
+  useEffect(() => {
+    if (onBotsTab && !models.length) void invoke<[string, string][]>("claude_models").then(setModels, () => {});
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [onBotsTab]);
   useEffect(() => {
     if (!config.jiraSite) return setStatuses([]);
     void invoke<{ name: string; category: string }[]>("jira_statuses", { conn: { site: config.jiraSite, email: config.jiraEmail, kind: config.jiraKind } }).then(setStatuses, () => setStatuses([]));
@@ -467,15 +477,27 @@ export default function Settings({ onChange, onClose, remoteUrl, onConnect, onCo
                           return (
                             <div key={b.id} className={"set-bot" + (b.on ? " on" : "")}>
                               <div className="set-bot-head">
-                                <button type="button" tabIndex={-1} className="set-bot-face" title={tr("누르면 다른 얼굴로 바꾼다")} onClick={() => put(nextFace(b))}>
-                                  <BotFace {...faceOf(b)} size={36} />
+                                <button type="button" tabIndex={-1} className="set-bot-face" title={tr("얼굴 고르기")} onClick={() => setFaceOf(facing === b.id ? "" : b.id)}>
+                                  <BotFace image={faceOf(b)} size={36} />
                                 </button>
                                 <input tabIndex={-1} className="set-bot-name" value={b.name} placeholder={tr("이름")} spellCheck={false} onChange={(e) => put({ name: e.target.value })} />
                                 <input tabIndex={-1} className="set-bot-job" value={b.job} placeholder={tr("하는 일 한 줄")} spellCheck={false} onChange={(e) => put({ job: e.target.value })} />
-                                <label className="set-toggle set-bot-up" title={tr("내 그림을 얼굴로 쓴다")}>
-                                  {tr("그림")}
-                                  <input type="file" accept="image/*" tabIndex={-1} hidden onChange={(e) => e.target.files?.[0] && void shrinkImage(e.target.files[0]).then((image) => put({ image })).catch(() => {})} />
-                                </label>
+                                <select tabIndex={-1} className="set-bot-model" value={b.model ?? ""} title={tr("이 봇의 상황을 가릴 모델")} onChange={(e) => put({ model: e.target.value || undefined })}>
+                                  <option value="">{tr("판단 모델 따름")}</option>
+                                  <optgroup label={tr("늘 최신")}>
+                                    <option value="haiku">Haiku</option>
+                                    <option value="sonnet">Sonnet</option>
+                                    <option value="opus">Opus</option>
+                                  </optgroup>
+                                  <optgroup label={tr("버전을 정해서")}>
+                                    {models.map(([id, name]) => (
+                                      <option key={id} value={id}>
+                                        {name || id}
+                                      </option>
+                                    ))}
+                                    {b.model && !["haiku", "sonnet", "opus"].includes(b.model) && !models.some(([id]) => id === b.model) && <option value={b.model}>{b.model}</option>}
+                                  </optgroup>
+                                </select>
                                 <span className="set-note">{tr`${b.runs}번 답함`}</span>
                                 <button type="button" tabIndex={-1} className={"set-toggle" + (b.on ? " on" : "")} onClick={() => put({ on: !b.on })}>
                                   {b.on ? tr("켬") : tr("끔")}
@@ -484,6 +506,24 @@ export default function Settings({ onChange, onClose, remoteUrl, onConnect, onCo
                                   ×
                                 </button>
                               </div>
+                              {facing === b.id && (
+                                <div className="set-bot-faces">
+                                  {Object.entries(ARTS).map(([name, url]) => (
+                                    <button key={name} type="button" tabIndex={-1} className={!b.image && faceOf(b) === url ? "on" : ""} onClick={() => (put({ art: name, image: undefined }), setFaceOf(""))}>
+                                      <BotFace image={url} size={40} />
+                                    </button>
+                                  ))}
+                                  {b.image && (
+                                    <button type="button" tabIndex={-1} className="on">
+                                      <BotFace image={b.image} size={40} />
+                                    </button>
+                                  )}
+                                  <label className="set-bot-up" title={tr("내 그림을 얼굴로 쓴다")}>
+                                    {tr("내 그림…")}
+                                    <input type="file" accept="image/*" tabIndex={-1} hidden onChange={(e) => e.target.files?.[0] && void shrinkImage(e.target.files[0]).then((image) => (put({ image }), setFaceOf(""))).catch(() => {})} />
+                                  </label>
+                                </div>
+                              )}
                               <label>
                                 <span>{tr("이런 상황이면")}</span>
                                 <textarea tabIndex={-1} rows={3} value={b.when} placeholder={tr("예: 끝냈다고 보고했는데 커밋하지 않았다")} spellCheck={false} onChange={(e) => put({ when: e.target.value })} />
@@ -495,7 +535,7 @@ export default function Settings({ onChange, onClose, remoteUrl, onConnect, onCo
                             </div>
                           );
                         })}
-                        <button type="button" tabIndex={-1} className="set-toggle" onClick={() => onBots([...bots, { id: crypto.randomUUID().slice(0, 8), name: "", job: "", when: "", say: "", on: false, runs: 0 }])}>
+                        <button type="button" tabIndex={-1} className="set-toggle" onClick={() => onBots([...bots, { id: crypto.randomUUID().slice(0, 8), name: "", job: "", when: "", say: "", on: false, runs: 0, art: freeFace(bots) }])}>
                           {tr("+ 봇 더하기")}
                         </button>
                       </div>

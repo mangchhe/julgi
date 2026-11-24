@@ -1032,21 +1032,33 @@ export default function App() {
   const triage = async (sessionId: string, since: number) => {
     if (triaging.current.has(sessionId)) return;
     triaging.current.set(sessionId, Date.now());
-    let verdict = { since, need: true, bot: 0, why: "" };
+    let verdict = { since, need: true, why: "" };
+    let bot: Bot | undefined;
     const active = botsRef.current.filter((b) => b.on && b.when.trim() && b.say.trim());
     try {
       const pair = await invoke<[string, string] | null>("last_exchange", { sessionId });
       if (pair?.[1]) {
-        // 물음은 대개 답의 끝에 있다
-        const raw = (await invoke<string | null>("route_ask", { system: TRIAGE_SYSTEM, prompt: triagePrompt(pair[0], pair[1], active.map((b) => b.when)), model: modelFor("note") })) ?? "";
-        verdict = { since, ...parseTriage(raw) };
+        // 봇은 모델별로 묶어 한 번씩 묻는다. 모델을 따로 정하지 않은 봇은 "할 일이 있나" 판정과 같은 호출에 실린다
+        const base = modelFor("note");
+        const models = [base, ...new Set(active.map((b) => b.model || base).filter((m) => m !== base))];
+        const answers = await Promise.all(
+          models.map(async (model) => {
+            const group = active.filter((b) => (b.model || base) === model);
+            // 물음은 대개 답의 끝에 있다
+            const raw = (await invoke<string | null>("route_ask", { system: TRIAGE_SYSTEM, prompt: triagePrompt(pair[0], pair[1], group.map((b) => b.when)), model }).catch(() => null)) ?? "";
+            const got = parseTriage(raw);
+            return { got, hit: group[got.bot - 1] };
+          }),
+        );
+        verdict = { since, need: answers[0].got.need, why: answers[0].got.why };
+        // 여러 봇이 맞았으면 목록에서 위에 있는 봇이 답한다
+        bot = active.find((b) => answers.some((a) => a.hit === b));
       }
     } catch {
       // 못 읽었으면 내 차례로 둔다. 놓치는 것보다 한 번 더 부르는 편이 낫다
     }
     // 답이 켜 둔 봇의 상황에 들어맞으면 그 봇의 말을 대신 보낸다. 내가 한 번도 끼지 않고 연달아 보내는 것은 한 세션에 세 번까지다
     const key = live.current.open.find((o) => o.sessionId === sessionId)?.key;
-    const bot = active[verdict.bot - 1];
     const streak = bot ? (goStreak.current[sessionId] ?? 0) : 0;
     if (bot && key && streak < 3) {
       goStreak.current[sessionId] = streak + 1;

@@ -123,7 +123,7 @@ export default function Sidebar({ open, items, threads, byId, states, tasks, cha
         <button type="button" className="side-work" onClick={onBots} title={tr`봇: 정해 둔 상황이면 세션에 대신 답한다`}>
           <span className="side-faces">
             {(bots.some((b) => b.on) ? bots.filter((b) => b.on) : bots).slice(0, 3).map((b) => (
-              <BotFace key={b.id} {...faceOf(b)} size={18} />
+              <BotFace key={b.id} image={faceOf(b)} size={18} />
             ))}
           </span>
           <span>{tr`봇`}</span>
