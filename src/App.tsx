@@ -3531,7 +3531,14 @@ export default function App() {
             if (job?.state === "decide") setBug(job.key, { state: "done" });
             record("답함", tr`"${nameOf(key)}"에 내 차례 목록에서 답함: ${text.slice(0, 80)}`, open.find((o) => o.key === key)?.sessionId); // i18n-ok
           }}
-          onOpen={(key) => (open.some((o) => o.key === key) ? show(key) : wake(key.slice(2)))}
+          onOpen={(key) => {
+            // 내 차례에서 답을 읽고 답 없이 세션을 열었으면 본 것으로 친다. 그 답이 그대로인 동안은 내 차례에서 내린다.
+            // 허락을 묻는 것과 멈춘 것은 보기만 해서는 풀리지 않으므로 그대로 둔다
+            const o = open.find((x) => x.key === key);
+            const st = states[key];
+            if (o?.sessionId && st?.state === "wait") triaged.current[o.sessionId] = { since: st.since, need: false, why: "" };
+            return o ? show(key) : wake(key.slice(2));
+          }}
           onPr={(pr) => openPr(pr)}
           // 내 차례 창만 닫는다. 그사이 다른 화면(작업 페이지 등)으로 넘어갔으면 그 화면을 닫지 않는다
           onClose={() => setOverlay((o) => (o === "queue" ? null : o))}
