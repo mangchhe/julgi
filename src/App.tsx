@@ -3393,6 +3393,7 @@ export default function App() {
                 }}
                 state={key && dead.includes(key) ? "dead" : key ? (states[key]?.state ?? "") : ""}
                 info={info && focus === i}
+                onInfoClose={() => (setInfo(false), terms.focus(panes[i] ?? ""))}
                 finding={finding && focus === i}
                 handing={!!key && handing.includes(key)}
                 handed={!!key && !!handed[key]}

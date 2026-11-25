@@ -22,4 +22,5 @@ export default {
   "목록에서 내린다. ⌘K로는 계속 찾는다": "Takes it off the list. Still found with ⌘K",
   "다시 살리기": "Bring back",
   "이 일 끝내기": "Finish this work",
+  "닫기 (⌘I)": "Close (⌘I)",
 } as Record<string, string>;

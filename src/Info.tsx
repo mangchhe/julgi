@@ -7,7 +7,7 @@ import { tr } from "./i18n";
 /** 지금 세션이 뭘 하던 것인지와 산출물. ⌘I로 여닫는다. */
 export type Member = { id: string; title: string; here: boolean };
 export type ThreadOps = { name: (name: string) => void; leave: (sessionId: string) => void; drop: () => void; finish: () => void; changes: () => void };
-type Props = { session?: Session; cwd: string; thread?: Thread; memory: string; members: Member[]; ops: ThreadOps; change?: Change };
+type Props = { session?: Session; cwd: string; thread?: Thread; memory: string; members: Member[]; ops: ThreadOps; change?: Change; onClose?: () => void };
 
 /** 인계 글의 마크다운을 읽기 좋게 줄 단위로 푼다. 제목 줄은 굵게, 나머지는 기호만 걷는다 */
 const lines = (text: string) =>
@@ -16,7 +16,7 @@ const lines = (text: string) =>
     .map((line) => ({ head: /^#{1,6}\s/.test(line), text: line.replace(/^#{1,6}\s+/, "").replace(/\*\*|`/g, "") }))
     .filter((line, i, all) => line.text.trim() || (i > 0 && all[i - 1].text.trim()));
 
-export default function Info({ session, cwd, thread, memory, members, ops, change }: Props) {
+export default function Info({ session, cwd, thread, memory, members, ops, change, onClose }: Props) {
   const [full, setFull] = useState(false);
   const short = (path: string) => path.replace(/^\/Users\/[^/]+/, "~");
   if (!session)
@@ -35,7 +35,11 @@ export default function Info({ session, cwd, thread, memory, members, ops, chang
   const files = [...(session.files ?? [])].reverse();
   const name = thread?.name ?? session.title;
   return (
-    <div className="info">
+    // 초점이 패널 안에 있을 때만 Esc로 닫는다. 터미널에 초점이 있을 때의 Esc는 Claude Code의 것이라 건드리지 않는다
+    <div className="info" tabIndex={-1} onKeyDown={(e) => e.key === "Escape" && (e.stopPropagation(), onClose?.())}>
+      <button type="button" className="info-x" tabIndex={-1} title={tr("닫기 (⌘I)")} onClick={onClose}>
+        ×
+      </button>
       <input
         key={(thread?.id ?? session.id) + name}
         className="info-name"

@@ -22,6 +22,8 @@ type Props = {
   members: Member[];
   thread_ops: ThreadOps;
   info: boolean;
+  /** 정보 패널을 닫는다(× 버튼, 패널 안에서 누른 Esc) */
+  onInfoClose?: () => void;
   /** 화면 글자 찾기 줄이 열려 있는가 */
   finding: boolean;
   /** 갈아타는 중인가 */
@@ -45,7 +47,7 @@ type Props = {
   onFocus: () => void;
 };
 
-export default function Pane({ termKey, focused, active, label, cwd, session, thread, memory, state, members, thread_ops, info, finding, handing, handed, stemDone, ticketNote, deployLine, pinned, change, review, ticketEnded, onPin, onFindClose, onFocus }: Props) {
+export default function Pane({ termKey, focused, active, label, cwd, session, thread, memory, state, members, thread_ops, info, onInfoClose, finding, handing, handed, stemDone, ticketNote, deployLine, pinned, change, review, ticketEnded, onPin, onFindClose, onFocus }: Props) {
   const body = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -133,7 +135,7 @@ export default function Pane({ termKey, focused, active, label, cwd, session, th
           <p>{tr`내 차례인 세션이 생기면 이 칸에 알아서 올라온다. 비어 있으면 잠시 뒤 칸이 없어진다.`}</p>
         </div>
       )}
-      {info && termKey && !finding && <Info session={session} cwd={cwd} thread={thread} memory={memory} members={members} ops={thread_ops} change={change} />}
+      {info && termKey && !finding && <Info onClose={onInfoClose} session={session} cwd={cwd} thread={thread} memory={memory} members={members} ops={thread_ops} change={change} />}
       {finding && termKey && (
         <div className="find">
           <input
