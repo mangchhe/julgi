@@ -265,6 +265,8 @@ export const config = {
   recentDays: 14,
   /** 레포가 드러나지 않는 일을 여는 폴더. 비우면 ~/julgi */
   defaultDir: "",
+  // ⌘ 클릭한 파일을 여는 앱 이름(예: "Visual Studio Code"). 비우면 macOS가 그 확장자에 정한 앱
+  editor: "",
   /** 답까지 본 뒤 이 시간(시) 넘게 쉰 세션은 재운다. 0이면 안 재운다 */
   sleepHours: 3,
   /** 점검을 도는 시각(0–23시). 매일 이 시각에 돌고, 그때 꺼져 있었으면 다음에 켰을 때 돈다 */

@@ -74,6 +74,7 @@
 | `mapRoot` | 없음 | 레포가 모여 있는 폴더. 그 아래의 git 레포가 지도에 들어간다 |
 | `mapFetch` | 켜짐 | 지도를 그리기 전에 원격에서 받아 온다 |
 | `defaultDir` | `~/julgi` | 레포가 드러나지 않는 일을 여는 폴더 |
+| `editor` | (비어 있음) | 터미널에서 ⌘ 클릭한 파일을 여는 앱. 응용 프로그램 폴더에 보이는 이름으로 적는다(예: `Visual Studio Code`). 비우면 macOS가 그 확장자에 정한 앱 |
 | `hotkey` | `ctrl+super+KeyJ` | 어느 앱에서든 창을 꺼내고 넣는 키 |
 
 ## 연결 설정 (GitHub · GitLab · Jira)
