@@ -1,3 +1,4 @@
+import { openUrl } from "@tauri-apps/plugin-opener";
 import Hint from "./Hint";
 import doneArt from "./assets/art/done.png";
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -294,10 +295,19 @@ export default function Queue({ rows, asks, mine, tickets, loadTicket, runs = []
                   </span>
                 </div>
               )}
-              <div className="qu-reply">
+              <div className="qu-reply" ref={(el) => void (el && (el.scrollTop = el.scrollHeight))}>
                 {reply === undefined && <small>{tr`읽는 중`}</small>}
                 {reply === "" && <small>{tr`마지막 답을 읽지 못했다. Enter로 세션을 연다.`}</small>}
-                {rest && <pre className="qu-rest">{rest.split("\n").slice(-40).join("\n")}</pre>}
+                {rest && (
+                  <div
+                    className="qu-rest md"
+                    dangerouslySetInnerHTML={{ __html: md(rest) }}
+                    onClick={(e) => {
+                      const a = (e.target as HTMLElement).closest("a");
+                      if (a) e.preventDefault(), void openUrl(a.href);
+                    }}
+                  />
+                )}
                 {asked && <pre className="qu-asked">{asked}</pre>}
                 {reply && !asked && <small>{tr`묻는 말로 끝나지 않았다. 답을 다 한 것일 수 있다.`}</small>}
               </div>

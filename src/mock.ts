@@ -61,7 +61,7 @@ async function invoke(cmd: string, args: Record<string, unknown> = {}): Promise<
         { name: "주간 Fable", used: 99, resets: Math.floor(Date.now() / 1000) + 65_000 },
       ];
     case "last_reply":
-      return "주문 다수 삭제 요청의 관련 테이블을 확인했습니다.\n\n- orders: 대상 132건\n- stock_count: 상품·옵션별 재고 카운터 41행이 같이 줄어야 합니다\n- 이력 테이블은 FK가 없어 그대로 둬도 됩니다\n\n삭제는 한 트랜잭션으로 묶었고, 실행 전에 같은 조건의 SELECT로 건수를 다시 확인하게 했습니다.\n\n이력 테이블의 행도 같이 지울까요, 아니면 감사용으로 남겨둘까요? 남기면 취소 사유 컬럼에 \"일괄 삭제\"를 적어 두겠습니다.";
+      return "주문 다수 삭제 요청의 관련 테이블을 확인했습니다.\n\n- orders: 대상 132건\n- stock_count: 상품·옵션별 재고 카운터 41행이 같이 줄어야 합니다\n- 이력 테이블은 FK가 없어 그대로 둬도 됩니다\n\n## 바꾼 것\n\n| 무엇 | 전 | 후 |\n|---|---|---|\n| `orders` 삭제 | 한 건씩 | **한 트랜잭션** |\n| 재고 카운터 | 손으로 맞춤 | 같이 줄임 |\n\n1. 먼저 건수를 센다\n   - 조건은 삭제와 같다\n2. 그다음 지운다. 기록은 https://example.com/notes/bulk-delete.\n\n삭제는 한 트랜잭션으로 묶었고, 실행 전에 같은 조건의 SELECT로 건수를 다시 확인하게 했습니다.\n\n이력 테이블의 행도 같이 지울까요, 아니면 감사용으로 남겨둘까요? 남기면 취소 사유 컬럼에 \"일괄 삭제\"를 적어 두겠습니다.";
     case "repo_commits":
       return flags.has("review")
         ? [

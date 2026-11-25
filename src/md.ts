@@ -1,7 +1,7 @@
 /**
- * PR 본문과 코멘트에 쓰는 작은 마크다운. 제목, 목록, 인용, 코드 묶음, 표 없는 문단, 굵게·기울임·코드·링크·체크박스만 한다.
+ * PR 본문과 코멘트에 쓰는 작은 마크다운. 제목, 목록, 인용, 코드 묶음, 표, 굵게·기울임·코드·링크·체크박스만 한다.
  * 남이 쓴 글을 HTML로 넣으므로 먼저 전부 이스케이프하고, 그 뒤에 우리가 만든 태그만 넣는다. 그래서 글 속 HTML은 글자로 보인다.
- * ponytail: 표, 각주, 중첩 목록은 글 그대로 둔다. 자주 보이면 marked + 소독기로 바꾼다
+ * ponytail: 각주, 중첩 목록은 글 그대로 둔다. 자주 보이면 marked + 소독기로 바꾼다
  */
 const esc = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 
@@ -14,7 +14,7 @@ function inline(text: string): string {
         ? `<code>${part.slice(1, -1)}</code>`
         : part
             .replace(/\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g, '<a href="$2">$1</a>')
-            .replace(/(^|[\s(])(https?:\/\/[^\s<)]+)/g, '$1<a href="$2">$2</a>')
+            .replace(/(^|[\s(])(https?:\/\/[^\s<)]*[^\s<).,;:!?])/g, '$1<a href="$2">$2</a>')
             .replace(/\*\*([^*]+)\*\*/g, "<b>$1</b>")
             .replace(/(^|[^*\w])\*([^*\s][^*]*)\*(?!\w)/g, "$1<i>$2</i>")
             .replace(/~~([^~]+)~~/g, "<s>$1</s>"),
@@ -43,6 +43,16 @@ export function md(src: string): string {
       out.push(`<pre><code>${esc(body.join("\n"))}</code></pre>`);
       continue;
     }
+    // 표: "| 가 | 나 |" 줄 바로 아래에 "|---|---|" 줄이 오면 표로 그린다
+    const cells = (l: string) => l.trim().replace(/^\||\|$/g, "").split(/(?<!\\)\|/).map((c) => inline(c.trim().replace(/\\\|/g, "|")));
+    if (/^\s*\|.*\|\s*$/.test(line) && /^\s*\|?\s*:?-{2,}:?\s*(\|\s*:?-{2,}:?\s*)*\|?\s*$/.test(lines[i + 1] ?? "")) {
+      flush();
+      const rows: string[][] = [];
+      for (i += 2; i < lines.length && /^\s*\|/.test(lines[i]); i++) rows.push(cells(lines[i]));
+      i--;
+      out.push(`<div class="md-table"><table><thead><tr>${cells(line).map((c) => `<th>${c}</th>`).join("")}</tr></thead><tbody>${rows.map((r) => `<tr>${r.map((c) => `<td>${c}</td>`).join("")}</tr>`).join("")}</tbody></table></div>`);
+      continue;
+    }
     const head = line.match(/^(#{1,6})\s+(.*)$/);
     const bullet = line.match(/^\s*[-*+]\s+(.*)$/);
     const num = line.match(/^\s*\d+[.)]\s+(.*)$/);
@@ -53,6 +63,11 @@ export function md(src: string): string {
       out.push(`<h${level}>${inline(head[2])}</h${level}>`);
     } else if (bullet || num) {
       if (para.length) flush();
+      // ponytail: 들여 쓴 줄은 앞 항목 안에 한 줄로 붙인다(번호가 끊기지 않게). 제대로 된 중첩 목록이 필요하면 그때 만든다
+      if (list && /^\s{2,}/.test(line)) {
+        list.items[list.items.length - 1] += `<br>${bullet ? "· " : ""}${inline((bullet ?? num)![1])}`;
+        continue;
+      }
       const tag = bullet ? "ul" : "ol";
       if (list && list.tag !== tag) flush();
       list ??= { tag, items: [] };
