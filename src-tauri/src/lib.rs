@@ -120,10 +120,12 @@ fn pty_spawn(
         loop {
             match reader.read(&mut buf) {
                 Ok(0) | Err(_) => {
+                    remote::gone(id);
                     let _ = app.emit("pty-exit", id);
                     break;
                 }
                 Ok(n) => {
+                    remote::feed(id, &buf[..n]);
                     if on_data.send(Response::new(buf[..n].to_vec())).is_err() {
                         break;
                     }
@@ -137,7 +139,20 @@ fn pty_spawn(
         .lock()
         .unwrap()
         .insert(id, Session { writer, master: pair.master, child });
+    remote::sized(id, cols, rows);
     Ok(())
+}
+
+/// 폰이 터미널을 보는 동안 그 크기를 폰에 맞추고, 다 보면 맥 크기로 되돌린다 (remote.rs)
+pub(crate) fn pty_size(app: &AppHandle, id: u32, cols: u16, rows: u16) {
+    if let Some(session) = app.state::<Ptys>().0.lock().unwrap().get(&id) {
+        let _ = session.master.resize(PtySize { rows, cols, pixel_width: 0, pixel_height: 0 });
+    }
+}
+
+/// 폰에서 누른 키를 터미널에 넣는다 (remote.rs)
+pub(crate) fn pty_type(app: &AppHandle, id: u32, data: &[u8]) -> bool {
+    app.state::<Ptys>().0.lock().unwrap().get_mut(&id).is_some_and(|session| session.writer.write_all(data).and_then(|_| session.writer.flush()).is_ok())
 }
 
 #[tauri::command]
@@ -150,6 +165,10 @@ fn pty_write(state: State<Ptys>, id: u32, data: String) -> Result<(), String> {
 
 #[tauri::command]
 fn pty_resize(state: State<Ptys>, id: u32, cols: u16, rows: u16) -> Result<(), String> {
+    // 폰이 보는 중이면 맥 크기는 적어만 두고, 폰이 나가면 그때 되돌린다
+    if !remote::sized(id, cols, rows) {
+        return Ok(());
+    }
     let map = state.0.lock().unwrap();
     let session = map.get(&id).ok_or_else(|| say("세션 없음", "No such session"))?;
     session
@@ -163,6 +182,7 @@ fn pty_kill(state: State<Ptys>, id: u32) {
     if let Some(mut session) = state.0.lock().unwrap().remove(&id) {
         let _ = session.child.kill();
     }
+    remote::gone(id);
     let _ = std::fs::remove_file(state_dir().join(id.to_string()));
 }
 
@@ -803,6 +823,7 @@ pub fn run() {
         // 창을 닫아도 메뉴 막대에 남아서 세션이 계속 돈다. 완전히 끄는 건 종료(⌘Q)뿐이다.
         .setup(|app| {
             install_assets();
+            remote::attach(app.handle().clone());
             let open = MenuItem::with_id(app, "tray-open", say("Julgi 열기", "Open Julgi"), true, None::<&str>)?;
             let quit = MenuItem::with_id(app, "tray-quit", say("종료", "Quit"), true, None::<&str>)?;
             let menu = Menu::with_items(app, &[&open, &PredefinedMenuItem::separator(app)?, &quit])?;
@@ -851,7 +872,7 @@ pub fn run() {
             Ok(())
         })
         .manage(Ptys::default())
-        .invoke_handler(tauri::generate_handler![lang::set_lang, pty_spawn, pty_write, pty_resize, pty_kill, clipboard_paste, term_states, log_line, env_flag, home_dir, layout_load, layout_save, handoff_write, config_load, sessions_elsewhere, app_exit, app_restart, data_read, data_write, data_append, data_remove, brain_load, notify, set_hotkey, repo_peek, repo_refs, repo_sync, git_siblings, route_ask, memory_load, inbox_take, default_dir, dirs_exist, path_find, path_open_with, file_read, project_make, ledger::last_reply, ledger::last_exchange, ledger::session_workdir, ledger::ledger_scan, remote::remote_start, remote::remote_stop, remote::remote_publish, usage::claude_usage, usage::claude_models, jira::jira_connect, jira::jira_disconnect, jira::jira_me, jira::jira_search, jira::jira_mine, jira::jira_projects, jira::jira_statuses, jira::jira_view, jira::jira_image, ci::ci_runs, ci::ci_jobs, ci::ci_log, argo::argo_status, argo::argo_logout, argo::argo_apps, argo::argo_app, argo::argo_reach, argo::argo_trail, jira::jira_transitions, jira::jira_transition, jira::jira_comment, tokens::token_usage, github::gh_status, github::glab_status, github::pr_view, github::pr_diff, github::pr_comments, github::repo_slug, github::pr_status, github::pr_review_requests, github::pr_mine, github::pr_list, github::pr_comment, github::pr_line_comment, github::pr_reply, github::pr_review, github::pr_merge, github::pr_close, github::pr_reopen, term_load, habits::habits, habits::corrections, skills::skill_usage, skills::skills_list, skills::skill_apply, skills::skill_retire, work::worktree_add, work::worktree_drop, work::repo_changes, work::repo_stat, work::repo_has, work::repo_snapshot, work::repo_diff, work::repo_moved, work::repo_state, work::repo_mrs, work::repo_commits, work::commit_message])
+        .invoke_handler(tauri::generate_handler![lang::set_lang, pty_spawn, pty_write, pty_resize, pty_kill, clipboard_paste, term_states, log_line, env_flag, home_dir, layout_load, layout_save, handoff_write, config_load, sessions_elsewhere, app_exit, app_restart, data_read, data_write, data_append, data_remove, brain_load, notify, set_hotkey, repo_peek, repo_refs, repo_sync, git_siblings, route_ask, memory_load, inbox_take, default_dir, dirs_exist, path_find, path_open_with, file_read, project_make, ledger::last_reply, ledger::last_exchange, ledger::session_workdir, ledger::ledger_scan, remote::remote_start, remote::remote_stop, remote::remote_publish, remote::remote_reclaim, usage::claude_usage, usage::claude_models, jira::jira_connect, jira::jira_disconnect, jira::jira_me, jira::jira_search, jira::jira_mine, jira::jira_projects, jira::jira_statuses, jira::jira_view, jira::jira_image, ci::ci_runs, ci::ci_jobs, ci::ci_log, argo::argo_status, argo::argo_logout, argo::argo_apps, argo::argo_app, argo::argo_reach, argo::argo_trail, jira::jira_transitions, jira::jira_transition, jira::jira_comment, tokens::token_usage, github::gh_status, github::glab_status, github::pr_view, github::pr_diff, github::pr_comments, github::repo_slug, github::pr_status, github::pr_review_requests, github::pr_mine, github::pr_list, github::pr_comment, github::pr_line_comment, github::pr_reply, github::pr_review, github::pr_merge, github::pr_close, github::pr_reopen, term_load, habits::habits, habits::corrections, skills::skill_usage, skills::skills_list, skills::skill_apply, skills::skill_retire, work::worktree_add, work::worktree_drop, work::repo_changes, work::repo_stat, work::repo_has, work::repo_snapshot, work::repo_diff, work::repo_moved, work::repo_state, work::repo_mrs, work::repo_commits, work::commit_message])
         .build(tauri::generate_context!())
         .expect("error while running tauri application")
         .run(|app, event| {

@@ -145,6 +145,17 @@ h2.mine { color: var(--wait); }
 .bubble .asked > :last-child { margin-bottom: 0; }
 .bubble .asked::before { content: attr(data-label); display: block; font-size: 12px; font-weight: 800; color: var(--wait); margin-bottom: 3px; }
 .grow { flex: 1; min-height: 14px; }
+.status .live { margin-left: auto; flex: none; border: 1px solid var(--line); background: var(--surface); border-radius: 999px; padding: 5px 12px; font-size: 13px; font-weight: 700; color: var(--accent); }
+.status span:last-of-type { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+#one.live { height: calc(100dvh - 60px); min-height: 0; }
+#one.live .bubble, #one.live .steps, #one.live .grow, #one.live .quick, #one:not(.live) #one-term, #one:not(.live) #keys { display: none; }
+#one-term { flex: 1; min-height: 0; margin: 0 -18px; padding: 6px 6px 0; overflow: hidden; touch-action: none; position: relative; }
+#one-term .halt { position: absolute; inset: auto 12px 12px; display: flex; align-items: center; gap: 10px; background: var(--surface); color: var(--ink); border-radius: 14px; box-shadow: var(--shadow); padding: 11px 14px; font-size: 14px; z-index: 3; }
+#one-term .halt button { margin-left: auto; flex: none; color: var(--accent); font-weight: 700; }
+#keys { display: flex; gap: 7px; overflow-x: auto; padding-bottom: 9px; margin: 0 -18px; padding-left: 18px; padding-right: 18px; scrollbar-width: none; }
+#keys::-webkit-scrollbar { display: none; }
+#keys button { flex: none; min-width: 44px; background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 8px 11px; font: 600 13.5px ui-monospace, "SF Mono", Menlo, monospace; }
+#keys button:active { background: var(--sunk); }
 .composer { position: sticky; bottom: 0; z-index: 4; margin: 0 -18px; padding: 10px 18px calc(10px + env(safe-area-inset-bottom, 0px)); background: color-mix(in srgb, var(--bg) 90%, transparent); -webkit-backdrop-filter: blur(18px); backdrop-filter: blur(18px); }
 .quick { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 9px; margin: 0 -18px; padding-left: 18px; padding-right: 18px; scrollbar-width: none; }
 .quick::-webkit-scrollbar { display: none; }
@@ -195,9 +206,11 @@ h2.mine { color: var(--wait); }
     <div class="status" id="one-status"></div>
     <div class="bubble" id="one-reply"></div>
     <details class="steps" id="one-steps" hidden><summary></summary><ol></ol></details>
+    <div id="one-term"></div>
     <div class="grow"></div>
     <form class="composer" id="answer">
       <div class="quick" id="quick"></div>
+      <div id="keys"></div>
       <div class="write">
         <textarea id="answer-text" rows="1"></textarea>
         <button type="submit" class="send" id="answer-send" disabled><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M10 16V4M4.5 9.5 10 4l5.5 5.5"/></svg></button>
@@ -240,6 +253,8 @@ const EN = {
   "응, 진행해": "Yes, go ahead", "계속해": "Continue", "아니, 멈춰": "No, stop", "다시 설명해 줘": "Explain again",
   "앞의 {0}줄 더 보기": "Show {0} earlier lines", "읽는 중": "Loading",
   "일하는 중이다. 답이 오면 여기에 뜬다.": "Working. The reply will appear here.",
+  "터미널": "Terminal", "요약": "Summary", "다시 보기": "Resume", "터미널을 여는 중": "Opening the terminal",
+  "맥에서 쓰는 중이라 멈췄다.": "Paused: in use on the Mac.", "이 터미널은 끝났다.": "This terminal has ended.", "터미널을 열지 못했다.": "Could not open the terminal.",
   "진행 과정 {0}": "Steps {0}", "읽음": "Read", "실행": "Run", "고침": "Edit", "씀": "Write", "찾음": "Search", "맡김": "Agent", "웹": "Web",
   "마지막 답을 읽지 못했다.": "Could not read the last reply.", "읽지 못했다.": "Could not read it.",
   "맥의 Julgi가 {0}부터 응답하지 않는다.": "Julgi on the Mac stopped responding {0}.",
@@ -364,6 +379,63 @@ function paintReply(text) {
   if (at >= 0) { const asked = el("div", "asked"); asked.dataset.label = T("묻는 말"); asked.append(...blocks(parts.slice(at).join("\n\n"))); nodes.push(asked); }
   box.replaceChildren(...nodes);
 }
+// ---- 터미널 실시간 보기 ----
+// 맥이 터미널에 찍히는 글자를 그대로 흘려보내고, 여기서 같은 터미널 부품(xterm)으로 그린다.
+// 보는 동안 터미널 크기를 폰 폭에 맞추므로 Claude Code가 폰 폭으로 다시 그린다. 맥에서 Julgi를 만지면 맥이 되찾아 간다.
+let live = null;
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+const need = (src) => new Promise((ok, fail) => { const n = src.endsWith(".css") ? Object.assign(document.createElement("link"), { rel: "stylesheet", href: src + "?t=" + token }) : Object.assign(document.createElement("script"), { src: src + "?t=" + token }); n.onload = ok; n.onerror = fail; document.head.append(n); });
+let termReady;
+const KEYS = [["esc", "\x1b"], ["⏎", "\r"], ["↑", "\x1b[A"], ["↓", "\x1b[B"], ["tab", "\t"], ["⇧tab", "\x1b[Z"], ["1", "1"], ["2", "2"], ["3", "3"], ["^C", "\x03"]];
+function stopLive() {
+  if (!live) return;
+  const old = live; live = null;
+  old.ctl && old.ctl.abort(); old.term && old.term.dispose();
+  $("one").classList.remove("live"); $("one-term").replaceChildren();
+}
+function halt(text, again) {
+  const note = el("div", "halt"); note.append(el("span", "", text));
+  if (again) { const b = el("button", "", T("다시 보기")); b.type = "button"; b.addEventListener("click", again); note.append(b); }
+  $("one-term").querySelector(".halt")?.remove(); $("one-term").append(note);
+}
+async function startLive(s) {
+  stopLive();
+  const me = live = { pty: s.pty, key: s.key, why: "" };
+  const box = $("one-term");
+  $("one").classList.add("live"); box.replaceChildren(); halt(T("터미널을 여는 중"));
+  try { await (termReady ||= Promise.all([need("/xterm.css"), need("/xterm.js").then(() => need("/unicode11.js"))])); } catch (e) { termReady = null; if (live === me) halt(T("터미널을 열지 못했다."), () => startLive(s)); return; }
+  if (live !== me) return;
+  const look = (state && state.theme) || {};
+  const term = me.term = new Terminal({ fontSize: 12, fontFamily: 'Menlo, ui-monospace, "SF Mono", monospace', disableStdin: true, scrollback: 4000, allowProposedApi: true, cursorBlink: false, theme: look });
+  term.loadAddon(new Unicode11Addon.Unicode11Addon()); term.unicode.activeVersion = "11";
+  box.style.background = look.background || "";
+  term.open(box);
+  // 글자 한 칸의 크기로 이 화면에 몇 칸 몇 줄이 들어가는지 센다
+  const cell = term._core._renderService.dimensions.css.cell;
+  const cols = Math.max(20, Math.floor((box.clientWidth - 12) / cell.width)), rows = Math.max(5, Math.floor((box.clientHeight - 6) / cell.height));
+  term.resize(cols, rows);
+  term.parser.registerOscHandler(7777, (what) => { if (what !== "ok") me.why = what; return true; });
+  // 손가락으로 지난 화면을 올려 본다
+  let from = 0, rest = 0;
+  box.ontouchstart = (e) => { from = e.touches[0].clientY; rest = 0; };
+  box.ontouchmove = (e) => { rest += from - e.touches[0].clientY; from = e.touches[0].clientY; const lines = Math.trunc(rest / cell.height); if (lines) { term.scrollLines(lines); rest -= lines * cell.height; } };
+  while (live === me && !me.why) {
+    me.ctl = new AbortController();
+    try {
+      const r = await fetch(`/api/term?pty=${me.pty}&cols=${cols}&rows=${rows}`, { headers: { "x-julgi-token": token }, signal: me.ctl.signal });
+      if (!r.ok) { me.why = "gone"; break; }
+      term.reset(); box.querySelector(".halt")?.remove();
+      for (const reader = r.body.getReader(); ; ) { const { done, value } = await reader.read(); if (done) break; term.write(value); }
+      await new Promise((r) => term.write("", r));
+    } catch (e) { /* 끊기면 아래에서 다시 붙는다 */ }
+    if (live === me && !me.why) await sleep(1000);
+  }
+  if (live === me && me.why !== "away") halt(me.why === "mac" ? T("맥에서 쓰는 중이라 멈췄다.") : T("이 터미널은 끝났다."), me.why === "mac" ? () => startLive(s) : undefined);
+}
+$("keys").append(...KEYS.map(([name, data]) => { const b = el("button", "", name); b.type = "button"; b.addEventListener("click", () => live && api("/api/keys", { pty: live.pty, data }).catch(() => {})); return b; }));
+// 폰을 덮거나 다른 앱으로 가면 터미널을 놓아 맥 크기로 돌려주고, 돌아오면 다시 붙는다
+document.addEventListener("visibilitychange", () => { const s = live && state && state.sessions.find((x) => x.key === live.key); if (document.hidden) { if (live) { live.away = true; live.why = "away"; live.ctl && live.ctl.abort(); } } else if (live && live.away && s) startLive(s); });
+
 const TOOL = { Read: "읽음", Bash: "실행", Edit: "고침", NotebookEdit: "고침", Write: "씀", Grep: "찾음", Glob: "찾음", Agent: "맡김", Task: "맡김", WebFetch: "웹", WebSearch: "웹" };
 /** 이번 차례에 세션이 한 일. 일하는 중이면 3초마다 다시 읽어 펼쳐 두고, 답이 온 뒤에는 접어 둔다 */
 function loadSteps(s) {
@@ -401,7 +473,7 @@ const TABS = ["home", "all", "acts"];
 function show(next, key, fromHistory) {
   if (view === "one" && picked) store.set("draft:" + picked, $("answer-text").value);
   const sheet = next === "throw";
-  if (!sheet) { view = next; picked = key || ""; shownFor = ""; whole = false; $("one-steps").hidden = true; delete $("one-steps").dataset.stamp; }
+  if (!sheet) { stopLive(); view = next; picked = key || ""; shownFor = ""; whole = false; $("one-steps").hidden = true; delete $("one-steps").dataset.stamp; }
   if (!fromHistory) {
     const hash = sheet ? "#new" : view === "one" ? "#s=" + encodeURIComponent(picked) : view === "home" ? "" : "#" + view;
     const url = location.pathname + location.search + hash;
@@ -501,7 +573,9 @@ function paint() {
   if (view === "one") {
     const s = state.sessions.find((x) => x.key === picked);
     $("title").textContent = s ? s.name : T("세션");
-    $("one-status").replaceChildren(...(s ? [pill(s), el("span", "", metaOf(s))] : [el("span", "", T("이 세션은 닫혔다"))]));
+    const flip = s && s.pty != null ? el("button", "live", live ? T("요약") : T("터미널")) : null;
+    if (flip) { flip.type = "button"; flip.addEventListener("click", () => { live ? stopLive() : startLive(s); paint(); }); }
+    $("one-status").replaceChildren(...(s ? [pill(s), el("span", "", metaOf(s)), ...(flip ? [flip] : [])] : [el("span", "", T("이 세션은 닫혔다"))]));
     if (s) { loadReply(s); loadSteps(s); }
   } else if (view === "home") paintHome();
   else if (view === "all") paintAll();

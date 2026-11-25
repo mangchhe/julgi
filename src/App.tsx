@@ -1565,6 +1565,18 @@ export default function App() {
     if (!config.remote) return void (setRemoteUrl(""), invoke("remote_stop"));
     void invoke<string>("remote_start", { port: config.remotePort }).then(setRemoteUrl, (why) => setRemoteUrl(String(why)));
   };
+  // 폰이 터미널을 보는 동안에는 터미널이 폰 폭이다. 맥에서 Julgi를 다시 만지면 맥 크기로 되돌린다
+  useEffect(() => {
+    let at = 0;
+    const back = () => {
+      if (!config.remote || Date.now() - at < 2000) return;
+      at = Date.now();
+      void invoke("remote_reclaim");
+    };
+    const kinds = ["focus", "pointerdown", "keydown"];
+    for (const kind of kinds) window.addEventListener(kind, back, true);
+    return () => kinds.forEach((kind) => window.removeEventListener(kind, back, true));
+  }, []);
   /** 폰에 보여 줄 지금 상태: 열린 세션과 그 상태, 새 세션을 열 수 있는 폴더, Julgi가 방금 한 일 */
   const publishRemote = () => {
     const { open, states, folders, base, acts } = live.current;
@@ -1573,11 +1585,11 @@ export default function App() {
       .map((o) => {
         const st = states[o.key];
         const ch = changesRef.current[o.cwd];
-        return { key: o.key, id: o.sessionId, name: nameOf(o.key), repo: repoOf(o.cwd), state: st?.state ?? "", label: STATE_LABEL[st?.state ?? ""] ?? tr("열려 있음"), since: st?.since ?? 0, why: (o.sessionId && triaged.current[o.sessionId]?.since === st?.since && triaged.current[o.sessionId]?.why) || "", changed: ch && ch.by === o.sessionId && ch.files ? tr`파일 ${ch.files} +${ch.adds} −${ch.dels}` : "" };
+        return { key: o.key, id: o.sessionId, pty: terms.idOf(o.key), name: nameOf(o.key), repo: repoOf(o.cwd), state: st?.state ?? "", label: STATE_LABEL[st?.state ?? ""] ?? tr("열려 있음"), since: st?.since ?? 0, why: (o.sessionId && triaged.current[o.sessionId]?.since === st?.since && triaged.current[o.sessionId]?.why) || "", changed: ch && ch.by === o.sessionId && ch.files ? tr`파일 ${ch.files} +${ch.adds} −${ch.dels}` : "" };
       })
       .sort((a, b) => a.since - b.since);
     const places = [...(base ? [{ repo: tr`기본 폴더 · ${repoOf(base)}`, cwd: base }] : []), ...folders.slice(0, 40).map((f) => ({ repo: f.repo, cwd: f.cwd }))];
-    void invoke("remote_publish", { state: JSON.stringify({ at: Date.now(), sessions, folders: places, acts: acts.slice(-30).reverse().map((a) => ({ at: a.at, kind: tr(a.kind), text: a.text.slice(0, 160) })), usage: config.usage ? (usageRef.current ?? []).map((u) => ({ name: u.name, used: u.used })) : [], botRuns: acts.filter((a) => a.kind === "대신 답함" && new Date(a.at).toDateString() === new Date().toDateString()).length }) }); // i18n-ok
+    void invoke("remote_publish", { state: JSON.stringify({ at: Date.now(), theme: terms.colors(), sessions, folders: places, acts: acts.slice(-30).reverse().map((a) => ({ at: a.at, kind: tr(a.kind), text: a.text.slice(0, 160) })), usage: config.usage ? (usageRef.current ?? []).map((u) => ({ name: u.name, used: u.used })) : [], botRuns: acts.filter((a) => a.kind === "대신 답함" && new Date(a.at).toDateString() === new Date().toDateString()).length }) }); // i18n-ok
   };
   const setConfig = (key: keyof typeof config, value: string | number | boolean) => {
     Object.assign(config, { [key]: value });

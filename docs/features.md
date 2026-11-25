@@ -113,5 +113,5 @@ A bot is one rule: **in this situation, send this message.** When a session fini
 
 - **Settings (`⌘,`)** are grouped: basics, what Julgi does, outside services, the rest. Each connection (GitHub, GitLab, Jira, Argo CD) is set up there.
 - **Themes.** Eleven, including Tokyo Night, Catppuccin Mocha, Dracula and Nord, each with its own terminal colors.
-- **From your phone.** A small web view, reachable only inside your Tailscale network, to answer and send work. A working session shows its steps as they happen: what it reads, runs and edits.
+- **From your phone.** A small web view, reachable only inside your Tailscale network, to answer and send work. A working session shows its steps as they happen: what it reads, runs and edits. Tap **Terminal** to watch that session's terminal live and press keys such as esc and the arrows. While you watch, the terminal is redrawn at the phone's width; touching Julgi on the Mac gives it back its size.
 - **Languages.** English and Korean; it follows the system language.

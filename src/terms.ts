@@ -396,6 +396,9 @@ export const idle = (key: string) => Date.now() - (pool.get(key)?.typedAt ?? 0);
 export const outAt = (key: string) => pool.get(key)?.outAt ?? 0;
 export const age = (key: string) => Date.now() - (pool.get(key)?.startedAt ?? 0);
 
+/** 지금 터미널 색. 폰에서 터미널을 같은 색으로 그리는 데 쓴다 */
+export const colors = () => theme;
+
 /** 열려 있는 터미널과 앞으로 열 터미널의 색을 바꾼다 */
 export function setTheme(next: ITheme, link?: { fg: string; bg: string }) {
   theme = next;

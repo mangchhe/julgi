@@ -1,18 +1,21 @@
 //! 폰에서 보기. Julgi가 작은 웹 화면을 띄워, 밖에서도 내 차례인 세션에 답하고 새 일을 던질 수 있게 한다.
-//! 터미널을 통째로 옮기지는 않는다. 폰에서 하는 일은 셋이다: 무엇이 도는지 보기, 묻는 말에 답하기, 새 일 던지기.
+//! 폰에서 하는 일은 넷이다: 무엇이 도는지 보기, 묻는 말에 답하기, 새 일 던지기, 세션의 터미널을 실시간으로 보고 키 누르기.
 //! 받는 곳은 Tailscale 망(100.64.0.0/10)과 이 맥 자신뿐이고, 그 안에서도 주소에 든 토큰이 맞아야 한다.
 //! 화면에 보일 상태는 앱이 주기적으로 넘겨 주고(remote_publish), 폰이 시킨 일은 세션들이 쓰는 것과 같은 inbox에 적어 앱이 처리한다.
 use crate::lang::say;
 use std::{
+    collections::HashMap,
     fs,
-    io::Read,
+    io::{Read, Write},
     net::IpAddr,
     path::PathBuf,
     process::Command,
     sync::{
-        atomic::{AtomicBool, Ordering},
-        Mutex, OnceLock,
+        atomic::{AtomicBool, AtomicU64, Ordering},
+        mpsc::{sync_channel, RecvTimeoutError, SyncSender},
+        LazyLock, Mutex, OnceLock,
     },
+    time::Duration,
 };
 
 use tiny_http::{Header, Method, Response, Server};
@@ -20,6 +23,99 @@ use tiny_http::{Header, Method, Response, Server};
 static STATE: Mutex<String> = Mutex::new(String::new());
 static ON: AtomicBool = AtomicBool::new(false);
 static STARTED: OnceLock<u16> = OnceLock::new();
+
+/// 터미널 하나를 폰으로 흘려보내는 자리. 맥에서의 크기와, 지금 보고 있는 폰들
+#[derive(Default)]
+struct Tap {
+    mac: (u16, u16),
+    viewers: Vec<(u64, SyncSender<Vec<u8>>)>,
+}
+
+static TAPS: LazyLock<Mutex<HashMap<u32, Tap>>> = LazyLock::new(Default::default);
+static APP: OnceLock<tauri::AppHandle> = OnceLock::new();
+static NEXT: AtomicU64 = AtomicU64::new(1);
+
+pub fn attach(app: tauri::AppHandle) {
+    let _ = APP.set(app);
+}
+
+/// 터미널이 찍은 글자를 보고 있는 폰들에 넘긴다. 받는 쪽이 밀리면(느린 망) 그 폰은 끊고, 폰이 다시 붙어 새로 그린다
+pub fn feed(id: u32, bytes: &[u8]) {
+    if let Ok(mut taps) = TAPS.lock() {
+        if let Some(tap) = taps.get_mut(&id).filter(|tap| !tap.viewers.is_empty()) {
+            tap.viewers.retain(|(_, to)| to.try_send(bytes.to_vec()).is_ok());
+        }
+    }
+}
+
+/// 맥에서의 터미널 크기를 적어 둔다. 돌려주는 값: 지금 그 크기를 실제로 적용해도 되는가 (폰이 보는 중이면 아니다)
+pub fn sized(id: u32, cols: u16, rows: u16) -> bool {
+    let Ok(mut taps) = TAPS.lock() else { return true };
+    let tap = taps.entry(id).or_default();
+    tap.mac = (cols, rows);
+    tap.viewers.is_empty()
+}
+
+/// 터미널이 끝났다. 보던 폰에 알리고 끊는다
+pub fn gone(id: u32) {
+    if let Some(tap) = TAPS.lock().ok().and_then(|mut taps| taps.remove(&id)) {
+        for (_, to) in tap.viewers {
+            let _ = to.try_send(b"\x1b]7777;gone\x07".to_vec());
+        }
+    }
+}
+
+/// 맥에서 Julgi를 다시 쓰기 시작했다. 보던 폰을 모두 끊어 터미널 크기를 맥에 돌려준다
+#[tauri::command]
+pub fn remote_reclaim() {
+    if let Ok(mut taps) = TAPS.lock() {
+        for tap in taps.values_mut() {
+            for (_, to) in tap.viewers.drain(..) {
+                let _ = to.try_send(b"\x1b]7777;mac\x07".to_vec());
+            }
+        }
+    }
+}
+
+/// 폰 하나에 터미널을 흘려보낸다. 터미널 크기를 폰에 맞추면 Claude Code가 그 폭으로 화면을 새로 그리고, 그것이 폰의 첫 화면이 된다.
+/// 폰이 나가면(끊김, 맥이 되찾음, 터미널 끝) 마지막 폰일 때 맥 크기로 되돌린다
+fn stream(request: tiny_http::Request, id: u32, cols: u16, rows: u16) {
+    let (to, from) = sync_channel::<Vec<u8>>(512);
+    let me = NEXT.fetch_add(1, Ordering::Relaxed);
+    let known = TAPS.lock().ok().is_some_and(|mut taps| taps.get_mut(&id).map(|tap| tap.viewers.push((me, to))).is_some());
+    if !known {
+        let _ = request.respond(json("{\"error\":\"no terminal\"}".into(), 404));
+        return;
+    }
+    let mut out = request.into_writer();
+    let mut alive = out.write_all(b"HTTP/1.1 200 OK\r\nContent-Type: application/octet-stream\r\nCache-Control: no-store\r\nX-Accel-Buffering: no\r\nConnection: close\r\n\r\n").and_then(|_| out.flush()).is_ok();
+    if let Some(app) = APP.get() {
+        // 크기가 같으면 새로 그리지 않으니 한 줄 줄였다 맞춘다
+        crate::pty_size(app, id, cols, rows.saturating_sub(1).max(2));
+        crate::pty_size(app, id, cols, rows);
+    }
+    while alive {
+        alive = match from.recv_timeout(Duration::from_secs(5)) {
+            Ok(mut bytes) => {
+                while let Ok(more) = from.try_recv() {
+                    bytes.extend(more);
+                }
+                out.write_all(&bytes).and_then(|_| out.flush()).is_ok()
+            }
+            // 조용할 때도 폰이 살아 있는지 알아야 크기를 되돌릴 수 있다
+            Err(RecvTimeoutError::Timeout) => out.write_all(b"\x1b]7777;ok\x07").and_then(|_| out.flush()).is_ok(),
+            Err(RecvTimeoutError::Disconnected) => false,
+        };
+    }
+    let back = TAPS.lock().ok().and_then(|mut taps| {
+        let tap = taps.get_mut(&id)?;
+        tap.viewers.retain(|(who, _)| *who != me);
+        (tap.viewers.is_empty() && tap.mac.0 > 0).then_some(tap.mac)
+    });
+    if let (Some((cols, rows)), Some(app)) = (back, APP.get()) {
+        crate::pty_size(app, id, cols, rows);
+    }
+}
 
 fn root() -> PathBuf {
     PathBuf::from(std::env::var("HOME").unwrap_or_default()).join(".julgi")
@@ -126,6 +222,24 @@ fn serve(server: Server, token: String) {
             let _ = request.respond(json("{\"error\":\"token\"}".into(), 401));
             continue;
         }
+        // 터미널 보기는 연결을 붙든 채 계속 보내니 따로 돌린다
+        if path == "/api/term" {
+            let num = |key: &str| param(&url, key).and_then(|v| v.parse::<u32>().ok());
+            match (num("pty"), num("cols"), num("rows")) {
+                (Some(id), Some(cols @ 20..=300), Some(rows @ 5..=200)) => drop(std::thread::spawn(move || stream(request, id, cols as u16, rows as u16))),
+                _ => drop(request.respond(json("{\"error\":\"size\"}".into(), 400))),
+            }
+            continue;
+        }
+        if path == "/xterm.js" || path == "/xterm.css" || path == "/unicode11.js" {
+            let (body, kind) = match path {
+                "/xterm.js" => (include_str!("../../node_modules/@xterm/xterm/lib/xterm.js"), "text/javascript"),
+                "/unicode11.js" => (include_str!("../../node_modules/@xterm/addon-unicode11/lib/addon-unicode11.js"), "text/javascript"),
+                _ => (include_str!("../../node_modules/@xterm/xterm/css/xterm.css"), "text/css"),
+            };
+            let _ = request.respond(Response::from_string(body).with_header(Header::from_bytes("Content-Type", kind).unwrap()).with_header(Header::from_bytes("Cache-Control", "max-age=86400").unwrap()));
+            continue;
+        }
         let reply = match (request.method(), path) {
             (Method::Get, "/api/state") => json(STATE.lock().map(|s| if s.is_empty() { "{}".to_owned() } else { s.clone() }).unwrap_or_else(|_| "{}".into()), 200),
             (Method::Get, "/api/reply") => {
@@ -138,6 +252,16 @@ fn serve(server: Server, token: String) {
                 let id = param(&url, "id").unwrap_or("");
                 let steps = if !id.is_empty() && id.chars().all(|c| c.is_ascii_alphanumeric() || c == '-') { crate::ledger::steps(id) } else { Vec::new() };
                 json(serde_json::json!({ "steps": steps }).to_string(), 200)
+            }
+            // 폰에서 누른 키. 지금 폰이 보고 있는 터미널에만 넣는다
+            (Method::Post, "/api/keys") => {
+                let mut body = String::new();
+                let _ = request.as_reader().take(40_000).read_to_string(&mut body);
+                let value: serde_json::Value = serde_json::from_str(&body).unwrap_or_default();
+                let id = value["pty"].as_u64().unwrap_or(0) as u32;
+                let watched = TAPS.lock().ok().is_some_and(|taps| taps.get(&id).is_some_and(|tap| !tap.viewers.is_empty()));
+                let ok = watched && APP.get().is_some_and(|app| crate::pty_type(app, id, value["data"].as_str().unwrap_or("").as_bytes()));
+                json(format!("{{\"ok\":{ok}}}"), if ok { 200 } else { 409 })
             }
             (Method::Post, "/api/answer") | (Method::Post, "/api/new") => {
                 let mut body = String::new();
