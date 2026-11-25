@@ -2993,6 +2993,16 @@ export default function App() {
     void getCurrentWebview()
       .onDragDropEvent((e) => {
         if (e.payload.type !== "drop") return;
+        const dropped = e.payload.paths.map((path) => path.replace(/[^\p{L}\p{N}_@%+=:,./-]/gu, "\\$&")).join(" ") + " ";
+        // 창(보내기, 내 차례 등)이 떠 있으면 뒤의 세션이 아니라 그 창의 글 칸에 넣는다. 글 칸에 초점이 없으면 아무 데도 넣지 않는다
+        if (live.current.overlay || live.current.prShown || live.current.ticketShown || fileRef.current) {
+          const el = document.activeElement;
+          if (el instanceof HTMLTextAreaElement || (el instanceof HTMLInputElement && el.type === "text")) {
+            el.setRangeText(dropped, el.selectionStart ?? el.value.length, el.selectionEnd ?? el.value.length, "end");
+            el.dispatchEvent(new Event("input", { bubbles: true }));
+          }
+          return;
+        }
         const x = e.payload.position.x / window.devicePixelRatio;
         const at = paneEls.current.findIndex((el) => {
           const rect = el?.getBoundingClientRect();
@@ -3001,7 +3011,7 @@ export default function App() {
         const key = live.current.panes[at];
         if (!key) return;
         setFocus(at);
-        terms.paste(key, e.payload.paths.map((path) => path.replace(/[^\p{L}\p{N}_@%+=:,./-]/gu, "\\$&")).join(" ") + " ");
+        terms.paste(key, dropped);
       })
       .then((off) => (gone ? off() : (offDrop = off)));
 
