@@ -295,6 +295,7 @@ async function invoke(cmd: string, args: Record<string, unknown> = {}): Promise<
         { id: 3, path: "src/refund/RefundCalculator.kt", line: null, side: "RIGHT", user: { login: "teammate" }, body: "이전 버전에 단 코멘트", created_at: new Date(Date.now() - 5000_000).toISOString() },
       ]);
     case "file_read":
+      if (String(args.path).endsWith(".sql")) return "-- 실행 전 확인\nSELECT COUNT(*) AS rows_total FROM orders WHERE status = 'paid';\n\nCREATE TABLE order_note\n(\n    order_note_id BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY,\n    body VARCHAR(200) NOT NULL\n);\n";
       return "---\nname: deploy-check\ndescription: 배포 뒤에 확인할 것\n---\n\n# 배포 뒤 점검\n\n배포가 끝나면 아래를 차례로 본다.\n\n1. 헬스 체크가 200인지\n2. 오류 로그가 늘지 않았는지\n\n| 무엇 | 어디서 |\n|---|---|\n| 헬스 | `/health` |\n| 로그 | 대시보드 |\n";
     case "path_find":
       return args.first as string;

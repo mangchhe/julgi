@@ -1,4 +1,4 @@
-import FileView, { FileTarget } from "./FileView";
+import FileView, { FileTarget, openOutside } from "./FileView";
 import Hint from "./Hint";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
@@ -100,6 +100,8 @@ export default function App() {
   const [focus, setFocus] = useState(0);
   // Julgi 안에서 펴 보는 파일(터미널에서 ⌘ 클릭한 경로, 스킬 목록에서 고른 스킬)
   const [fileShown, setFileShown] = useState<FileTarget | null>(null);
+  const fileRef = useRef(fileShown);
+  fileRef.current = fileShown;
   const [states, setStates] = useState<Record<string, TermState>>({});
   const [dead, setDead] = useState<string[]>([]);
   const [overlay, setOverlay] = useState<"palette" | "send" | "help" | "history" | "settings" | "threads" | "queue" | "quit" | "close" | "work" | "usage" | "morning" | null>(null);
@@ -2870,6 +2872,13 @@ export default function App() {
       const key = panes[focus];
       const cwd = open.find((o) => o.key === key)?.cwd ?? (live.current.base || home);
       const cmd = e.metaKey && !e.altKey && !e.ctrlKey;
+      // 파일 보기 창이 맨 위에 떠 있으면 키는 그 창만 받는다. Esc와 ⌘W는 뒤의 창이 아니라 이 창을 닫는다
+      if (fileRef.current) {
+        e.stopPropagation();
+        if (e.key === "Escape" || (cmd && e.code === "KeyW")) e.preventDefault(), setFileShown(null);
+        else if (e.key === "o" && !e.metaKey && !e.ctrlKey && !e.altKey) e.preventDefault(), void openOutside(fileRef.current.path), setFileShown(null);
+        return;
+      }
       // PR 화면이 떠 있으면 그 화면만 상대한다. ⌘W는 뒤의 세션이 아니라 PR 화면을 닫는다.
       // 포커스가 PR 화면 밖으로 빠졌어도 Esc로 닫히게 여기서도 받는다
       if (live.current.prShown || live.current.ticketShown) {

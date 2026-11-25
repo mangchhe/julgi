@@ -517,12 +517,12 @@ body.dragging .pane-body { pointer-events: none; }
 .rv-note textarea { width: 100%; box-sizing: border-box; font: 13.5px/1.5 -apple-system, "Apple SD Gothic Neo", system-ui, sans-serif; color: var(--ink); background: var(--bg); border: 1px solid var(--accent); border-radius: 6px; padding: 6px 9px; outline: none; resize: vertical; }
 
 /* 문법 색칠. 테마의 색을 그대로 써서 어느 테마에서든 맞는다 */
-.rv-line .hljs-keyword, .rv-line .hljs-built_in, .rv-line .hljs-literal, .rv-line .hljs-meta { color: var(--accent); }
-.rv-line .hljs-string, .rv-line .hljs-regexp, .rv-line .hljs-symbol, .rv-line .hljs-attr { color: var(--ok); }
-.rv-line .hljs-number { color: var(--wait); }
-.rv-line .hljs-comment, .rv-line .hljs-quote { color: var(--muted); font-style: italic; }
-.rv-line .hljs-title, .rv-line .hljs-type, .rv-line .hljs-section, .rv-line .hljs-name { color: color-mix(in srgb, var(--accent) 55%, var(--ink)); font-weight: 600; }
-.rv-line .hljs-variable, .rv-line .hljs-params, .rv-line .hljs-property { color: var(--ink); }
+.rv-line .hljs-keyword, .rv-line .hljs-built_in, .rv-line .hljs-literal, .rv-line .hljs-meta, .fv-code .hljs-keyword, .fv-code .hljs-built_in, .fv-code .hljs-literal, .fv-code .hljs-meta { color: var(--accent); }
+.rv-line .hljs-string, .rv-line .hljs-regexp, .rv-line .hljs-symbol, .rv-line .hljs-attr, .fv-code .hljs-string, .fv-code .hljs-regexp, .fv-code .hljs-symbol, .fv-code .hljs-attr { color: var(--ok); }
+.rv-line .hljs-number, .fv-code .hljs-number { color: var(--wait); }
+.rv-line .hljs-comment, .rv-line .hljs-quote, .fv-code .hljs-comment, .fv-code .hljs-quote { color: var(--muted); font-style: italic; }
+.rv-line .hljs-title, .rv-line .hljs-type, .rv-line .hljs-section, .rv-line .hljs-name, .fv-code .hljs-title, .fv-code .hljs-type, .fv-code .hljs-section, .fv-code .hljs-name { color: color-mix(in srgb, var(--accent) 55%, var(--ink)); font-weight: 600; }
+.rv-line .hljs-variable, .rv-line .hljs-params, .rv-line .hljs-property, .fv-code .hljs-variable, .fv-code .hljs-params, .fv-code .hljs-property { color: var(--ink); }
 
 .rv-path { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
 .rv-path .hs-kind { font-weight: 400; flex: none; }

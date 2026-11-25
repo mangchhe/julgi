@@ -26,11 +26,11 @@ export function md(src: string): string {
   const out: string[] = [];
   const lines = src.replace(/\r\n/g, "\n").split("\n");
   let para: string[] = [];
-  let list: { tag: "ul" | "ol"; items: string[] } | null = null;
+  let list: { tag: "ul" | "ol"; items: string[]; start?: number } | null = null;
   const flush = () => {
     if (para.length) out.push(`<p>${para.map(inline).join("<br>")}</p>`);
     para = [];
-    if (list) out.push(`<${list.tag}>${list.items.map((i) => `<li>${i}</li>`).join("")}</${list.tag}>`);
+    if (list) out.push(`<${list.tag}${list.start && list.start > 1 ? ` start="${list.start}"` : ""}>${list.items.map((i) => `<li>${i}</li>`).join("")}</${list.tag}>`);
     list = null;
   };
   for (let i = 0; i < lines.length; i++) {
@@ -70,7 +70,8 @@ export function md(src: string): string {
       }
       const tag = bullet ? "ul" : "ol";
       if (list && list.tag !== tag) flush();
-      list ??= { tag, items: [] };
+      // 사이에 다른 글이 끼어 목록이 끊겼어도 적힌 번호에서 이어 센다
+      list ??= { tag, items: [], start: num ? parseInt(line) : undefined };
       const text = (bullet ?? num)![1];
       const box = text.match(/^\[([ xX])\]\s+(.*)$/);
       list.items.push(box ? `<input type="checkbox" disabled${box[1] === " " ? "" : " checked"}> ${inline(box[2])}` : inline(text));

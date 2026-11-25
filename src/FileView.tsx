@@ -3,6 +3,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { openPath } from "@tauri-apps/plugin-opener";
 import { config } from "./model";
 import { md } from "./md";
+import { langOf, paint } from "./CodeReview";
 import { tr } from "./i18n";
 
 export type FileTarget = { path: string; line?: number };
@@ -19,7 +20,7 @@ export async function openOutside(path: string) {
 
 /**
  * 파일 하나를 읽기만 하는 창. 마크다운은 그려서, 나머지는 줄 번호와 함께 보여 준다.
- * 글이 아니거나(그림, 폴더) 너무 크면 읽지 않고 밖의 앱으로 넘긴다
+ * 글이 아니거나(그림, 폴더) 너무 크면 읽지 않고 밖의 앱으로 넘긴다. 키(Esc, O)는 App의 전역 키 처리가 받는다
  */
 export default function FileView({ target, onClose }: { target: FileTarget; onClose: () => void }) {
   const [text, setText] = useState<string>();
@@ -39,6 +40,12 @@ export default function FileView({ target, onClose }: { target: FileTarget; onCl
     const m = text?.match(/^---\n([\s\S]*?)\n---\n?/);
     return m ? [m[1], text!.slice(m[0].length)] : ["", text ?? ""];
   }, [text]);
+  // 확장자로 언어를 골라 줄마다 색칠한다. 모르는 언어와 아주 큰 파일(5000줄 넘음)은 색 없이 둔다
+  const painted = useMemo(() => {
+    const rows = (text ?? "").split("\n");
+    const lang = langOf(target.path);
+    return lang && rows.length <= 5000 ? rows.map((l) => paint(l, lang)) : [];
+  }, [text, target.path]);
   const name = target.path.split("/").pop();
   return (
     <div className="pal-back wide fv-back" onMouseDown={onClose}>
@@ -47,11 +54,6 @@ export default function FileView({ target, onClose }: { target: FileTarget; onCl
         ref={box}
         tabIndex={-1}
         onMouseDown={(e) => e.stopPropagation()}
-        onKeyDown={(e) => {
-          e.stopPropagation();
-          if (e.key === "Escape") onClose();
-          else if (e.key === "o" && !e.metaKey) void openOutside(target.path), onClose();
-        }}
       >
         <div className="fv-head">
           <b>{name}</b>
@@ -73,7 +75,7 @@ export default function FileView({ target, onClose }: { target: FileTarget; onCl
               {text.split("\n").map((l, i) => (
                 <div key={i} data-n={i + 1} className={i + 1 === target.line ? "hit" : ""}>
                   <i>{i + 1}</i>
-                  <span>{l || " "}</span>
+                  {painted[i] === undefined ? <span>{l || " "}</span> : <span dangerouslySetInnerHTML={{ __html: painted[i]! || " " }} />}
                 </div>
               ))}
             </div>
