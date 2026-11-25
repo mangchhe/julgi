@@ -10,6 +10,8 @@ export type SessionInfo = {
   links: string[];
   /** 세션이 새로 만든 파일의 경로. 최근 것이 뒤에 온다 */
   files?: string[];
+  /** 이 세션이 올린 아티팩트의 주소 → 이름 */
+  link_names?: Record<string, string>;
   mtime: number;
   size: number;
   /** 폴더가 속한 git 레포 이름. 폴더가 이미 없으면 비어 있다 */
@@ -171,6 +173,7 @@ export function enrich(ledger: Ledger): Session[] {
   const repeats = new Map<string, number>();
   for (const s of ledger.sessions) repeats.set(s.title, (repeats.get(s.title) ?? 0) + 1);
   const marks = config.scriptEntry.split(",").map((m) => m.trim()).filter(Boolean);
+  for (const s of ledger.sessions) for (const [url, name] of Object.entries(s.link_names ?? {})) linkNames.set(url, name);
   return ledger.sessions.map((s) => {
     const repo = s.repo || repoOf(s.cwd);
     const branch = s.branch.toLowerCase();
@@ -418,9 +421,11 @@ export const DEFAULTS: Record<string, unknown> = JSON.parse(JSON.stringify(confi
 export const hot = (tokens: number) => tokens > config.hotTokens;
 
 /** 링크를 짧게: 무엇인지와 번호만 */
+/** 아티팩트 주소 → 이름. 어느 세션이 올렸든 한곳에 모은다. 다른 세션에서 그 링크를 말하기만 해도 이름으로 보인다 */
+const linkNames = new Map<string, string>();
 export function linkLabel(url: string): string {
   const artifact = url.match(/claude\.ai\/artifact\/(\w{6})/);
-  if (artifact) return tr`아티팩트 ${artifact[1]}`;
+  if (artifact) return linkNames.get(url) ?? tr`아티팩트 ${artifact[1]}`;
   const pr = url.match(/\/([^/]+)\/(?:-\/)?(pull|merge_requests|issues)\/(\d+)/);
   if (pr) return `${pr[1]} ${pr[2] === "pull" ? "PR" : pr[2] === "issues" ? tr("이슈") : "MR"} #${pr[3]}`;
   const ticket = url.match(/browse\/([A-Z][A-Z0-9]+-\d+)/);

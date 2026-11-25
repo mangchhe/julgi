@@ -35,6 +35,12 @@ pub struct SessionInfo {
     /// 세션이 새로 만든 파일(Write 도구로 통째로 쓴 것)의 경로. 최근 것이 뒤에 온다. 임시 폴더의 것은 뺀다
     #[serde(default)]
     pub files: Vec<String>,
+    /// 이 세션이 올린 아티팩트의 주소 → 이름(페이지 제목, 없으면 올릴 때 적은 설명). 링크를 "아티팩트 55EgFd" 대신 이름으로 보여 주는 데 쓴다
+    #[serde(default)]
+    pub link_names: std::collections::HashMap<String, String>,
+    /// 이름을 찾으려고 파일 전체를 한 번 읽었는가. 평소에는 끝부분만 읽으므로, 오래전에 올린 아티팩트는 이때 한 번만 찾는다
+    #[serde(default)]
+    pub named_whole: bool,
     pub mtime: u64,
     pub size: u64,
     /// 폴더가 속한 git 레포 이름. 훑을 때마다 다시 채운다
@@ -113,6 +119,86 @@ fn collect_files(v: &Value, files: &mut Vec<String>) {
     }
 }
 
+/// 아티팩트를 올리는 도구 호출에서 그 페이지의 이름을 얻는다: 적어 준 제목, 없으면 HTML 파일의 <title>, 그것도 없으면 설명.
+fn artifact_name(input: &Value) -> Option<String> {
+    let from_file = || {
+        let head = read_range(Path::new(input["file_path"].as_str()?), 0, 65_536)?;
+        let at = head.find("<title>")? + 7;
+        Some(head[at..at + head[at..].find("</title>")?].trim().to_owned())
+    };
+    let name = input["title"].as_str().map(str::to_owned).filter(|t| !t.is_empty()).or_else(from_file).filter(|t| !t.is_empty()).or_else(|| input["description"].as_str().map(str::to_owned))?;
+    let name = name.split_whitespace().collect::<Vec<_>>().join(" ");
+    (!name.is_empty()).then(|| name.chars().take(60).collect())
+}
+
+/// 한 줄에서 아티팩트 올리기와 그 결과를 짝지어, 결과에 적힌 주소에 이름을 붙인다. pending: 도구 호출 id → 이름
+fn collect_names(v: &Value, pending: &mut std::collections::HashMap<String, String>, names: &mut std::collections::HashMap<String, String>) {
+    for part in v["message"]["content"].as_array().into_iter().flatten() {
+        if part["type"] == "tool_use" && part["name"] == "Artifact" && part["input"]["file_path"].is_string() {
+            if let (Some(id), Some(name)) = (part["id"].as_str(), artifact_name(&part["input"])) {
+                pending.insert(id.to_owned(), name);
+            }
+        } else if part["type"] == "tool_result" {
+            let Some(name) = part["tool_use_id"].as_str().and_then(|id| pending.remove(id)) else { continue };
+            let text = part["content"].to_string();
+            let mut found = Vec::new();
+            collect_links(&text, &mut found);
+            // 결과 글의 맨 앞에 "Published … at <주소>"가 온다. 뒤쪽 안내 글에 다른 주소가 섞여 있어도 첫 아티팩트 주소만 쓴다
+            if let Some(url) = found.iter().find(|u| u.contains("claude.ai/artifact/")) {
+                names.insert(url.clone(), name);
+            }
+        }
+    }
+}
+
+/// 글 속의 마크다운 링크 "[이름](아티팩트 주소)"에서도 이름을 얻는다(티켓 본문이나 다른 세션의 답에 적힌 것). 올릴 때 얻은 이름이 있으면 그것이 먼저다.
+fn collect_md_names(text: &str, names: &mut std::collections::HashMap<String, String>) {
+    let mark = "](https://claude.ai/artifact/";
+    let mut rest = text;
+    while let Some(at) = rest.find(mark) {
+        let label = rest[..at].rfind('[').map(|open| rest[open + 1..at].trim());
+        let mut found = Vec::new();
+        // 글자 단위로 자른다. 바이트 수로 자르면 한글 글자 가운데가 걸려 죽는다
+        collect_links(&rest[at + 2..].chars().take(200).take_while(|c| *c != ')').collect::<String>(), &mut found);
+        if let (Some(label), Some(url)) = (label, found.first()) {
+            // 이름 자리에 주소를 그대로 적었거나 줄이 넘어간 것은 이름이 아니다
+            if !label.is_empty() && label.chars().count() <= 80 && !label.contains("http") && !label.contains("\\n") {
+                names.entry(url.clone()).or_insert_with(|| label.chars().take(60).collect());
+            }
+        }
+        rest = &rest[at + mark.len()..];
+    }
+}
+
+/// 이름 없는 아티팩트 링크가 남아 있으면 대화 기록 전체를 한 번 훑어 이름을 찾는다. 올린 기록이 끝부분 밖으로 밀려난 긴 세션을 위한 것이다.
+/// 세션마다 한 번만 한다. 그 뒤에 올린 것은 끝부분을 읽을 때 잡히고, 찾아 둔 이름은 다음 훑기로 넘겨받는다. 돌려주는 값: 무언가 바뀌었는가
+fn name_whole(path: &Path, info: &mut SessionInfo) -> bool {
+    if info.named_whole || info.links.iter().all(|u| !u.contains("claude.ai/artifact/") || info.link_names.contains_key(u)) {
+        return false;
+    }
+    info.named_whole = true;
+    let Ok(file) = fs::File::open(path) else { return true };
+    let mut pending = std::collections::HashMap::new();
+    for line in std::io::BufRead::lines(std::io::BufReader::new(file)).map_while(Result::ok) {
+        // 줄마다 JSON으로 풀면 느리다. 아티팩트 이야기가 든 줄만 푼다
+        if !line.contains("\"Artifact\"") && !line.contains("claude.ai/artifact/") {
+            continue;
+        }
+        if let Ok(v) = serde_json::from_str::<Value>(&line) {
+            collect_names(&v, &mut pending, &mut info.link_names);
+        }
+    }
+    // 올릴 때의 이름을 다 모은 뒤에, 남은 것만 글 속 링크의 이름으로 채운다
+    if let Ok(file) = fs::File::open(path) {
+        for line in std::io::BufRead::lines(std::io::BufReader::new(file)).map_while(Result::ok) {
+            if line.contains("](https://claude.ai/artifact/") {
+                collect_md_names(&line, &mut info.link_names);
+            }
+        }
+    }
+    true
+}
+
 fn first_text(message: &Value) -> Option<String> {
     let content = &message["content"];
     let text = match content {
@@ -154,8 +240,10 @@ fn scan_file(path: &Path, mtime: u64, size: u64) -> Option<SessionInfo> {
     if from > 0 {
         lines.next(); // 중간에서 잘린 첫 줄
     }
+    let mut pending = std::collections::HashMap::new();
     for line in lines {
         let Ok(v) = serde_json::from_str::<Value>(line) else { continue };
+        collect_names(&v, &mut pending, &mut info.link_names);
         // 링크는 사람과 Claude가 주고받은 말에서만 모은다 (도구 설정 같은 기록은 뺀다)
         if matches!(v["type"].as_str(), Some("user" | "assistant")) && v["isSidechain"] != true {
             collect_links(line, &mut info.links);
@@ -233,7 +321,7 @@ fn scan_file(path: &Path, mtime: u64, size: u64) -> Option<SessionInfo> {
 }
 
 fn scan_sessions() -> Vec<SessionInfo> {
-    let cache_path = home().join(".julgi/ledger-v6.json");
+    let cache_path = home().join(".julgi/ledger-v7.json");
     let cache: HashMap<String, Option<SessionInfo>> = fs::read_to_string(&cache_path)
         .ok()
         .and_then(|s| serde_json::from_str(&s).ok())
@@ -259,13 +347,24 @@ fn scan_sessions() -> Vec<SessionInfo> {
                 Some(info) => info.mtime == mtime && info.size == meta.len(),
                 None => false, // 세션이 아니라고 봤던 파일은 싸니까 다시 본다
             });
-            let info = match cached {
+            let mut info = match cached {
                 Some(hit) => hit.clone(),
                 None => {
                     changed = true;
-                    scan_file(&path, mtime, meta.len())
+                    let mut fresh = scan_file(&path, mtime, meta.len());
+                    // 전에 찾아 둔 아티팩트 이름은 넘겨받는다. 올린 기록이 끝부분 밖으로 밀려나도 이름이 남는다
+                    if let (Some(now), Some(Some(old))) = (fresh.as_mut(), cache.get(&key)) {
+                        for (url, name) in &old.link_names {
+                            now.link_names.entry(url.clone()).or_insert_with(|| name.clone());
+                        }
+                        now.named_whole = old.named_whole;
+                    }
+                    fresh
                 }
             };
+            if let Some(now) = info.as_mut() {
+                changed |= name_whole(&path, now);
+            }
             next.insert(key, info);
         }
     }
@@ -497,5 +596,40 @@ mod workdir_tests {
         assert_eq!(pick_workdir(&[0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1], 2), Some(1), "최근 호출이 워크트리를 가리킨다");
         assert_eq!(pick_workdir(&[1, 0, 1, 0], 2), None, "반반이면 정하지 않는다");
         assert_eq!(pick_workdir(&[1, 1], 2), None, "근거가 적으면 정하지 않는다");
+    }
+}
+
+#[cfg(test)]
+mod name_tests {
+    use super::*;
+
+    #[test]
+    fn names_from_markdown_links() {
+        let mut names = std::collections::HashMap::new();
+        collect_md_names(r#"{"text":"- 보기: [정산 흐름 v2 (그림)](https://claude.ai/artifact/AbCdEf123) 그리고 [https://x](https://claude.ai/artifact/Zz99)"}"#, &mut names);
+        assert_eq!(names.get("https://claude.ai/artifact/AbCdEf123").map(String::as_str), Some("정산 흐름 v2 (그림)"));
+        assert!(!names.contains_key("https://claude.ai/artifact/Zz99"));
+    }
+
+    #[test]
+    fn markdown_link_followed_by_long_korean_text() {
+        // 주소 뒤 200바이트 자리가 한글 글자 가운데에 걸리는 글. 전에는 여기서 죽었다
+        for pad in 0..4 {
+            let text = format!("[이름](https://claude.ai/artifact/AbCdEf123){}{}", "a".repeat(pad), "가나다라마바사".repeat(40));
+            let mut names = std::collections::HashMap::new();
+            collect_md_names(&text, &mut names);
+            assert_eq!(names.len(), 1);
+        }
+    }
+
+    #[test]
+    fn names_from_publish() {
+        let mut pending = std::collections::HashMap::new();
+        let mut names = std::collections::HashMap::new();
+        let call: Value = serde_json::from_str(r#"{"message":{"content":[{"type":"tool_use","id":"t1","name":"Artifact","input":{"file_path":"/nonexistent/a.html","description":"환불 계산 흐름 한 장"}}]}}"#).unwrap();
+        let result: Value = serde_json::from_str(r#"{"message":{"content":[{"type":"tool_result","tool_use_id":"t1","content":"Published /nonexistent/a.html at https://claude.ai/artifact/AbCdEf123 (Version 1)"}]}}"#).unwrap();
+        collect_names(&call, &mut pending, &mut names);
+        collect_names(&result, &mut pending, &mut names);
+        assert_eq!(names.get("https://claude.ai/artifact/AbCdEf123").map(String::as_str), Some("환불 계산 흐름 한 장"));
     }
 }
