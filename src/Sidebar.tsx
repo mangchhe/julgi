@@ -308,10 +308,12 @@ export default function Sidebar({ open, items, threads, byId, states, tasks, cha
         <button type="button" onClick={onSettings} title={tr`설정 (⌘,)`}>
           <svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="2.2" /><path d="M8 1.8v2M8 12.2v2M1.8 8h2M12.2 8h2M3.6 3.6l1.4 1.4M11 11l1.4 1.4M12.4 3.6 11 5M5 11l-1.4 1.4" /></svg>
           {tr`설정`}
+          <small>⌘,</small>
         </button>
         <button type="button" onClick={onHistory} title={tr`Julgi가 알아서 한 일 (⌘Y)`}>
           <svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="5.5" /><path d="M8 5v3.2l2 1.3" /></svg>
           {tr`한 일`}
+          <small>⌘Y</small>
         </button>
       </div>
     </aside>
