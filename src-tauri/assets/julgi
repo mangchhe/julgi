@@ -78,6 +78,15 @@ case "${1:-}" in
     printf '%s\n' "$*" | ask send "$target"
     say "보내 달라고 했다. 답은 그 세션에 쌓이고, 나는 기다리지 않는다." "Asked Julgi to send it. The reply stays in that session; do not wait for it."
     ;;
+  event)
+    # 바깥 도구(메신저, 메일, 일정, cron …)가 봇을 깨울 일을 넣는다. Julgi가 띄운 세션이 아니어도 쓸 수 있다.
+    # julgi event <이름> "제목"  (본문은 표준 입력, 없어도 된다). 봇은 깨우는 일 "event"에 그 이름을 적어 둔다
+    [ -n "${2:-}" ] && [ -n "${3:-}" ] || { say "쓰는 법: julgi event <이름> \"제목\"  (본문은 표준 입력으로 줄 수 있다)" "Usage: julgi event <name> \"title\"  (the body can come on standard input)" >&2; exit 1; }
+    mkdir -p "$ROOT/inbox"
+    file="$ROOT/inbox/$(date +%s)-$$-$RANDOM"
+    { printf 'event\next\n%s\n%s\n' "$2" "$3"; [ -t 0 ] || cat; } > "$file.tmp" && mv "$file.tmp" "$file.req"
+    say "봇을 깨울 일로 넣었다. 이 이름을 기다리는 봇이 있으면 깬다." "Queued as an event. Any bot waiting for this name wakes up."
+    ;;
   handoff)
     printf '' | ask handoff ""
     say "이 답이 끝나면 인계 글을 받아 새 세션으로 넘어가 달라고 했다." "Asked Julgi to take a handoff note when this reply ends and move to a new session."
@@ -197,6 +206,7 @@ julgi memory [글]           내 줄기의 기억, 또는 글에 맞는 줄기�
 julgi note "내용"           내 줄기 기억에 한 줄 적기
 julgi send <줄기|new> "말"  다른 줄기(또는 새 줄기)에 일을 넘기기
 julgi handoff               이 세션이 커졌을 때 새 세션으로 넘어가기
+julgi event <이름> "제목"  봇을 깨울 일 넣기 (본문은 표준 입력, 세션 밖에서도 쓴다)
 julgi done                  이 일을 끝난 것으로 하기 (Jira 티켓은 닫지 않는다)
 julgi ticket                이 세션에 이어진 티켓과 지금 Jira 상태
 julgi ticket move "상태"    그 티켓을 그 상태로 옮기기
@@ -219,6 +229,7 @@ julgi memory [text]          my stem's memory, or the memory of the stem matchin
 julgi note "text"            write one line to my stem's memory
 julgi send <stem|new> "ask"  hand work to another stem (or a new one)
 julgi handoff                hand off to a new session when this one has grown too big
+julgi event <name> "title"   queue an event that wakes bots (body on stdin; works outside sessions)
 julgi done                   mark this work as done (does not close the Jira ticket)
 julgi ticket                 the ticket tied to this session and its Jira status now
 julgi ticket move "status"   move that ticket to that status

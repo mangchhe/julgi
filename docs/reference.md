@@ -136,6 +136,7 @@ Everything is a text file under `~/.julgi/`. Conversations are not here; Claude 
 | `pr-seen.json`, `jira-seen.json`, `jira-news.json` | Last known state of PRs and tickets, to tell news from old; ticket news not yet looked at |
 | `run-seen.json` | Last known state of my CI runs, to notice when one finishes |
 | `argo-seen.json` | Last known sync and health of linked Argo CD apps, to notice a change for the worse |
+| `bots/list.json`, `bots/<id>/MEMORY.md` | Bots: name, face, role, working folder, wakes, daily limit, recent runs. And the memory each bot rewrites itself |
 | `rules.json` | auto-reply rules: name, face, the situation each watches for, the message it sends, how often it answered |
 | `background.txt` | The background photo, scaled down and stored as text |
 | `triage.json` | For each finished reply, whether it needed you and why |

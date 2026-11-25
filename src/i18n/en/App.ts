@@ -198,4 +198,9 @@ export default {
   "\"{0}\" · 끝낸 줄기의 세션에서 다시 일을 시켜 목록에 올림": "\"{0}\" · work was sent to a session of a finished stem, so it is back on the list",
   "규칙 \"{0}\" → \"{1}\": {2}": "Rule \"{0}\" → \"{1}\": {2}",
   "파일을 찾지 못했다: {0}": "File not found: {0}",
+  "\"{0}\"을 깨우지 못했다: {1}": "Could not wake \"{0}\": {1}",
+  "\"{0}\"이 깸: {1}": "\"{0}\" woke up: {1}",
+  "정한 시간 {0}": "Scheduled time {0}",
+  "지금 깨움": "Woken by hand",
+  "봇": "Bots",
 } as Record<string, string>;

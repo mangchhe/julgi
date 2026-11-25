@@ -6,6 +6,7 @@ English · [한국어](features.ko.md)
 
 - [Sending work](#sending-work)
 - [Knowing whose turn it is](#knowing-whose-turn-it-is)
+- [Bots](#bots)
 - [Auto-reply](#auto-reply)
 - [Sessions and panes](#sessions-and-panes)
 - [Code review](#code-review)
@@ -34,6 +35,17 @@ English · [한국어](features.ko.md)
 - **Stalls are flagged.** A session that stops mid-work, or runs one request for too long, is pointed out.
 - **Briefing (`⌘⇧B`).** Come back after a while and one screen shows what is waiting, news on PRs and tickets, where each piece of work stands, and what Julgi did meanwhile.
 - **Progress per stem.** Goal, done, left and blocked for each piece of work, kept up to date as sessions reply.
+
+## Bots
+
+A bot is **a role, the things that wake it, and a memory**. When one of those things happens, Julgi opens a new session with the bot's role and its memory so far, and the session rewrites the memory before it finishes.
+
+- **Wakes.** A scheduled time (`weekdays 09:00`), ticket news (assigned, mention, comment, status change), a review request, an outside event. One bot can have several.
+- **Outside events.** Any tool can queue one from a terminal with `~/.julgi/bin/julgi event <name> "title"` (body on standard input). That one line connects a chat app, mail, a calendar or cron.
+- **Memory.** Each bot has `~/.julgi/bots/<id>/MEMORY.md`. It is read on waking and rewritten at the end with only what the next run needs.
+- **When it has a question** it shows up in My turn (`⌘J`) like any session. Auto-reply rules apply to it too.
+- **No leaks.** Each bot has a daily limit and never wakes twice for the same thing. Each wake is listed in `⌘Y`, and `⌘,` → Bots shows recent runs and their sessions.
+- Text carried by an event is read as data only, and hard-to-undo actions happen only when the role says so.
 
 ## Auto-reply
 

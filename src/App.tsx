@@ -11,6 +11,7 @@ import Queue from "./Queue";
 import Status from "./Status";
 import History, { Act } from "./History";
 import Morning from "./Morning";
+import { Bot, BotEvent, botPrompt, ran, readBots, settle, timeDue, wakes } from "./bots.ts";
 import { Rule, DEFAULT_RULES, TRIAGE_SYSTEM, triagePrompt, parseTriage } from "./triageAsk.ts";
 import Pane from "./Pane";
 import Palette, { Pick } from "./Palette";
@@ -1407,6 +1408,10 @@ export default function App() {
           terms.submitWhenClear(target, body);
           record("답함", tr`폰에서 "${nameOf(target)}"에 답함: ${body.slice(0, 80)}`, open.find((o) => o.key === target)?.sessionId); // i18n-ok
         }
+      } else if (cmd === "event" && sessionId === "ext" && target.trim()) {
+        // 바깥 도구가 `julgi event <이름> "제목"`으로 넣은 일. 그 이름을 기다리는 봇을 깨운다
+        const [title, ...text] = body.split("\n");
+        actions.current.raise({ source: "event", kind: target.trim().slice(0, 40), key: `event:${Date.now()}:${Math.random().toString(36).slice(2, 8)}`, title: title.trim().slice(0, 200) || target.trim(), body: text.join("\n") });
       } else if (cmd === "throw" && body && sessionId === "phone") {
         // 폰에서 새 일을 던졌다. 화면에 보여 준 폴더에서만 연다
         const { folders, base } = live.current;
@@ -2530,6 +2535,7 @@ export default function App() {
   const askNotice = (a: ReviewAsk) => {
     const repo = repoName(a.repository.nameWithOwner);
     record("리뷰 요청", `${a.author.login}: ${repo} #${a.number} ${a.title.slice(0, 60)}`); // i18n-ok
+    actions.current.raise({ source: "review", kind: "review", key: `review:${a.repository.nameWithOwner}#${a.number}`, title: `${repo} #${a.number} ${a.title}`.slice(0, 200), body: `${a.author.login}\n${a.url}` });
     if (!config.notify || document.hasFocus()) return;
     void invoke("notify", { title: tr`리뷰 요청 · ${repo} #${a.number}`, body: `${a.author.login}: ${a.title.slice(0, 80)}` });
   };
@@ -2579,8 +2585,64 @@ export default function App() {
     // i18n-on
     void dispatch({ kind: "new", cwd }, ask, { rank: 0, by: "리뷰 요청" }); // i18n-ok
   };
-  const actions = useRef({ readUsage, publishRemote, say, dispatch, show, close, sleep, requestQuit, handoff, exited, newSession, newShell, nextWaiting, openTerm, resize, split, unsplit, finishThread, move, togglePin, tend, triage, serve, record, confirmClose, toggleReview, prNotice, askNotice, mineNotice, sleepNotice, wake, ticketNotice, ticketOffer, checkEnded });
-  actions.current = { readUsage, publishRemote, say, dispatch, show, close, sleep, requestQuit, handoff, exited, newSession, newShell, nextWaiting, openTerm, resize, split, unsplit, finishThread, move, togglePin, tend, triage, serve, record, confirmClose, toggleReview, prNotice, askNotice, mineNotice, sleepNotice, wake, ticketNotice, ticketOffer, checkEnded };
+  // ---- 봇: 역할과 기억을 가진 일꾼. 깨우는 일이 생기면 그 역할로 세션을 연다 ----
+  const [crew, setCrew] = useState<Bot[]>([]);
+  const crewRef = useRef(crew);
+  const saveCrew = (next: Bot[]) => {
+    crewRef.current = next;
+    setCrew(next);
+    void invoke("data_write", { name: "bots/list.json", text: JSON.stringify(next, null, 1) });
+  };
+  /** 설정에서 고친 봇들. 켰거나 깨우는 일을 고친 봇은 오늘 이미 지난 시각을 다룬 것으로 친다 */
+  const editCrew = (next: Bot[]) =>
+    saveCrew(
+      next.map((b) => {
+        const old = crewRef.current.find((x) => x.id === b.id);
+        return !old || (b.on && !old.on) || JSON.stringify(b.wakes) !== JSON.stringify(old.wakes) ? settle(b) : b;
+      }),
+    );
+  useEffect(() => {
+    void invoke<string | null>("data_read", { name: "bots/list.json" }).then((json) => ((crewRef.current = readBots(json)), setCrew(crewRef.current)));
+  }, []);
+  /** 봇 하나를 이 일로 깨운다: 역할, 지난 기억, 깨운 일을 실은 새 세션을 연다. 기억은 세션이 끝내기 전에 고쳐 적는다 */
+  const wakeBot = async (bot: Bot, e: BotEvent) => {
+    const at = Date.now();
+    const who = bot.name || bot.id;
+    // 세션이 뜨기 전에 적어 둔다: 같은 일이 연달아 와도 두 번 깨지 않는다
+    saveCrew(crewRef.current.map((b) => (b.id === bot.id ? ran(b, e, "", at) : b)));
+    const file = `bots/${bot.id}/MEMORY.md`;
+    const memory = (await invoke<string | null>("data_read", { name: file }).catch(() => null)) ?? "";
+    const { home, base } = live.current;
+    const cwd = e.cwd || bot.cwd.trim().replace(/^~(?=\/|$)/, home) || base || home;
+    const session = await dispatch({ kind: "new", cwd }, botPrompt(bot, e, memory, `${home}/.julgi/${file}`), { rank: -1, by: `봇 ${who}` }, false, true); // i18n-ok
+    if (typeof session !== "string") return record("봇", tr`"${who}"을 깨우지 못했다: ${e.title.slice(0, 60)}`); // i18n-ok
+    saveCrew(crewRef.current.map((b) => (b.id === bot.id ? { ...b, runs: b.runs.map((r) => (r.at === at ? { ...r, session } : r)) } : b)));
+    // 목록에서 누가 무슨 일로 깼는지 알아보게 이름을 붙여 둔다
+    const named = { ...live.current.names, [session]: `${who} · ${e.title.slice(0, 28)}` };
+    live.current.names = named;
+    setNames(named);
+    void invoke("data_write", { name: "names.json", text: JSON.stringify(named) });
+    record("봇", tr`"${who}"이 깸: ${e.title.slice(0, 70)}`, session); // i18n-ok
+  };
+  /** 깨울 일이 생겼다. 이 일을 기다리는 봇을 모두 깨운다 */
+  const raise = (e: BotEvent) => {
+    for (const bot of crewRef.current) if (wakes(bot, e)) void wakeBot(bot, e);
+  };
+  // 시간으로 깨는 봇: 30초마다 정한 시각이 찼는지 본다
+  useEffect(() => {
+    const timer = setInterval(() => {
+      const now = new Date();
+      for (const bot of crewRef.current)
+        for (const w of bot.wakes) {
+          const key = w.source === "time" ? timeDue(w.when, now) : "";
+          const e = { source: "time", kind: "time", key, title: tr`정한 시간 ${w.when.trim()}`, body: "" };
+          if (key && wakes(bot, e, now)) void actions.current.wakeBot(bot, e);
+        }
+    }, 30_000);
+    return () => clearInterval(timer);
+  }, []);
+  const actions = useRef({ wakeBot, raise, readUsage, publishRemote, say, dispatch, show, close, sleep, requestQuit, handoff, exited, newSession, newShell, nextWaiting, openTerm, resize, split, unsplit, finishThread, move, togglePin, tend, triage, serve, record, confirmClose, toggleReview, prNotice, askNotice, mineNotice, sleepNotice, wake, ticketNotice, ticketOffer, checkEnded });
+  actions.current = { wakeBot, raise, readUsage, publishRemote, say, dispatch, show, close, sleep, requestQuit, handoff, exited, newSession, newShell, nextWaiting, openTerm, resize, split, unsplit, finishThread, move, togglePin, tend, triage, serve, record, confirmClose, toggleReview, prNotice, askNotice, mineNotice, sleepNotice, wake, ticketNotice, ticketOffer, checkEnded };
 
   /** 세션이 남긴 링크 가운데 마지막 PR */
   const prOfSession = (id?: string) => {
@@ -2759,6 +2821,7 @@ export default function App() {
         setTicketMeta(metaRef.current);
         setTicketNews((old) => ({ ...old, [t.key]: news }));
         actions.current.ticketNotice(t, news, hush);
+        if (!hush) actions.current.raise({ source: "ticket", kind: meta.mention ? "mention" : meta.kind, key: `ticket:${t.key}:${meta.kind}:${t.updated}`, title: `${t.key} ${t.title}`.slice(0, 200), body: `${news}\n${t.url}` });
         // 나를 부른 댓글은 Julgi를 보고 있어도 눈에 띄게 알린다
         if (meta.mention) actions.current.say(`${t.key} · ${news} · ${t.title.slice(0, 50)}`, 9000);
       }
@@ -3648,6 +3711,17 @@ export default function App() {
           onBg={saveBg}
           rules={rules}
           onRules={saveRules}
+          crew={crew}
+          onCrew={editCrew}
+          onWakeBot={(bot) => void wakeBot(bot, { source: "manual", kind: "manual", key: `manual:${Date.now()}`, title: tr("지금 깨움"), body: "" })}
+          runLabel={(session) => {
+            const o = live.current.open.find((x) => x.sessionId === session);
+            return o ? (STATE_LABEL[states[o.key]?.state ?? ""] ?? tr("열려 있음")) : tr("닫힘");
+          }}
+          onOpenRun={(session) => {
+            const s = live.current.byId.get(session);
+            if (s) (setOverlay(null), openSession(s));
+          }}
           argoLogin={argoLogin}
           onRun={(command, label) => {
             // 설치와 로그인은 사람이 보고 답해야 한다(브라우저가 뜨거나 비밀번호를 묻는다). 셸 칸에서 돌린다. 끝나면 배포 상태를 다시 읽는다

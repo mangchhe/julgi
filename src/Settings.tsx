@@ -9,6 +9,7 @@ import { CORE, MORE } from "./Help";
 import { getLang, resolveLang, tr } from "./i18n";
 import { argoHost, argoLoginCommand } from "./argo";
 import { Rule, DEFAULT_RULES } from "./triageAsk.ts";
+import { Bot, SOURCES, newBot, runsToday } from "./bots.ts";
 import { setupDiff, setupOf } from "./setup";
 import { BACKDROPS, presetOf } from "./backdrops";
 import BotFace, { ARTS, faceOf, freeFace, shrinkImage } from "./BotFace";
@@ -35,12 +36,21 @@ type Props = {
   /** 등록된 봇과 그것을 고쳐 쓰는 길 */
   rules: Rule[];
   onRules: (next: Rule[]) => void;
+  /** 봇(역할과 기억을 가진 일꾼)과 그것을 고쳐 쓰는 길 */
+  crew: Bot[];
+  onCrew: (next: Bot[]) => void;
+  /** 조건을 기다리지 않고 지금 한 번 깨운다 */
+  onWakeBot: (bot: Bot) => void;
+  /** 봇이 깨서 연 세션의 지금 상태 (하는 중, 내 차례, 닫힘 …) */
+  runLabel: (session: string) => string;
+  onOpenRun: (session: string) => void;
 };
 
 /** under: 이 줄은 바로 위 줄에 딸린 줄이다. 들여 그리고, 위 줄이 꺼져 있으면(함수가 false) 감춘다 */
 type Row = { under?: (s: { bg: boolean }) => boolean } & RowKind;
 type RowKind =
   | { kind: "theme"; label: string; note: string }
+  | { kind: "crew"; label: string; note: string }
   | { kind: "number"; key: Key; label: string; note: string; step: number; min: number; max: number; show: (n: number) => string }
   | { kind: "toggle"; key: Key; label: string; note: string }
   | { kind: "pick"; key: Key; label: string; note: string; options: [string, string][] }
@@ -140,6 +150,14 @@ const SECTIONS: { id: string; title: string; hint: string; needs?: "jira" | "arg
     { kind: "toggle", key: "autoLead", label: tr("알아서 조율하기"), note: tr("⌘L로 던진 일이 레포 두 곳 넘게 걸치면 새 세션을 조율자로 세운다. 조율자는 일감으로 나눠 레포마다 다른 세션에 맡기고 결과를 모은다") },
     { under: () => config.autoLead, kind: "toggle", key: "taskWorktree", label: tr("일감은 따로 딴 폴더에서"), note: tr("일감을 맡은 세션은 레포의 작업 폴더가 아니라 Julgi가 만든 워크트리(브랜치 julgi/일감번호)에서 일한다. 고친 것이 없으면 끝난 뒤 지운다") },
     { kind: "toggle", key: "growSkills", label: tr("스킬 알아서 만들고 가꾸기"), note: tr("되풀이해서 시킨 일은 스킬로 만들고(한 주에 하나), 자주 쓰는 내 스킬은 쓰인 기록에 비추어 다듬는다(한 주에 하나, 옛 글은 ~/.julgi/skill-history에 남는다). 링크로 건 스킬과 레포의 스킬은 건드리지 않는다") },
+    ],
+  },
+  {
+    id: "봇", // i18n-ok
+    title: tr("봇"),
+    hint: tr("역할과 기억을 가진 일꾼. 깨우는 일이 생기면 그 역할로 세션을 연다"),
+    rows: [
+      { kind: "crew", label: tr("내 봇"), note: tr("봇 하나는 역할, 깨우는 일, 기억이다. 깨우는 일(정한 시간, 티켓 소식, 리뷰 요청, 바깥 이벤트)이 생기면 Julgi가 그 봇의 역할과 지난 기억을 실어 새 세션을 열고, 세션은 끝내기 전에 기억을 고쳐 적는다. 물을 것이 생기면 여느 세션처럼 내 차례(⌘J)에 올라온다. 하루 상한을 넘으면 그날은 더 깨지 않고, 같은 일로 두 번 깨지 않는다. 깬 것은 ⌘Y에 \"봇\"으로 남는다. 바깥 도구는 터미널에서 ~/.julgi/bin/julgi event <이름> \"제목\" 으로 일을 넣는다") },
     ],
   },
   {
@@ -287,7 +305,10 @@ const showKey = (combo: string) =>
     .join("");
 
 /** 설정 (⌘,). 바꾸는 즉시 적용되고 ~/.julgi/config.json에 남는다 */
-export default function Settings({ onChange, onClose, remoteUrl, onConnect, onConnectLab, argoLogin = [], onRun, startAt, rules, onRules, bg, onBg }: Props) {
+/** 깨우는 일의 종류를 화면에 부르는 이름 */
+const SOURCE_NAMES: Record<string, string> = { time: tr("정한 시간"), ticket: tr("티켓 소식"), review: tr("리뷰 요청"), event: tr("바깥 이벤트") };
+
+export default function Settings({ onChange, onClose, remoteUrl, onConnect, onConnectLab, argoLogin = [], onRun, startAt, rules, onRules, crew, onCrew, onWakeBot, runLabel, onOpenRun, bg, onBg }: Props) {
   const [at, setAt] = useState(() => Math.max(0, FIRST_OF[SECTIONS.findIndex((s) => s.id === startAt)] ?? 0));
   // Jira가 연결돼 있으면 그 Jira의 상태 이름을 읽어 "옮길 상태" 칸에서 고르게 한다. 워크플로가 프로젝트마다 달라서
   // 목록은 전체 상태이고, 실제로 옮길 수 있는지는 그 티켓의 지금 상태에 달려 있다
@@ -469,7 +490,7 @@ export default function Settings({ onChange, onClose, remoteUrl, onConnect, onCo
             <div className="set-card">
               {ROWS.map((row, i) =>
                 SECTION_OF[i] !== SECTION_OF[at] || !shown(i) ? null : (
-                <div key={`${row.label}-${i}`} className={"set-row" + (i === at ? " on" : "") + (row.kind === "keys" ? " keys" : "") + (row.kind === "theme" || row.kind === "bots" ? " stack" : "") + (row.under ? " child" : "")} onClick={() => setAt(i)}>
+                <div key={`${row.label}-${i}`} className={"set-row" + (i === at ? " on" : "") + (row.kind === "keys" ? " keys" : "") + (row.kind === "theme" || row.kind === "bots" || row.kind === "crew" ? " stack" : "") + (row.under ? " child" : "")} onClick={() => setAt(i)}>
                   {row.kind === "keys" && <kbd className="set-kbd">{row.label}</kbd>}
                   <div className="set-label">
                     {row.kind !== "keys" && row.label}
@@ -598,6 +619,99 @@ export default function Settings({ onChange, onClose, remoteUrl, onConnect, onCo
                           </button>
                         )}
                       </span>
+                    )}
+                    {row.kind === "crew" && (
+                      <div className="set-bots" onClick={(e) => e.stopPropagation()}>
+                        {crew.map((b) => {
+                          const put = (patch: Partial<Bot>) => onCrew(crew.map((x) => (x.id === b.id ? { ...x, ...patch } : x)));
+                          const wake = (i: number, patch: Partial<Bot["wakes"][number]>) => put({ wakes: b.wakes.map((w, at) => (at === i ? { ...w, ...patch } : w)) });
+                          return (
+                            <div key={b.id} className={"set-bot" + (b.on ? " on" : "")}>
+                              <div className="set-bot-head">
+                                <button type="button" tabIndex={-1} className="set-bot-face" title={tr("얼굴 고르기")} onClick={() => setFaceOf(facing === "crew:" + b.id ? "" : "crew:" + b.id)}>
+                                  <BotFace image={faceOf(b)} size={36} />
+                                </button>
+                                <input tabIndex={-1} className="set-bot-name" value={b.name} placeholder={tr("이름")} spellCheck={false} onChange={(e) => put({ name: e.target.value })} />
+                                <span className="set-note set-bot-job">{tr`오늘 ${runsToday(b)}번 깸 · 하루 ${b.cap}번까지`}</span>
+                                <button type="button" tabIndex={-1} className="set-toggle" disabled={!b.role.trim()} title={tr("조건을 기다리지 않고 지금 한 번 깨운다")} onClick={() => onWakeBot(b)}>
+                                  {tr("지금 깨우기")}
+                                </button>
+                                <button type="button" tabIndex={-1} className={"set-toggle" + (b.on ? " on" : "")} onClick={() => put({ on: !b.on })}>
+                                  {b.on ? tr("켬") : tr("끔")}
+                                </button>
+                                <button type="button" tabIndex={-1} className="set-toggle" title={tr("이 봇을 지운다. 기억 파일은 남는다")} onClick={() => onCrew(crew.filter((x) => x.id !== b.id))}>
+                                  ×
+                                </button>
+                              </div>
+                              {facing === "crew:" + b.id && (
+                                <div className="set-bot-faces">
+                                  {Object.entries(ARTS).map(([name, url]) => (
+                                    <button key={name} type="button" tabIndex={-1} className={!b.image && faceOf(b) === url ? "on" : ""} onClick={() => (put({ art: name, image: undefined }), setFaceOf(""))}>
+                                      <BotFace image={url} size={40} />
+                                    </button>
+                                  ))}
+                                  <label className="set-bot-up" title={tr("내 그림을 얼굴로 쓴다")}>
+                                    {tr("내 그림…")}
+                                    <input type="file" accept="image/*" tabIndex={-1} hidden onChange={(e) => e.target.files?.[0] && void shrinkImage(e.target.files[0]).then((image) => (put({ image }), setFaceOf(""))).catch(() => {})} />
+                                  </label>
+                                </div>
+                              )}
+                              <label>
+                                <span>{tr("역할")}</span>
+                                <textarea tabIndex={-1} rows={4} value={b.role} placeholder={tr("예: 새로 배정된 티켓을 읽고, 관련 코드를 찾아 원인과 고칠 방법을 정리한다. 코드는 고치지 않는다")} spellCheck={false} onChange={(e) => put({ role: e.target.value })} />
+                              </label>
+                              <label>
+                                <span>{tr("일하는 폴더")}</span>
+                                <input tabIndex={-1} value={b.cwd} placeholder={tr("비우면 기본 폴더")} spellCheck={false} onChange={(e) => put({ cwd: e.target.value })} />
+                              </label>
+                              <div className="set-bot-wakes">
+                                <span>{tr("깨우는 일")}</span>
+                                <div>
+                                  {b.wakes.map((w, i) => (
+                                    <div key={i} className="set-bot-wake">
+                                      <select tabIndex={-1} value={w.source} onChange={(e) => wake(i, { source: e.target.value, when: "" })}>
+                                        {SOURCES.map((src) => (
+                                          <option key={src.id} value={src.id}>
+                                            {SOURCE_NAMES[src.id] ?? src.id}
+                                          </option>
+                                        ))}
+                                      </select>
+                                      <input tabIndex={-1} value={w.when} placeholder={SOURCES.find((src) => src.id === w.source)?.hint || tr("비우면 전부")} spellCheck={false} onChange={(e) => wake(i, { when: e.target.value })} />
+                                      <button type="button" tabIndex={-1} className="set-toggle" onClick={() => put({ wakes: b.wakes.filter((_, at) => at !== i) })}>
+                                        ×
+                                      </button>
+                                    </div>
+                                  ))}
+                                  <button type="button" tabIndex={-1} className="set-toggle" onClick={() => put({ wakes: [...b.wakes, { source: "time", when: "" }] })}>
+                                    {tr("+ 깨우는 일 더하기")}
+                                  </button>
+                                </div>
+                              </div>
+                              <label>
+                                <span>{tr("하루 상한")}</span>
+                                <input tabIndex={-1} type="number" min={1} max={50} value={b.cap} onChange={(e) => put({ cap: Math.min(50, Math.max(1, Number(e.target.value) || 1)) })} />
+                              </label>
+                              {b.runs.length > 0 && (
+                                <div className="set-bot-wakes">
+                                  <span>{tr("최근에 한 일")}</span>
+                                  <div>
+                                    {b.runs.slice(-5).reverse().map((r) => (
+                                      <button key={r.at} type="button" tabIndex={-1} className="set-bot-run" disabled={!r.session} onClick={() => onOpenRun(r.session)}>
+                                        <small>{new Date(r.at).toLocaleString(undefined, { month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit" })}</small>
+                                        <span>{r.why}</span>
+                                        <b>{r.session ? runLabel(r.session) : ""}</b>
+                                      </button>
+                                    ))}
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })}
+                        <button type="button" tabIndex={-1} className="set-toggle" onClick={() => onCrew([...crew, newBot(crypto.randomUUID().slice(0, 8), freeFace(crew))])}>
+                          {tr("+ 봇 더하기")}
+                        </button>
+                      </div>
                     )}
                     {row.kind === "bots" && (
                       <div className="set-bots" onClick={(e) => e.stopPropagation()}>
