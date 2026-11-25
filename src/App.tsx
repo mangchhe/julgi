@@ -588,7 +588,12 @@ export default function App() {
   const cwdOf = (key: string | null) => open.find((o) => o.key === key)?.cwd ?? (base || home);
   const folders = useMemo(() => buildFolders(sessions.filter((s) => exists[s.cwd] !== false)), [sessions, exists]);
   const candidates = useMemo(() => mergeCandidates(items), [items]);
-  const waitCount = open.filter((o) => waiting(states[o.key])).length;
+  // 내가 이미 본 답: 초점이 있는 칸에서 끝난 답, 또는 내 차례에서 읽고 답 없이 연 답. 세션 → 그 답이 끝난 시각.
+  // 점은 그대로 "기다림"이지만 내 차례(숫자, ⌘J 목록, 독 배지)에는 올리지 않는다. 허락 물음과 멈춘 세션은 봐도 풀리지 않아 늘 올린다
+  const [looked, setLooked] = useState<Record<string, number>>({});
+  const sawReply = (key: string, since: number) => setLooked((old) => (old[key] === since ? old : { ...old, [key]: since }));
+  const calls = (key: string) => waiting(states[key]) && !(states[key].state === "wait" && looked[key] === states[key].since);
+  const waitCount = open.filter((o) => calls(o.key)).length;
 
   // 키 처리와 이벤트 콜백은 한 번만 걸고, 최신 상태는 여기서 읽는다
   const live = useRef({ open, panes, widths, focus, states, overlay, sessions, home, base, fontSize, handing, byId, threads, memories, pinned, items, folders, names, zoom, notes, skills, reviews, acts, skillUses, closing, dead, mapText, skillCands, reviewing, prNews, asks, mineNews, prShown, sleepNews, ticketShown, ticketLinks, tickets });
@@ -1913,6 +1918,9 @@ export default function App() {
     const now = Date.now();
     tendBugs();
     for (const key of panes) if (key && waiting(states[key])) seen.current[key] = states[key].since;
+    // 초점이 있는 칸의 답은 내가 눈앞에서 본 것이다. 다른 화면이 덮고 있거나 Julgi 창이 뒤에 있으면 본 것이 아니다
+    const front = panes[live.current.focus];
+    if (front && states[front]?.state === "wait" && !overlay && document.hasFocus() && !document.hidden) sawReply(front, states[front].since);
     for (const key of panes) if (key) shownAt.current[key] = now;
     for (const o of open) {
       const was = lastStates.current[o.key]?.state;
@@ -3323,7 +3331,7 @@ export default function App() {
           }}
           work={{ prs: minePrs.length, asks: asks.length, news: Object.keys(mineNews).length + Object.keys(prNews).length + Object.keys(sleepNews).length }}
           onWork={() => setOverlay("work")}
-          turn={open.filter((o) => waiting(states[o.key]) || prNews[o.key]).length + asks.length + Object.keys(mineNews).length + Object.keys(sleepNews).length}
+          turn={open.filter((o) => calls(o.key) || prNews[o.key]).length + asks.length + Object.keys(mineNews).length + Object.keys(sleepNews).length}
           bots={bots}
           botRuns={acts.filter((a) => a.kind === "대신 답함" && new Date(a.at).toDateString() === new Date().toDateString()).length} // i18n-ok
           onQueue={() => setOverlay("queue")}
@@ -3468,7 +3476,7 @@ export default function App() {
         <Queue
           busy={open.filter((o) => states[o.key]?.state === "run").length}
           rows={open
-            .filter((o) => waiting(states[o.key]) || (prNews[o.key] && states[o.key]?.state !== "run"))
+            .filter((o) => calls(o.key) || (prNews[o.key] && states[o.key]?.state !== "run"))
             .sort((a, b) => (states[a.key]?.since ?? Infinity) - (states[b.key]?.since ?? Infinity))
             .map((o) => ({ key: o.key, name: nameOf(o.key), repo: repoOf(o.cwd), state: states[o.key]?.state ?? "", since: states[o.key]?.since ?? 0, sessionId: o.sessionId, news: prNews[o.key], pr: prOfSession(o.sessionId) ?? undefined, bug: bugJobs.find((j) => j.sessionId === o.sessionId && j.state === "decide")?.key }))
             // 잠든 세션도 PR에 일이 생겼으면 내 차례다. 고르면 깨운다
@@ -3532,11 +3540,11 @@ export default function App() {
             record("답함", tr`"${nameOf(key)}"에 내 차례 목록에서 답함: ${text.slice(0, 80)}`, open.find((o) => o.key === key)?.sessionId); // i18n-ok
           }}
           onOpen={(key) => {
-            // 내 차례에서 답을 읽고 답 없이 세션을 열었으면 본 것으로 친다. 그 답이 그대로인 동안은 내 차례에서 내린다.
+            // 내 차례에서 답을 읽고 답 없이 세션을 열었으면 본 것으로 친다. 그 답이 그대로인 동안은 내 차례에서 내린다(점은 그대로 둔다).
             // 허락을 묻는 것과 멈춘 것은 보기만 해서는 풀리지 않으므로 그대로 둔다
             const o = open.find((x) => x.key === key);
             const st = states[key];
-            if (o?.sessionId && st?.state === "wait") triaged.current[o.sessionId] = { since: st.since, need: false, why: "" };
+            if (st?.state === "wait") sawReply(key, st.since);
             return o ? show(key) : wake(key.slice(2));
           }}
           onPr={(pr) => openPr(pr)}

@@ -90,7 +90,7 @@ async function invoke(cmd: string, args: Record<string, unknown> = {}): Promise<
       return JSON.stringify({ open, panes: [open[0].key, open[1].key, flags.has("two") ? null : open[2].key], focus: 0, fontSize: 13, sidebar: true });
     }
     case "term_states":
-      return { 1: ["run", Date.now()], 2: ["wait", Date.now() - 60000], 4: ["ask", Date.now() - 5000] };
+      return { 1: ["run", BOOT], 2: ["wait", BOOT - 60000], 4: ["ask", BOOT - 5000] }; // 시각은 그대로 둔다. 물을 때마다 바뀌면 "같은 답"인지 알 수 없다
     case "pty_spawn": {
       const channel = args.onData as { id: number };
       callbacks.get(channel.id)?.({ index: 0, message: Array.from(new TextEncoder().encode(SCREEN)) });
@@ -364,4 +364,6 @@ setTimeout(() => {
 
 /** ci_runs를 몇 번 읽었나 (cifail 깃발) */
 let ciReads = 0;
+/** 시험 화면을 연 시각. 세션 상태의 "언제부터"를 고정하는 데 쓴다 */
+const BOOT = Date.now();
 export {};
