@@ -44,7 +44,7 @@ export default {
   "사람이 연 것이 아니라 스크립트나 SDK가 돌린 세션. 설정의 \"화면\"에서 숨기거나 섞을 수 있다": "Sessions run by a script or the SDK, not opened by a person. Hide or mix them in Settings under \"Display\"",
   "내 차례: 나를 기다리는 세션, PR, 티켓 (⌘J)": "My turn: sessions, PRs and tickets waiting on me (⌘J)",
   "작업: PR, 티켓, CI, 배포를 묶음별로 둘러본다 (⌘U)": "Work: browse PRs, tickets, CI and deploys by group (⌘U)",
-  "봇: 정해 둔 상황이면 세션에 대신 답한다": "Bots: answer sessions for me in situations I set",
+  "대신 답하기: 정해 둔 상황이면 세션에 대신 답한다": "Auto-reply: answer sessions for me in situations I set",
   "오늘 {0}번 답함": "answered {0} today",
   "{0}개 켜짐": "{0} on",
   "꺼져 있다": "off",

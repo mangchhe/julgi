@@ -121,14 +121,14 @@ If you use Argo CD, the apps that belong to your repos show sync and health, whe
 <tr>
 <td>
 
-### Bots
+### Auto-reply
 
-A bot is one rule: in this situation, send this message. When a session stops only to ask "shall I go on?", or reports work done without checking it, a bot can answer for you.
+A rule is this: in this situation, send this message. When a session stops only to ask "shall I go on?", or reports work done without checking it, a rule can answer for you.
 
-Bots never answer a question that asks you to choose, or one about something hard to undo. Register your own in `⌘,` → Bots; each has a name and a face.
+Rules never answer a question that asks you to choose, or one about something hard to undo. Register your own in `⌘,` → Auto-reply; each has a name and a face.
 
 </td>
-<td><img src="docs/images/bots.png" alt="The Bots tab in settings with two bots, each with a face, a name, the situation it watches for and the message it sends" /></td>
+<td><img src="docs/images/bots.png" alt="The Auto-reply tab in settings with two rules, each with a face, a name, the situation it watches for and the message it sends" /></td>
 </tr>
 </table>
 

@@ -13,7 +13,7 @@ Read this before you run it. Everything here can be turned off or narrowed in se
 - **Writes to `~/.julgi/grown`, and reads of transcripts (`~/.claude/projects`) and skill folders, do not ask either.** Sessions that create and refine skills need them.
 - **A preference note is appended to each session's system prompt** (`--append-system-prompt-file`). Turn `brain` off and it is not attached.
 - **Usage display reads Claude Code's login token.** It reads it from the keychain and sends it only to `api.anthropic.com/api/oauth/usage`. This endpoint is undocumented and may stop working. Off by default.
-- **The model list for bots reads Claude Code's login token too.** Opening the Bots tab asks `api.anthropic.com/v1/models` which models this login can use, with the same token, sent nowhere else.
+- **The model list for rules reads Claude Code's login token too.** Opening the Auto-reply tab asks `api.anthropic.com/v1/models` which models this login can use, with the same token, sent nowhere else.
 - **Simple permission prompts can be answered for you** (`autoAllow`, off by default). `look` lets read-only commands through (git status/diff/log, ls, gh and glab views); `check` adds test and build runners, which run scripts from the project. They are passed to Claude Code as permission rules at launch. Commands that read file contents (cat, grep) are not included; add them in `allowRules` if you want them.
 - **Phone view opens one port** (default 4747). It accepts only the Tailscale range (100.64.0.0/10) and this Mac, and the token in the URL (`~/.julgi/remote-token`) must match. Off by default.
 - **Sessions can read the repos on the map without asking** (a `Read` permission passed through `--settings`). Editing another repo still asks.
@@ -32,7 +32,7 @@ The core knows only Claude Code and git. Company or personal pieces attach throu
 - `worksCommand`: a command that prints a JSON list of work items used to group sessions.
 - `repoPatterns`: regexes that pull a repo name out of a path when the folder is gone.
 - `scriptShow`, `scriptEntry`: how sessions run by a script or the SDK (such as `claude -p`) sit in the list. `scriptShow` is `group` (default, folded into one group at the bottom), `hide` (left out, findable with `⌘K`) or `mix`. A session counts as run by a script when the `entrypoint` in its transcript starts with `scriptEntry` (default `sdk`, comma-separated).
-- `bots.json`: registered bots. A bot is "in this situation (`when`), send this message (`say`)". When a finished reply matches the situation of a bot that is on, Julgi sends the message for me. Questions that ask to choose, wait for information, or concern things that are hard to undo (push, merge, deploy, delete) are not answered, and at most three messages in a row go to one session. Add and edit them under "Bots" in Settings. Needs `triage` on.
+- `rules.json`: auto-reply rules. A rule is "in this situation (`when`), send this message (`say`)". When a finished reply matches the situation of a rule that is on, Julgi sends the message for me. Questions that ask to choose, wait for information, or concern things that are hard to undo (push, merge, deploy, delete) are not answered, and at most three messages in a row go to one session. Add and edit them under "Rules" in Settings. Needs `triage` on.
 - `stripEnv`: environment variable prefixes not passed to Julgi's shells.
 - `models`: which model each kind of judgment uses.
 
@@ -113,9 +113,9 @@ What the connections use:
 
 Settings are all text files under `~/.julgi`, so you can move that folder or keep it in your dotfiles. To share with someone else, export from `⌘,` → Settings files.
 
-- **Export** writes one file, `~/.julgi/share/julgi-setup.json`, and copies it to the clipboard. It holds looks, ways of working and bots.
-- **Left out**: things tied to your machine and company (folders, connections, ticket and deploy settings, the hotkey, language), settings that loosen permissions (`skipPermissions`, `autoAllow`, `allowRules`), the background photo, and bots' own pictures and counts.
-- **Import** reads a file, shows the values that differ and the new bots first, and changes nothing until you press Apply. The items above are dropped even if the file has them. Imported bots arrive switched off.
+- **Export** writes one file, `~/.julgi/share/julgi-setup.json`, and copies it to the clipboard. It holds looks, ways of working and rules.
+- **Left out**: things tied to your machine and company (folders, connections, ticket and deploy settings, the hotkey, language), settings that loosen permissions (`skipPermissions`, `autoAllow`, `allowRules`), the background photo, and rules' own pictures and counts.
+- **Import** reads a file, shows the values that differ and the new rules first, and changes nothing until you press Apply. The items above are dropped even if the file has them. Imported rules arrive switched off.
 
 ## Files
 
@@ -136,7 +136,7 @@ Everything is a text file under `~/.julgi/`. Conversations are not here; Claude 
 | `pr-seen.json`, `jira-seen.json`, `jira-news.json` | Last known state of PRs and tickets, to tell news from old; ticket news not yet looked at |
 | `run-seen.json` | Last known state of my CI runs, to notice when one finishes |
 | `argo-seen.json` | Last known sync and health of linked Argo CD apps, to notice a change for the worse |
-| `bots.json` | Registered bots: name, face, the situation each watches for, the message it sends, how often it answered |
+| `rules.json` | auto-reply rules: name, face, the situation each watches for, the message it sends, how often it answered |
 | `background.txt` | The background photo, scaled down and stored as text |
 | `triage.json` | For each finished reply, whether it needed you and why |
 | `progress.json` | Goal, done, left, blocked per stem |

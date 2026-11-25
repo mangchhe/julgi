@@ -303,7 +303,7 @@ export default function Numbers({ acts, tasks, reviews, sessions, threads, open,
       <section>
         <h3>{tr("대신 한 일 · 내가 안 해도 됐던 것")}</h3>
         <div className="nm-tiles">
-          <Tile n={v.went} label={tr("봇이 대신 답함")} sub={tr("최근 7일 · 봇이 세션에 대신 보낸 말")} />
+          <Tile n={v.went} label={tr("규칙이 대신 답함")} sub={tr("최근 7일 · 규칙이 세션에 대신 보낸 말")} />
           <Tile n={v.scripts} label={tr("스크립트가 돌린 세션")} sub={tr("최근 14일 · claude -p나 SDK로 돈 것")} />
         </div>
         {v.scripts > 0 && (

@@ -11,7 +11,7 @@ import Queue from "./Queue";
 import Status from "./Status";
 import History, { Act } from "./History";
 import Morning from "./Morning";
-import { Bot, DEFAULT_BOTS, TRIAGE_SYSTEM, triagePrompt, parseTriage } from "./triageAsk.ts";
+import { Rule, DEFAULT_RULES, TRIAGE_SYSTEM, triagePrompt, parseTriage } from "./triageAsk.ts";
 import Pane from "./Pane";
 import Palette, { Pick } from "./Palette";
 import Send, { RouteNote, Target } from "./Send";
@@ -468,25 +468,26 @@ export default function App() {
     return () => void (url && URL.revokeObjectURL(url));
   }, [bg, bgShow, bgBlur]);
   const goStreak = useRef<Record<string, number>>({}); // 세션마다 봇이 연달아 대신 답한 횟수
-  const [bots, setBots] = useState<Bot[]>(DEFAULT_BOTS);
-  const botsRef = useRef(bots);
-  const saveBots = (next: Bot[]) => {
-    botsRef.current = next;
-    setBots(next);
-    void invoke("data_write", { name: "bots.json", text: JSON.stringify(next, null, 1) });
+  const [rules, setRules] = useState<Rule[]>(DEFAULT_RULES);
+  const rulesRef = useRef(rules);
+  const saveRules = (next: Rule[]) => {
+    rulesRef.current = next;
+    setRules(next);
+    void invoke("data_write", { name: "rules.json", text: JSON.stringify(next, null, 1) });
   };
   useEffect(() => {
-    void invoke<string | null>("data_read", { name: "bots.json" }).then((json) => {
+    // 예전에는 이 규칙들을 봇이라 부르고 bots.json 에 두었다. rules.json 이 없으면 그 파일을 읽는다
+    void invoke<string | null>("data_read", { name: "rules.json" }).then((json) => json ?? invoke<string | null>("data_read", { name: "bots.json" })).then((json) => {
       try {
-        const list = JSON.parse(json ?? "") as Bot[];
+        const list = JSON.parse(json ?? "") as Rule[];
         if (!Array.isArray(list)) return;
         // 이름과 하는 일을 나누기 전에 적힌 파일: 처음 봇이면 새 이름을 주고, 내가 만든 봇이면 적어 둔 이름을 하는 일로 옮긴다
         const next = list.map((b) => {
           if (typeof b.job === "string") return b;
-          const base = DEFAULT_BOTS.find((d) => d.id === b.id);
+          const base = DEFAULT_RULES.find((d) => d.id === b.id);
           return base ? { ...b, name: base.name, job: base.job } : { ...b, job: b.name, name: "" };
         });
-        (botsRef.current = next), setBots(next);
+        (rulesRef.current = next), setRules(next);
       } catch {
         // 없거나 깨졌으면 처음 봇들로 둔다
       }
@@ -1091,8 +1092,8 @@ export default function App() {
     if (triaging.current.has(sessionId)) return;
     triaging.current.set(sessionId, Date.now());
     let verdict = { since, need: true, why: "" };
-    let bot: Bot | undefined;
-    const active = botsRef.current.filter((b) => b.on && b.when.trim() && b.say.trim());
+    let bot: Rule | undefined;
+    const active = rulesRef.current.filter((b) => b.on && b.when.trim() && b.say.trim());
     try {
       const pair = await invoke<[string, string] | null>("last_exchange", { sessionId });
       if (pair?.[1]) {
@@ -1122,8 +1123,8 @@ export default function App() {
       goStreak.current[sessionId] = streak + 1;
       verdict = { ...verdict, need: false };
       terms.submitWhenClear(key, bot.say);
-      record("대신 답함", tr`봇 "${bot.name || bot.job}" → "${nameOf(key).slice(0, 40)}": ${bot.say.slice(0, 60)}`, sessionId); // i18n-ok
-      saveBots(botsRef.current.map((b) => (b.id === bot.id ? { ...b, runs: b.runs + 1 } : b)));
+      record("대신 답함", tr`규칙 "${bot.name || bot.job}" → "${nameOf(key).slice(0, 40)}": ${bot.say.slice(0, 60)}`, sessionId); // i18n-ok
+      saveRules(rulesRef.current.map((b) => (b.id === bot.id ? { ...b, runs: b.runs + 1 } : b)));
     } else delete goStreak.current[sessionId];
     triaged.current = { ...triaged.current, [sessionId]: verdict };
     triaging.current.delete(sessionId);
@@ -1589,7 +1590,7 @@ export default function App() {
       })
       .sort((a, b) => a.since - b.since);
     const places = [...(base ? [{ repo: tr`기본 폴더 · ${repoOf(base)}`, cwd: base }] : []), ...folders.slice(0, 40).map((f) => ({ repo: f.repo, cwd: f.cwd }))];
-    void invoke("remote_publish", { state: JSON.stringify({ at: Date.now(), theme: terms.colors(), sessions, folders: places, acts: acts.slice(-30).reverse().map((a) => ({ at: a.at, kind: tr(a.kind), text: a.text.slice(0, 160) })), usage: config.usage ? (usageRef.current ?? []).map((u) => ({ name: u.name, used: u.used })) : [], botRuns: acts.filter((a) => a.kind === "대신 답함" && new Date(a.at).toDateString() === new Date().toDateString()).length }) }); // i18n-ok
+    void invoke("remote_publish", { state: JSON.stringify({ at: Date.now(), theme: terms.colors(), sessions, folders: places, acts: acts.slice(-30).reverse().map((a) => ({ at: a.at, kind: tr(a.kind), text: a.text.slice(0, 160) })), usage: config.usage ? (usageRef.current ?? []).map((u) => ({ name: u.name, used: u.used })) : [], ruleRuns: acts.filter((a) => a.kind === "대신 답함" && new Date(a.at).toDateString() === new Date().toDateString()).length }) }); // i18n-ok
   };
   const setConfig = (key: keyof typeof config, value: string | number | boolean) => {
     Object.assign(config, { [key]: value });
@@ -3370,10 +3371,10 @@ export default function App() {
           work={{ prs: minePrs.length, asks: asks.length, news: Object.keys(mineNews).length + Object.keys(prNews).length + Object.keys(sleepNews).length }}
           onWork={() => setOverlay("work")}
           turn={open.filter((o) => calls(o.key) || prNews[o.key]).length + asks.length + Object.keys(mineNews).length + Object.keys(sleepNews).length}
-          bots={bots}
-          botRuns={acts.filter((a) => a.kind === "대신 답함" && new Date(a.at).toDateString() === new Date().toDateString()).length} // i18n-ok
+          rules={rules}
+          ruleRuns={acts.filter((a) => a.kind === "대신 답함" && new Date(a.at).toDateString() === new Date().toDateString()).length} // i18n-ok
           onQueue={() => setOverlay("queue")}
-          onBots={() => (setSettingsAt("봇"), setOverlay("settings"))} // i18n-ok
+          onRules={() => (setSettingsAt("규칙"), setOverlay("settings"))} // i18n-ok
           onSettings={() => (setSettingsAt(undefined), setOverlay("settings"))}
           onHistory={() => setOverlay("history")}
         />
@@ -3639,8 +3640,8 @@ export default function App() {
         <Settings
           bg={bg}
           onBg={saveBg}
-          bots={bots}
-          onBots={saveBots}
+          rules={rules}
+          onRules={saveRules}
           argoLogin={argoLogin}
           onRun={(command, label) => {
             // 설치와 로그인은 사람이 보고 답해야 한다(브라우저가 뜨거나 비밀번호를 묻는다). 셸 칸에서 돌린다. 끝나면 배포 상태를 다시 읽는다

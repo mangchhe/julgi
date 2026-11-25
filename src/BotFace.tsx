@@ -1,4 +1,4 @@
-import type { Bot } from "./triageAsk.ts";
+import type { Rule } from "./triageAsk.ts";
 
 /** 앱에 들어 있는 얼굴 그림들. assets/art 의 bot-*.png 가 전부 선택지가 된다: 파일을 더 넣으면 고를 것이 는다 */
 const FILES = import.meta.glob<string>("./assets/art/bot-*.png", { eager: true, query: "?url", import: "default" });
@@ -12,11 +12,11 @@ export const ARTS: Record<string, string> = Object.fromEntries(
 const OWN: Record<string, string> = { go: "go", verify: "check" };
 const NAMES = Object.keys(ARTS);
 /** 그림을 정해 두지 않은 봇은 id에서 하나를 고른다. 같은 봇은 늘 같은 얼굴이다 */
-const artOf = (b: Bot) => (b.art && ARTS[b.art] ? b.art : (OWN[b.id] ?? NAMES[[...b.id].reduce((h, c) => (h * 31 + c.charCodeAt(0)) >>> 0, 7) % NAMES.length]));
+const artOf = (b: Rule) => (b.art && ARTS[b.art] ? b.art : (OWN[b.id] ?? NAMES[[...b.id].reduce((h, c) => (h * 31 + c.charCodeAt(0)) >>> 0, 7) % NAMES.length]));
 /** 봇의 얼굴: 내가 고른 그림, 없으면 들어 있는 그림 */
-export const faceOf = (b: Bot) => b.image ?? ARTS[artOf(b)];
+export const faceOf = (b: Rule) => b.image ?? ARTS[artOf(b)];
 /** 새 봇에 줄 그림: 아직 아무도 안 쓰는 것부터 */
-export const freeFace = (bots: Bot[]) => NAMES.find((n) => !bots.some((b) => !b.image && artOf(b) === n)) ?? NAMES[bots.length % NAMES.length];
+export const freeFace = (bots: Rule[]) => NAMES.find((n) => !bots.some((b) => !b.image && artOf(b) === n)) ?? NAMES[bots.length % NAMES.length];
 
 /** 고른 그림을 가운데 정사각형으로 잘라 128px로 줄인다. 봇 목록 파일에 그대로 담을 만큼 작아진다 */
 export const shrinkImage = (file: File) =>

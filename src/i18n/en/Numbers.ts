@@ -98,6 +98,6 @@ export default {
   "최근 14일, 하루에 스크립트가 돌린 수": "Last 14 days, script runs per day",
   "하루에 스크립트가 돌린 수": "Script runs per day",
   "어디서 돌았나": "Where they ran",
-  "봇이 대신 답함": "Answered by bots",
-  "최근 7일 · 봇이 세션에 대신 보낸 말": "Last 7 days · messages bots sent to sessions for me",
+  "규칙이 대신 답함": "Answered by rules",
+  "최근 7일 · 규칙이 세션에 대신 보낸 말": "Last 7 days · messages rules sent to sessions for me",
 } as Record<string, string>;

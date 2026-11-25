@@ -8,7 +8,7 @@ import { THEMES } from "./themes";
 import { CORE, MORE } from "./Help";
 import { getLang, resolveLang, tr } from "./i18n";
 import { argoHost, argoLoginCommand } from "./argo";
-import { Bot, DEFAULT_BOTS } from "./triageAsk.ts";
+import { Rule, DEFAULT_RULES } from "./triageAsk.ts";
 import { setupDiff, setupOf } from "./setup";
 import { BACKDROPS, presetOf } from "./backdrops";
 import BotFace, { ARTS, faceOf, freeFace, shrinkImage } from "./BotFace";
@@ -33,8 +33,8 @@ type Props = {
   bg: string | null;
   onBg: (data: string | null) => void;
   /** 등록된 봇과 그것을 고쳐 쓰는 길 */
-  bots: Bot[];
-  onBots: (next: Bot[]) => void;
+  rules: Rule[];
+  onRules: (next: Rule[]) => void;
 };
 
 /** under: 이 줄은 바로 위 줄에 딸린 줄이다. 들여 그리고, 위 줄이 꺼져 있으면(함수가 false) 감춘다 */
@@ -143,11 +143,11 @@ const SECTIONS: { id: string; title: string; hint: string; needs?: "jira" | "arg
     ],
   },
   {
-    id: "봇", // i18n-ok
-    title: tr("봇"),
+    id: "규칙", // i18n-ok
+    title: tr("대신 답하기"),
     hint: tr("세션이 답을 끝냈을 때 정해 둔 상황이면 대신 답한다"),
     rows: [
-      { kind: "bots", label: tr("등록된 봇"), note: tr("봇 하나는 \"이런 상황이면 이 말을 보낸다\"이다. 세션이 답을 끝내면 작은 모델이 그 답을 읽고, 켜 둔 봇의 상황에 꼭 들어맞을 때만 그 봇의 말을 세션에 대신 보낸다. 여러 안 가운데 고르라는 물음, 내가 줄 정보를 기다리는 물음, 푸시·머지·배포·삭제처럼 되돌리기 어려운 일을 묻는 물음에는 어느 봇도 답하지 않는다. 한 세션에 연달아 세 번까지만 보내고, 보낸 것은 ⌘Y에 \"대신 답함\"으로 남는다. \"할 일이 있을 때만 부르기\"가 켜져 있어야 한다") },
+      { kind: "bots", label: tr("대신 답하기 규칙"), note: tr("규칙 하나는 \"이런 상황이면 이 말을 보낸다\"이다. 세션이 답을 끝내면 작은 모델이 그 답을 읽고, 켜 둔 규칙의 상황에 꼭 들어맞을 때만 그 규칙의 말을 세션에 대신 보낸다. 여러 안 가운데 고르라는 물음, 내가 줄 정보를 기다리는 물음, 푸시·머지·배포·삭제처럼 되돌리기 어려운 일을 묻는 물음에는 어느 규칙도 답하지 않는다. 한 세션에 연달아 세 번까지만 보내고, 보낸 것은 ⌘Y에 \"대신 답함\"으로 남는다. \"할 일이 있을 때만 부르기\"가 켜져 있어야 한다") },
     ],
   },
   {
@@ -248,7 +248,7 @@ const SECTIONS: { id: string; title: string; hint: string; needs?: "jira" | "arg
     title: tr("설정 파일"),
     hint: tr("어디에 있고, 어떻게 나누나"),
     rows: [
-      { kind: "share", label: tr("내 설정 내보내기와 가져오기"), note: tr("설정은 전부 ~/.julgi 아래의 글 파일이다. config.json 에는 기본값에서 바꾼 것만 적히고, 봇은 bots.json 에, 배경 사진은 background.txt 에 있다. 이 폴더를 그대로 옮기거나 dotfiles 로 관리해도 된다. 내보내기는 내가 기본값에서 바꾼 것 가운데 남과 나눌 수 있는 것만 한 파일(julgi-setup.json)로 모은다: 생김새, 일하는 방식, 내가 만든 봇. 내 컴퓨터와 회사에 딸린 것(폴더, 연결, 티켓과 배포 설정)과 허락을 푸는 설정은 넣지 않는다. 가져올 때 봇은 꺼진 채로 들어온다") },
+      { kind: "share", label: tr("내 설정 내보내기와 가져오기"), note: tr("설정은 전부 ~/.julgi 아래의 글 파일이다. config.json 에는 기본값에서 바꾼 것만 적히고, 대신 답하기 규칙은 rules.json 에, 봇은 bots/ 에, 배경 사진은 background.txt 에 있다. 이 폴더를 그대로 옮기거나 dotfiles 로 관리해도 된다. 내보내기는 내가 기본값에서 바꾼 것 가운데 남과 나눌 수 있는 것만 한 파일(julgi-setup.json)로 모은다: 생김새, 일하는 방식, 내가 만든 대신 답하기 규칙. 내 컴퓨터와 회사에 딸린 것(폴더, 연결, 티켓과 배포 설정)과 허락을 푸는 설정은 넣지 않는다. 가져올 때 규칙은 꺼진 채로 들어온다") },
     ],
   },
 ];
@@ -263,7 +263,7 @@ const FIRST_OF: number[] = SECTIONS.map((_, n) => SECTION_OF.indexOf(n));
 // 묶음의 이름표(id)는 저장되지 않는 안쪽 이름이다 i18n-off
 const NAV: { title: string; ids: string[] }[] = [
   { title: tr("기본"), ids: ["화면", "꾸미기", "세션"] },
-  { title: tr("Julgi가 하는 일"), ids: ["알아서 하는 일", "봇", "코드 검토", "점검과 모델", "지도"] },
+  { title: tr("Julgi가 하는 일"), ids: ["알아서 하는 일", "봇", "규칙", "코드 검토", "점검과 모델", "지도"] },
   { title: tr("밖의 서비스"), ids: ["연결", "PR", "티켓", "배포"] },
   { title: tr("그 밖"), ids: ["밖에서", "설정 파일", "keys"] },
 ];
@@ -287,7 +287,7 @@ const showKey = (combo: string) =>
     .join("");
 
 /** 설정 (⌘,). 바꾸는 즉시 적용되고 ~/.julgi/config.json에 남는다 */
-export default function Settings({ onChange, onClose, remoteUrl, onConnect, onConnectLab, argoLogin = [], onRun, startAt, bots, onBots, bg, onBg }: Props) {
+export default function Settings({ onChange, onClose, remoteUrl, onConnect, onConnectLab, argoLogin = [], onRun, startAt, rules, onRules, bg, onBg }: Props) {
   const [at, setAt] = useState(() => Math.max(0, FIRST_OF[SECTIONS.findIndex((s) => s.id === startAt)] ?? 0));
   // Jira가 연결돼 있으면 그 Jira의 상태 이름을 읽어 "옮길 상태" 칸에서 고르게 한다. 워크플로가 프로젝트마다 달라서
   // 목록은 전체 상태이고, 실제로 옮길 수 있는지는 그 티켓의 지금 상태에 달려 있다
@@ -295,11 +295,11 @@ export default function Settings({ onChange, onClose, remoteUrl, onConnect, onCo
   // 봇: 얼굴을 고르는 중인 봇, 그리고 이 로그인으로 쓸 수 있는 모델들 (봇 탭을 처음 열 때 한 번 읽는다)
   const [facing, setFaceOf] = useState("");
   const [models, setModels] = useState<[string, string][]>([]);
-  const onBotsTab = SECTIONS[SECTION_OF[at]]?.id === "봇"; // i18n-ok
+  const onRulesTab = SECTIONS[SECTION_OF[at]]?.id === "규칙"; // i18n-ok
   useEffect(() => {
-    if (onBotsTab && !models.length) void invoke<[string, string][]>("claude_models").then(setModels, () => {});
+    if (onRulesTab && !models.length) void invoke<[string, string][]>("claude_models").then(setModels, () => {});
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [onBotsTab]);
+  }, [onRulesTab]);
   useEffect(() => {
     if (!config.jiraSite) return setStatuses([]);
     void invoke<{ name: string; category: string }[]>("jira_statuses", { conn: { site: config.jiraSite, email: config.jiraEmail, kind: config.jiraKind } }).then(setStatuses, () => setStatuses([]));
@@ -371,23 +371,23 @@ export default function Settings({ onChange, onClose, remoteUrl, onConnect, onCo
   const shown = (i: number) => ROWS[i].under?.({ bg: !!bg }) ?? true;
   // 내보내기와 가져오기: 나눌 수 있는 값만 다룬다
   const [shareNote, setShareNote] = useState("");
-  const [incoming, setIncoming] = useState<{ values: [Key, string | number | boolean][]; bots: Bot[] } | null>(null);
+  const [incoming, setIncoming] = useState<{ values: [Key, string | number | boolean][]; bots: Rule[] } | null>(null);
   const exportSetup = async () => {
-    const text = JSON.stringify(setupOf(config, bots, DEFAULTS, DEFAULT_BOTS), null, 1);
+    const text = JSON.stringify(setupOf(config, rules, DEFAULTS, DEFAULT_RULES), null, 1);
     const path = await invoke<string>("data_write", { name: "share/julgi-setup.json", text }).catch(() => "");
     await navigator.clipboard.writeText(text).catch(() => {});
     setShareNote(path ? tr`${path.replace(/^\/Users\/[^/]+/, "~")} 에 썼고, 클립보드에도 복사했다` : tr("클립보드에 복사했다"));
   };
   const readSetup = (text: string) => {
-    const found = setupDiff(text, config, bots);
+    const found = setupDiff(text, config, rules);
     setShareNote(found ? "" : tr("Julgi 설정 파일이 아니다"));
     setIncoming(found);
   };
   const applySetup = () => {
     if (!incoming) return;
     for (const [key, value] of incoming.values) onChange(key, value);
-    if (incoming.bots.length) onBots([...bots, ...incoming.bots]);
-    setShareNote(tr`값 ${incoming.values.length}개를 바꾸고 봇 ${incoming.bots.length}개를 더했다`);
+    if (incoming.bots.length) onRules([...rules, ...incoming.bots]);
+    setShareNote(tr`값 ${incoming.values.length}개를 바꾸고 규칙 ${incoming.bots.length}개를 더했다`);
     setIncoming(null);
   };
   const onKey = (e: React.KeyboardEvent) => {
@@ -560,7 +560,7 @@ export default function Settings({ onChange, onClose, remoteUrl, onConnect, onCo
                           <span className="set-share-in">
                             <span>
                               {incoming.values.length || incoming.bots.length
-                                ? tr`바뀌는 값 ${incoming.values.length}개${incoming.values.length ? ": " + incoming.values.slice(0, 8).map(([k]) => k).join(", ") + (incoming.values.length > 8 ? " …" : "") : ""} · 새 봇 ${incoming.bots.length}개`
+                                ? tr`바뀌는 값 ${incoming.values.length}개${incoming.values.length ? ": " + incoming.values.slice(0, 8).map(([k]) => k).join(", ") + (incoming.values.length > 8 ? " …" : "") : ""} · 새 규칙 ${incoming.bots.length}개`
                                 : tr("지금 설정과 다른 것이 없다")}
                             </span>
                             {(incoming.values.length > 0 || incoming.bots.length > 0) && (
@@ -601,8 +601,8 @@ export default function Settings({ onChange, onClose, remoteUrl, onConnect, onCo
                     )}
                     {row.kind === "bots" && (
                       <div className="set-bots" onClick={(e) => e.stopPropagation()}>
-                        {bots.map((b) => {
-                          const put = (patch: Partial<Bot>) => onBots(bots.map((x) => (x.id === b.id ? { ...x, ...patch } : x)));
+                        {rules.map((b) => {
+                          const put = (patch: Partial<Rule>) => onRules(rules.map((x) => (x.id === b.id ? { ...x, ...patch } : x)));
                           return (
                             <div key={b.id} className={"set-bot" + (b.on ? " on" : "")}>
                               <div className="set-bot-head">
@@ -611,7 +611,7 @@ export default function Settings({ onChange, onClose, remoteUrl, onConnect, onCo
                                 </button>
                                 <input tabIndex={-1} className="set-bot-name" value={b.name} placeholder={tr("이름")} spellCheck={false} onChange={(e) => put({ name: e.target.value })} />
                                 <input tabIndex={-1} className="set-bot-job" value={b.job} placeholder={tr("하는 일 한 줄")} spellCheck={false} onChange={(e) => put({ job: e.target.value })} />
-                                <select tabIndex={-1} className="set-bot-model" value={b.model ?? ""} title={tr("이 봇의 상황을 가릴 모델")} onChange={(e) => put({ model: e.target.value || undefined })}>
+                                <select tabIndex={-1} className="set-bot-model" value={b.model ?? ""} title={tr("이 규칙의 상황을 가릴 모델")} onChange={(e) => put({ model: e.target.value || undefined })}>
                                   <option value="">{tr("판단 모델 따름")}</option>
                                   <optgroup label={tr("늘 최신")}>
                                     <option value="haiku">Haiku</option>
@@ -631,7 +631,7 @@ export default function Settings({ onChange, onClose, remoteUrl, onConnect, onCo
                                 <button type="button" tabIndex={-1} className={"set-toggle" + (b.on ? " on" : "")} onClick={() => put({ on: !b.on })}>
                                   {b.on ? tr("켬") : tr("끔")}
                                 </button>
-                                <button type="button" tabIndex={-1} className="set-toggle" title={tr("이 봇을 지운다")} onClick={() => onBots(bots.filter((x) => x.id !== b.id))}>
+                                <button type="button" tabIndex={-1} className="set-toggle" title={tr("이 규칙을 지운다")} onClick={() => onRules(rules.filter((x) => x.id !== b.id))}>
                                   ×
                                 </button>
                               </div>
@@ -664,8 +664,8 @@ export default function Settings({ onChange, onClose, remoteUrl, onConnect, onCo
                             </div>
                           );
                         })}
-                        <button type="button" tabIndex={-1} className="set-toggle" onClick={() => onBots([...bots, { id: crypto.randomUUID().slice(0, 8), name: "", job: "", when: "", say: "", on: false, runs: 0, art: freeFace(bots) }])}>
-                          {tr("+ 봇 더하기")}
+                        <button type="button" tabIndex={-1} className="set-toggle" onClick={() => onRules([...rules, { id: crypto.randomUUID().slice(0, 8), name: "", job: "", when: "", say: "", on: false, runs: 0, art: freeFace(rules) }])}>
+                          {tr("+ 규칙 더하기")}
                         </button>
                       </div>
                     )}

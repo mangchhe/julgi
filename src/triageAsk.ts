@@ -10,9 +10,9 @@ export const triagePrompt = (said: string, reply: string, bots: string[] = []) =
   `사용자가 시킨 말:\n${said.slice(0, 600)}\n\n에이전트의 마지막 답(끝부분):\n${reply.slice(-2800)}\n${bots.length ? `\n등록된 봇 (번호. 상황):\n${bots.map((when, i) => `${i + 1}. ${when.slice(0, 300)}`).join("\n")}\n` : ""}`;
 
 /** 봇: 세션이 답을 끝냈을 때 그 답이 when의 상황이면 Julgi가 say를 대신 보낸다 */
-export type Bot = { id: string; /** 봇을 부르는 이름 */ name: string; /** 하는 일 한 줄 */ job: string; when: string; say: string; on: boolean; runs: number; /** 들어 있는 얼굴 그림의 이름 */ art?: string; /** 이 봇의 상황을 가릴 모델. 없으면 판단 모델을 따른다 */ model?: string; /** 내가 고른 얼굴 그림 (작게 줄인 data URL) */ image?: string };
+export type Rule = { id: string; /** 봇을 부르는 이름 */ name: string; /** 하는 일 한 줄 */ job: string; when: string; say: string; on: boolean; runs: number; /** 들어 있는 얼굴 그림의 이름 */ art?: string; /** 이 봇의 상황을 가릴 모델. 없으면 판단 모델을 따른다 */ model?: string; /** 내가 고른 얼굴 그림 (작게 줄인 data URL) */ image?: string };
 /** 처음에 넣어 두는 봇. 둘 다 꺼 둔다. 이름과 글은 설정에서 고친다 */
-export const DEFAULT_BOTS: Bot[] = [
+export const DEFAULT_RULES: Rule[] = [
   { id: "go", name: "고고", job: "진행 물음에 답하기", when: "에이전트가 스스로 내놓은 다음 단계나 방금 설명한 계획을 그대로 진행해도 되는지만 묻고 멈췄다", say: "응, 진행해. 푸시, 머지, 배포, 삭제처럼 되돌리기 어려운 일은 하기 전에 물어봐.", on: false, runs: 0 },
   { id: "verify", name: "꼼꼼이", job: "확인하고 끝내게 하기", when: "사용자가 이번에 코드를 고치거나 만들라고 시켰고 에이전트가 그 일을 끝냈다고 보고했는데, 시험이나 실행으로 확인했다는 말이 답에 없다", say: "확인해 봐. 돌린 명령과 그 출력을 같이 붙여 줘.", on: false, runs: 0 },
 ];

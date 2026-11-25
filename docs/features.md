@@ -6,7 +6,7 @@ English · [한국어](features.ko.md)
 
 - [Sending work](#sending-work)
 - [Knowing whose turn it is](#knowing-whose-turn-it-is)
-- [Bots](#bots)
+- [Auto-reply](#auto-reply)
 - [Sessions and panes](#sessions-and-panes)
 - [Code review](#code-review)
 - [Pull requests](#pull-requests)
@@ -35,16 +35,16 @@ English · [한국어](features.ko.md)
 - **Briefing (`⌘⇧B`).** Come back after a while and one screen shows what is waiting, news on PRs and tickets, where each piece of work stands, and what Julgi did meanwhile.
 - **Progress per stem.** Goal, done, left and blocked for each piece of work, kept up to date as sessions reply.
 
-## Bots
+## Auto-reply
 
-A bot is one rule: **in this situation, send this message.** When a session finishes a reply and the reply clearly matches the situation of a bot that is on, Julgi sends the bot's message to the session for you.
+A rule is this: **in this situation, send this message.** When a session finishes a reply and the reply clearly matches the situation of a rule that is on, Julgi sends the rule's message to the session for you.
 
-<img src="images/bots.png" alt="The Bots tab in settings: two bots, each with a face, a name, what it does, the situation it watches for and the message it sends" width="760" />
+<img src="images/bots.png" alt="The Auto-reply tab in settings: two rules, each with a face, a name, what it does, the situation it watches for and the message it sends" width="760" />
 
-- Two bots come registered and switched off: one answers "shall I go on?", one asks a session to verify work it reported as done. Add your own in `⌘,` → Bots.
-- Each bot has a name, a face (drawn by Julgi, or a picture you choose), and a count of how often it answered.
-- No bot answers a question that asks you to choose between options, waits for information from you, follows a failure, or is about something hard to undo (push, merge, deploy, delete).
-- At most three bot messages in a row go to one session. Each one is listed in `⌘Y`.
+- Two rules come registered and switched off: one answers "shall I go on?", one asks a session to verify work it reported as done. Add your own in `⌘,` → Auto-reply.
+- Each rule has a name, a face (drawn by Julgi, or a picture you choose), and a count of how often it answered.
+- No rule answers a question that asks you to choose between options, waits for information from you, follows a failure, or is about something hard to undo (push, merge, deploy, delete).
+- At most three rule messages in a row go to one session. Each one is listed in `⌘Y`.
 
 ## Sessions and panes
 
@@ -107,7 +107,7 @@ A bot is one rule: **in this situation, send this message.** When a session fini
 ## Numbers
 
 - **Token usage (`⌘⇧U`).** Tokens by day, model, project and session, counted from Claude Code's transcripts.
-- **Statistics (`⌘G`).** How often replies end in a question, how much of what you say is only approval, whether routing picked the right session, and what was done for you: questions bots answered and sessions run by scripts.
+- **Statistics (`⌘G`).** How often replies end in a question, how much of what you say is only approval, whether routing picked the right session, and what was done for you: questions rules answered and sessions run by scripts.
 
 ## The rest
 
