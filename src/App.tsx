@@ -18,6 +18,7 @@ import Settings from "./Settings";
 import { findings, measure, Review, Route } from "./review";
 import Threads from "./Threads";
 import { applyTheme, themeOf } from "./themes";
+import { backdropUrl } from "./backdrops";
 import { CHECK_SYSTEM, CORRECT_SYSTEM, prefsText, CAND_SYSTEM, Candidate as SkillCandidate, formatNote, indexLine, indexText, LEARN_SYSTEM, Note, parseNote, BRIEF_SYSTEM, MAP_SYSTEM, mapDomains, mapItems, recallText, stale, Stats, statOf, SWEEP_SYSTEM, TIDY_SYSTEM } from "./brain";
 import Sidebar from "./Sidebar";
 import PrView from "./PrView";
@@ -426,7 +427,7 @@ export default function App() {
     setBg(data);
     void invoke(data ? "data_write" : "data_remove", data ? { name: "background.txt", text: data } : { name: "background.txt" });
   };
-  useEffect(() => void invoke<string | null>("data_read", { name: "background.txt" }).then((data) => data?.startsWith("data:image/") && setBg(data), () => {}), []);
+  useEffect(() => void invoke<string | null>("data_read", { name: "background.txt" }).then((data) => (data?.startsWith("data:image/") || data?.startsWith("preset:")) && setBg(data.trim()), () => {}), []);
   const [look, bgShow, bgBlur] = [`${config.termPad}/${config.termLine}/${config.cursorStyle}/${config.cursorBlink}/${config.dimOthers}`, config.bgShow, config.bgBlur];
   useEffect(() => {
     const root = document.documentElement.style;
@@ -454,10 +455,11 @@ export default function App() {
     const root = document.documentElement.style;
     root.setProperty("--bg-show", String(bgShow / 100));
     root.setProperty("--bg-blur", `${bgBlur}px`);
-    if (!bg) return void root.removeProperty("--bg-image");
+    const src = backdropUrl(bg);
+    if (!src) return void root.removeProperty("--bg-image");
     // 큰 글을 스타일에 그대로 넣지 않게 주소로 바꿔 건다
     let url = "";
-    void fetch(bg).then((r) => r.blob()).then((blob) => root.setProperty("--bg-image", `url(${(url = URL.createObjectURL(blob))})`));
+    void fetch(src).then((r) => r.blob()).then((blob) => root.setProperty("--bg-image", `url(${(url = URL.createObjectURL(blob))})`));
     return () => void (url && URL.revokeObjectURL(url));
   }, [bg, bgShow, bgBlur]);
   const goStreak = useRef<Record<string, number>>({}); // 세션마다 봇이 연달아 대신 답한 횟수

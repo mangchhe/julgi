@@ -10,7 +10,7 @@ import { getLang, resolveLang, tr } from "./i18n";
 import { argoHost, argoLoginCommand } from "./argo";
 import { Bot, DEFAULT_BOTS } from "./triageAsk.ts";
 import { setupDiff, setupOf } from "./setup";
-import { BACKDROPS } from "./backdrops";
+import { BACKDROPS, presetOf } from "./backdrops";
 import BotFace, { ARTS, faceOf, freeFace, shrinkImage } from "./BotFace";
 
 type Key = keyof typeof config;
@@ -578,11 +578,11 @@ export default function Settings({ onChange, onClose, remoteUrl, onConnect, onCo
                     {row.kind === "bg" && (
                       <span className="set-bg" onClick={(e) => e.stopPropagation()}>
                         {BACKDROPS.map((b) => (
-                          <button key={b.id} type="button" tabIndex={-1} className={"set-bg-pick" + (bg === b.url ? " on" : "")} title={tr("들어 있는 그림")} onClick={() => onBg(b.url)}>
+                          <button key={b.id} type="button" tabIndex={-1} className={"set-bg-pick" + (bg === presetOf(b.id) ? " on" : "")} title={tr("들어 있는 그림")} onClick={() => onBg(presetOf(b.id))}>
                             <img src={b.url} alt="" />
                           </button>
                         ))}
-                        {bg && !BACKDROPS.some((b) => b.url === bg) && (
+                        {bg && !bg.startsWith("preset:") && (
                           <span className="set-bg-pick on">
                             <img src={bg} alt="" />
                           </span>

@@ -1,10 +1,20 @@
-// 앱에 들어 있는 배경 그림들. 그림 파일 없이 SVG로 그려서 용량이 없고 어느 크기에서도 깨끗하다.
+// 앱에 들어 있는 배경 그림들: 사진 세 장과, 그림 파일 없이 SVG로 그린 세 장.
 // 어두운 쪽이 많고 밝은 데가 조금 있는 그림이어야 글자가 묻히지 않는다: 어두운 테마에서는 밝은 쪽만 바탕에 더해진다
+import forest from "./assets/backdrops/forest.jpg";
+import city from "./assets/backdrops/city.jpg";
+import sea from "./assets/backdrops/sea.jpg";
 
 const svg = (body: string) => "data:image/svg+xml," + encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 1000" preserveAspectRatio="xMidYMid slice">${body}</svg>`);
 
-/** id는 저장하지 않는다. 고르면 그림 자체가 배경 사진으로 들어간다 */
+/** 들어 있는 그림을 골랐으면 background.txt 에는 "preset:이름"만 적는다. 그림의 주소는 빌드마다 달라져서 주소를 적어 두면 안 된다 */
+export const presetOf = (id: string) => "preset:" + id;
+/** background.txt 에 적힌 것(내 사진의 data URL 또는 "preset:이름")에서 실제 그림 주소를 낸다. 없는 이름이면 빈 글 */
+export const backdropUrl = (stored: string | null) => (!stored ? "" : stored.startsWith("preset:") ? (BACKDROPS.find((b) => presetOf(b.id) === stored)?.url ?? "") : stored);
+
 export const BACKDROPS: { id: string; url: string }[] = [
+  { id: "forest", url: forest }, // 새벽 안개가 낀 숲
+  { id: "city", url: city }, // 멀리 번진 밤의 도시 불빛
+  { id: "sea", url: sea }, // 깊은 바다에서 올려다본 빛줄기
   {
     id: "ridge", // 밤의 능선: 남색에서 보라로 내려가는 하늘, 겹친 산, 옅은 달
     url: svg(
