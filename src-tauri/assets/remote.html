@@ -134,6 +134,13 @@ h2.mine { color: var(--wait); }
 .bubble pre { margin: 0 0 11px; background: var(--sunk); border-radius: 12px; padding: 11px 13px; overflow-x: auto; -webkit-overflow-scrolling: touch; }
 .bubble pre code { background: none; padding: 0; white-space: pre; }
 .bubble .more { display: block; width: 100%; color: var(--accent); font-size: 14px; font-weight: 600; padding: 0 0 11px; margin-bottom: 11px; text-align: left; border-bottom: 1px solid var(--line); }
+.steps { margin-top: 10px; font-size: 13.5px; color: var(--muted); }
+.steps summary { padding: 6px 4px; font-weight: 700; }
+.steps ol { list-style: none; margin: 0; padding: 0 4px; }
+.steps li { display: flex; gap: 8px; padding: 3px 0; line-height: 1.45; overflow-wrap: anywhere; }
+.steps li b { flex: none; min-width: 34px; color: var(--accent); font-weight: 700; }
+.steps li.say { color: var(--ink); }
+.steps li.say b { display: none; }
 .bubble .asked { margin-top: 13px; background: var(--wait-soft); border-radius: 13px; padding: 11px 13px; }
 .bubble .asked > :last-child { margin-bottom: 0; }
 .bubble .asked::before { content: attr(data-label); display: block; font-size: 12px; font-weight: 800; color: var(--wait); margin-bottom: 3px; }
@@ -187,6 +194,7 @@ h2.mine { color: var(--wait); }
   <main id="one" class="view" hidden>
     <div class="status" id="one-status"></div>
     <div class="bubble" id="one-reply"></div>
+    <details class="steps" id="one-steps" hidden><summary></summary><ol></ol></details>
     <div class="grow"></div>
     <form class="composer" id="answer">
       <div class="quick" id="quick"></div>
@@ -232,6 +240,7 @@ const EN = {
   "응, 진행해": "Yes, go ahead", "계속해": "Continue", "아니, 멈춰": "No, stop", "다시 설명해 줘": "Explain again",
   "앞의 {0}줄 더 보기": "Show {0} earlier lines", "읽는 중": "Loading",
   "일하는 중이다. 답이 오면 여기에 뜬다.": "Working. The reply will appear here.",
+  "진행 과정 {0}": "Steps {0}", "읽음": "Read", "실행": "Run", "고침": "Edit", "씀": "Write", "찾음": "Search", "맡김": "Agent", "웹": "Web",
   "마지막 답을 읽지 못했다.": "Could not read the last reply.", "읽지 못했다.": "Could not read it.",
   "맥의 Julgi가 {0}부터 응답하지 않는다.": "Julgi on the Mac stopped responding {0}.",
   "맥의 Julgi에서 아직 상태를 받지 못했다.": "No status from Julgi on the Mac yet.",
@@ -355,6 +364,23 @@ function paintReply(text) {
   if (at >= 0) { const asked = el("div", "asked"); asked.dataset.label = T("묻는 말"); asked.append(...blocks(parts.slice(at).join("\n\n"))); nodes.push(asked); }
   box.replaceChildren(...nodes);
 }
+const TOOL = { Read: "읽음", Bash: "실행", Edit: "고침", NotebookEdit: "고침", Write: "씀", Grep: "찾음", Glob: "찾음", Agent: "맡김", Task: "맡김", WebFetch: "웹", WebSearch: "웹" };
+/** 이번 차례에 세션이 한 일. 일하는 중이면 3초마다 다시 읽어 펼쳐 두고, 답이 온 뒤에는 접어 둔다 */
+function loadSteps(s) {
+  const box = $("one-steps"), stamp = `${s.key}|${s.state}|${s.since}`;
+  if (!s.id || (!busy(s) && box.dataset.stamp === stamp)) return;
+  api("/api/steps?id=" + encodeURIComponent(s.id)).then(({ steps }) => {
+    if (picked !== s.key) return;
+    const fresh = box.dataset.stamp !== stamp;
+    box.dataset.stamp = stamp;
+    box.hidden = !steps.length;
+    if (fresh) box.open = busy(s);
+    box.querySelector("summary").textContent = T("진행 과정 {0}", steps.length);
+    const near = innerHeight + scrollY >= document.body.scrollHeight - 80;
+    box.querySelector("ol").replaceChildren(...steps.map(([tool, text]) => { const li = el("li", tool === "say" ? "say" : ""); li.append(el("b", "", TOOL[tool] ? T(TOOL[tool]) : tool.replace(/^mcp__.*__/, "")), el("span", "", text)); return li; }));
+    if (box.open && busy(s) && near) window.scrollTo(0, document.body.scrollHeight);
+  }, () => {});
+}
 function loadReply(s) {
   const stamp = `${s.key}|${s.state}|${s.since}`;
   if (shownFor === stamp) return;
@@ -375,7 +401,7 @@ const TABS = ["home", "all", "acts"];
 function show(next, key, fromHistory) {
   if (view === "one" && picked) store.set("draft:" + picked, $("answer-text").value);
   const sheet = next === "throw";
-  if (!sheet) { view = next; picked = key || ""; shownFor = ""; whole = false; }
+  if (!sheet) { view = next; picked = key || ""; shownFor = ""; whole = false; $("one-steps").hidden = true; delete $("one-steps").dataset.stamp; }
   if (!fromHistory) {
     const hash = sheet ? "#new" : view === "one" ? "#s=" + encodeURIComponent(picked) : view === "home" ? "" : "#" + view;
     const url = location.pathname + location.search + hash;
@@ -476,7 +502,7 @@ function paint() {
     const s = state.sessions.find((x) => x.key === picked);
     $("title").textContent = s ? s.name : T("세션");
     $("one-status").replaceChildren(...(s ? [pill(s), el("span", "", metaOf(s))] : [el("span", "", T("이 세션은 닫혔다"))]));
-    if (s) loadReply(s);
+    if (s) { loadReply(s); loadSteps(s); }
   } else if (view === "home") paintHome();
   else if (view === "all") paintAll();
   else paintActs();
@@ -516,7 +542,9 @@ const route = () => {
 window.addEventListener("popstate", route);
 paint();
 pull().then(route, route);
-setInterval(pull, 3000);
+// 세션 하나를 보는 동안은 1초마다, 그 밖에는 3초마다 읽는다
+let beat = 0;
+setInterval(() => { if (view === "one" || beat++ % 3 === 0) pull(); }, 1000);
 document.addEventListener("visibilitychange", () => { if (!document.hidden) pull(); });
 </script>
 </body>

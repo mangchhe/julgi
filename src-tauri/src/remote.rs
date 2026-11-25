@@ -134,6 +134,11 @@ fn serve(server: Server, token: String) {
                 let text = if !id.is_empty() && id.chars().all(|c| c.is_ascii_alphanumeric() || c == '-') { crate::ledger::last_reply(id.to_owned()).unwrap_or_default() } else { String::new() };
                 json(serde_json::json!({ "text": text }).to_string(), 200)
             }
+            (Method::Get, "/api/steps") => {
+                let id = param(&url, "id").unwrap_or("");
+                let steps = if !id.is_empty() && id.chars().all(|c| c.is_ascii_alphanumeric() || c == '-') { crate::ledger::steps(id) } else { Vec::new() };
+                json(serde_json::json!({ "steps": steps }).to_string(), 200)
+            }
             (Method::Post, "/api/answer") | (Method::Post, "/api/new") => {
                 let mut body = String::new();
                 let _ = request.as_reader().take(40_000).read_to_string(&mut body);

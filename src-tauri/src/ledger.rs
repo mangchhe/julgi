@@ -463,6 +463,52 @@ pub fn last_reply(session_id: String) -> Option<String> {
     reply
 }
 
+/// 이번 차례에 세션이 한 일을 차례대로: 중간에 한 말("say")과 쓴 도구(도구 이름)와 그 대상 한 줄.
+/// 내가 마지막으로 말한 뒤부터 센다. 폰에서 진행 과정을 보여 주는 데 쓴다.
+fn steps_of(tail: &str) -> Vec<(String, String)> {
+    let short = |text: &str, max: usize| text.lines().next().unwrap_or("").chars().take(max).collect::<String>();
+    let mut steps = Vec::new();
+    for line in tail.lines() {
+        let Ok(v) = serde_json::from_str::<Value>(line) else { continue };
+        if v["isSidechain"] == true || v["isMeta"] == true || v["isCompactSummary"] == true {
+            continue;
+        }
+        let content = &v["message"]["content"];
+        if v["type"] == "user" {
+            let text = match content.as_str() {
+                Some(text) => text.to_string(),
+                None => content.as_array().into_iter().flatten().filter_map(|part| part["text"].as_str()).collect::<Vec<_>>().join("\n"),
+            };
+            // 도구 결과나 시스템이 끼워 넣은 글은 내 말이 아니다
+            if !text.trim().is_empty() && !text.trim_start().starts_with('<') {
+                steps.clear();
+            }
+        } else if v["type"] == "assistant" {
+            for part in content.as_array().into_iter().flatten() {
+                if let Some(text) = part["text"].as_str().map(str::trim).filter(|t| !t.is_empty()) {
+                    steps.push(("say".to_string(), short(text, 160)));
+                } else if let Some(name) = part["name"].as_str() {
+                    let input = &part["input"];
+                    let about = match input["file_path"].as_str() {
+                        Some(path) => path.rsplit('/').next().unwrap_or(path).to_string(),
+                        None => ["description", "command", "pattern", "query", "url", "skill"].iter().find_map(|key| input[*key].as_str()).map(|text| short(text, 100)).unwrap_or_default(),
+                    };
+                    steps.push((name.to_string(), about));
+                }
+            }
+        }
+    }
+    // ponytail: 마지막 60개만. 더 긴 차례는 앞이 잘린다
+    steps.split_off(steps.len().saturating_sub(60))
+}
+
+pub fn steps(session_id: &str) -> Vec<(String, String)> {
+    let found = fs::read_dir(home().join(".claude/projects")).ok().and_then(|dirs| dirs.flatten().map(|project| project.path().join(format!("{session_id}.jsonl"))).find(|path| path.is_file()));
+    let Some(path) = found else { return Vec::new() };
+    let size = fs::metadata(&path).map(|m| m.len()).unwrap_or(0);
+    read_range(&path, size.saturating_sub(TAIL_BYTES), TAIL_BYTES).map(|tail| steps_of(&tail)).unwrap_or_default()
+}
+
 /// 세션에서 내가 마지막으로 한 말과 그 답. 엉뚱한 세션에 친 말을 다른 줄기로 옮길 때 쓴다.
 #[tauri::command(async)]
 pub fn last_exchange(session_id: String) -> Option<(String, String)> {
@@ -602,6 +648,21 @@ mod workdir_tests {
 #[cfg(test)]
 mod name_tests {
     use super::*;
+
+    #[test]
+    fn steps_start_after_my_last_message() {
+        let tail = [
+            r#"{"type":"user","message":{"content":"첫 일"}}"#,
+            r#"{"type":"assistant","message":{"content":[{"type":"tool_use","name":"Read","input":{"file_path":"/a/old.rs"}}]}}"#,
+            r#"{"type":"user","message":{"content":"다음 일"}}"#,
+            r#"{"type":"assistant","message":{"content":[{"type":"text","text":"한글로 길게 말한다\n둘째 줄"},{"type":"tool_use","name":"Bash","input":{"command":"npm test","description":"테스트 돌리기"}}]}}"#,
+            r#"{"type":"user","message":{"content":[{"type":"tool_result","content":"ok"}]}}"#,
+            r#"{"type":"assistant","message":{"content":[{"type":"tool_use","name":"Edit","input":{"file_path":"/a/b/md.ts"}}]}}"#,
+        ]
+        .join("\n");
+        let want: Vec<(String, String)> = [("say", "한글로 길게 말한다"), ("Bash", "테스트 돌리기"), ("Edit", "md.ts")].iter().map(|(a, b)| (a.to_string(), b.to_string())).collect();
+        assert_eq!(steps_of(&tail), want);
+    }
 
     #[test]
     fn names_from_markdown_links() {
