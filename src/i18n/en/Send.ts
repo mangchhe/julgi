@@ -23,4 +23,11 @@ export default {
   "요약이 아직 없다": "No summary yet",
   "세션이 크다. ⌘Enter로 갈아탄 뒤 보낼 수 있다": "The session is large. ⌘Enter hands off to a fresh session, then sends",
   "Enter 알아서 보내기 · ↑↓로 고르면 고른 곳으로 · Tab 모델에게 미리 묻기 · ⌘Enter 갈아탄 뒤 보내기 · ⇧Enter 줄바꿈 · Esc": "Enter send automatically · ↑↓ pick where it goes · Tab ask the model first · ⌘Enter hand off, then send · ⇧Enter new line · Esc",
+  "+ 새 프로젝트 · 폴더를 만들고 연다": "+ New project · make the folder and open it",
+  "폴더를 만들지 못했다: {0}": "Could not make the folder: {0}",
+  "폴더 이름. 고칠 수 있다": "Folder name. You can change it",
+  "Enter를 누르면 {0} 폴더를 만들고 git init을 한 뒤, 거기서 새 세션을 열어 이 글을 보낸다. 이름은 오른쪽 칸에서 고칠 수 있다.": "Enter makes the folder {0}, runs git init, opens a new session there and sends this message. You can change the name in the box on the right.",
+  "새 프로젝트를 시작하자는 글로 보인다. Enter를 누르면 \"새 프로젝트\" 줄을 골라 두고, 한 번 더 누르면 폴더를 만든다. 다른 곳으로 보내려면 ↑↓로 고른다.": "This looks like the start of a new project. Enter selects the \"New project\" row, and Enter again makes the folder. Use ↑↓ to send it somewhere else.",
+  "이름을 적는다": "name",
+  "폴더 이름이 아직 없다. 오른쪽 칸에 이름을 적고 Enter를 누른다. 폴더 이름은 나중에 바꾸면 세션이 끊기므로 먼저 정한다.": "No folder name yet. Type one in the box on the right and press Enter. Renaming the folder later would cut the session off, so decide it first.",
 } as Record<string, string>;

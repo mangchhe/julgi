@@ -601,6 +601,30 @@ fn path_find(first: String, rel: String, cwd: String) -> Option<String> {
     None
 }
 
+/// 새 프로젝트의 폴더를 만들고 git 레포로 만든다. 돌려주는 값: 만든 폴더의 경로.
+/// 이름은 영어 글자, 숫자, 점, 밑줄, 하이픈만 받는다(경로를 벗어나지 못하게). 이미 있는 이름이면 만들지 않는다.
+#[tauri::command]
+fn project_make(root: String, name: String) -> Result<String, String> {
+    let plain = !name.is_empty() && name.len() <= 64 && !name.starts_with('.') && name.chars().all(|c| c.is_ascii_alphanumeric() || "._-".contains(c));
+    if !plain {
+        return Err(format!("bad name: {name}"));
+    }
+    let root = match root.strip_prefix("~/") {
+        Some(rest) => format!("{}/{rest}", home_dir()),
+        None => root,
+    };
+    let dir = std::path::Path::new(&root).join(&name);
+    if dir.exists() {
+        return Err(format!("already exists: {}", dir.display()));
+    }
+    std::fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
+    let init = std::process::Command::new("git").arg("init").arg("-q").current_dir(&dir).status();
+    if !init.map(|s| s.success()).unwrap_or(false) {
+        return Err("git init failed".into());
+    }
+    Ok(dir.to_string_lossy().into_owned())
+}
+
 /// Julgi 안에서 펴 볼 파일의 글. 폴더, 2MB 넘는 파일, 글이 아닌 파일(UTF-8이 아님)은 읽지 않는다. 그런 것은 부른 쪽이 밖의 앱으로 연다.
 #[tauri::command]
 fn file_read(path: String) -> Result<String, String> {
@@ -827,7 +851,7 @@ pub fn run() {
             Ok(())
         })
         .manage(Ptys::default())
-        .invoke_handler(tauri::generate_handler![lang::set_lang, pty_spawn, pty_write, pty_resize, pty_kill, clipboard_paste, term_states, log_line, env_flag, home_dir, layout_load, layout_save, handoff_write, config_load, sessions_elsewhere, app_exit, app_restart, data_read, data_write, data_append, data_remove, brain_load, notify, set_hotkey, repo_peek, repo_refs, repo_sync, git_siblings, route_ask, memory_load, inbox_take, default_dir, dirs_exist, path_find, path_open_with, file_read, ledger::last_reply, ledger::last_exchange, ledger::session_workdir, ledger::ledger_scan, remote::remote_start, remote::remote_stop, remote::remote_publish, usage::claude_usage, usage::claude_models, jira::jira_connect, jira::jira_disconnect, jira::jira_me, jira::jira_search, jira::jira_mine, jira::jira_projects, jira::jira_statuses, jira::jira_view, jira::jira_image, ci::ci_runs, ci::ci_jobs, ci::ci_log, argo::argo_status, argo::argo_logout, argo::argo_apps, argo::argo_app, argo::argo_reach, argo::argo_trail, jira::jira_transitions, jira::jira_transition, jira::jira_comment, tokens::token_usage, github::gh_status, github::glab_status, github::pr_view, github::pr_diff, github::pr_comments, github::repo_slug, github::pr_status, github::pr_review_requests, github::pr_mine, github::pr_list, github::pr_comment, github::pr_line_comment, github::pr_reply, github::pr_review, github::pr_merge, github::pr_close, github::pr_reopen, term_load, habits::habits, habits::corrections, skills::skill_usage, skills::skills_list, skills::skill_apply, skills::skill_retire, work::worktree_add, work::worktree_drop, work::repo_changes, work::repo_stat, work::repo_has, work::repo_snapshot, work::repo_diff, work::repo_moved, work::repo_state, work::repo_mrs, work::repo_commits, work::commit_message])
+        .invoke_handler(tauri::generate_handler![lang::set_lang, pty_spawn, pty_write, pty_resize, pty_kill, clipboard_paste, term_states, log_line, env_flag, home_dir, layout_load, layout_save, handoff_write, config_load, sessions_elsewhere, app_exit, app_restart, data_read, data_write, data_append, data_remove, brain_load, notify, set_hotkey, repo_peek, repo_refs, repo_sync, git_siblings, route_ask, memory_load, inbox_take, default_dir, dirs_exist, path_find, path_open_with, file_read, project_make, ledger::last_reply, ledger::last_exchange, ledger::session_workdir, ledger::ledger_scan, remote::remote_start, remote::remote_stop, remote::remote_publish, usage::claude_usage, usage::claude_models, jira::jira_connect, jira::jira_disconnect, jira::jira_me, jira::jira_search, jira::jira_mine, jira::jira_projects, jira::jira_statuses, jira::jira_view, jira::jira_image, ci::ci_runs, ci::ci_jobs, ci::ci_log, argo::argo_status, argo::argo_logout, argo::argo_apps, argo::argo_app, argo::argo_reach, argo::argo_trail, jira::jira_transitions, jira::jira_transition, jira::jira_comment, tokens::token_usage, github::gh_status, github::glab_status, github::pr_view, github::pr_diff, github::pr_comments, github::repo_slug, github::pr_status, github::pr_review_requests, github::pr_mine, github::pr_list, github::pr_comment, github::pr_line_comment, github::pr_reply, github::pr_review, github::pr_merge, github::pr_close, github::pr_reopen, term_load, habits::habits, habits::corrections, skills::skill_usage, skills::skills_list, skills::skill_apply, skills::skill_retire, work::worktree_add, work::worktree_drop, work::repo_changes, work::repo_stat, work::repo_has, work::repo_snapshot, work::repo_diff, work::repo_moved, work::repo_state, work::repo_mrs, work::repo_commits, work::commit_message])
         .build(tauri::generate_context!())
         .expect("error while running tauri application")
         .run(|app, event| {

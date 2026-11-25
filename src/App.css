@@ -1562,3 +1562,6 @@ body.dragging .pane-body { pointer-events: none; }
 .info-x { position: absolute; top: 8px; right: 8px; width: 22px; height: 22px; line-height: 20px; padding: 0; font: inherit; font-size: 15px; color: var(--muted); background: none; border: 0; border-radius: 6px; cursor: pointer; }
 .info-x:hover { color: var(--ink); background: var(--bg); }
 .info .info-name { margin-right: 22px; }
+.send-make { display: inline-flex; align-items: center; }
+.send-make input { width: 150px; margin-left: 1px; font: inherit; color: var(--ink); background: var(--bg); border: 1px solid var(--line); border-radius: 5px; padding: 1px 5px; outline: none; }
+.send-make input:focus { border-color: var(--accent); }

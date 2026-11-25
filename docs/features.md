@@ -21,6 +21,7 @@ English · [한국어](features.ko.md)
 ## Sending work
 
 - **Say it in `⌘L`.** Type what you want and press Enter. A model reads the message and picks the session that was already doing that work, or opens a new one in the right repo.
+- **Start a new project.** Write that you are starting a new project and a row offers a new folder under your repo root, with a name you can change. Enter twice makes the folder, runs `git init` and opens the session there.
 - **Paste a picture.** An image pasted into the send box goes to the session with the message.
 - **The draft stays.** Close the box mid-sentence and the text is still there next time; it is cleared when you send.
 - **Hand-off without losing your place.** A session that has grown too large writes a brief and a fresh session takes over in the same pane, with the earlier screen still above it.
