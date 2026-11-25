@@ -55,16 +55,16 @@ type RowKind =
   | { kind: "share"; label: string; note: string }
   | { kind: "keys"; label: string; note: string };
 
-/** 배경으로 쓸 사진을 긴 쪽 2560px 안으로 줄여 JPEG로 만든다. 원본을 그대로 두면 켤 때마다 수십 MB를 읽게 된다 */
+/** 배경으로 쓸 사진을 긴 쪽 3840px(4K 화면 폭) 안으로 줄여 JPEG로 만든다. 원본을 그대로 두면 켤 때마다 수십 MB를 읽게 된다 */
 const shrinkPhoto = (file: File) =>
   new Promise<string>((done, fail) => {
     const img = new Image();
     img.onload = () => {
-      const scale = Math.min(1, 2560 / Math.max(img.width, img.height));
+      const scale = Math.min(1, 3840 / Math.max(img.width, img.height));
       const canvas = Object.assign(document.createElement("canvas"), { width: Math.round(img.width * scale), height: Math.round(img.height * scale) });
       canvas.getContext("2d")!.drawImage(img, 0, 0, canvas.width, canvas.height);
       URL.revokeObjectURL(img.src);
-      done(canvas.toDataURL("image/jpeg", 0.85));
+      done(canvas.toDataURL("image/jpeg", 0.9));
     };
     img.onerror = fail;
     img.src = URL.createObjectURL(file);
