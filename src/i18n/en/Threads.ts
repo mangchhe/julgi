@@ -74,4 +74,5 @@ export default {
   "레포를 넣고 빼는 것은 ⌘, 설정의 \"레포가 모여 있는 폴더\" · ⌘1–⌘5 · Esc": "Add or remove repos under ⌘, Settings → \"Folder that holds your repos\" · ⌘1–⌘5 · Esc",
   "⌘1–⌘5 또는 Tab으로 탭 바꾸기 · Esc": "⌘1–⌘5 or Tab switch tabs · Esc",
   "상태는 숫자로 정한다: 30일 안에 쓰였으면 쓰는 중, 안 쓰였으면 안 쓰임, 안 쓰이고 석 달 넘게 안 고쳤으면 낡음 · Tab 통계 · Esc": "Status comes from the numbers: used within 30 days is In use, otherwise Unused, and unused plus not edited for over three months is Stale · Tab stats · Esc",
+  "누르면 스킬 글을 편다": "Click to read the skill",
 } as Record<string, string>;

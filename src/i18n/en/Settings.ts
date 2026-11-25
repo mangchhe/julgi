@@ -51,7 +51,7 @@ export default {
   "전부": "All",
   "기본 폴더": "Default folder",
   "파일을 여는 앱": "Open files with",
-  "터미널에서 ⌘ 클릭한 파일을 이 앱으로 연다. 응용 프로그램 폴더에 보이는 이름 그대로 적는다. 그 앱이 없으면 macOS가 정한 앱으로 연다": "A file you ⌘-click in the terminal opens in this app. Write the name as it appears in the Applications folder. If the app is missing, macOS's default app is used",
+  "터미널에서 ⌘ 클릭한 파일은 Julgi 안에서 펴 본다. 거기서 \"밖에서 열기\"를 누르거나 글이 아닌 파일(그림 등)이면 이 앱으로 연다. 응용 프로그램 폴더에 보이는 이름 그대로 적는다. 그 앱이 없으면 macOS가 정한 앱으로 연다": "A file you ⌘-click in the terminal is shown inside Julgi. \"Open outside\" there, or a file that is not text (an image), opens in this app. Write the name as it appears in the Applications folder. If the app is missing, macOS's default app is used",
   "비우면 macOS가 정한 앱 · 예: Visual Studio Code": "Empty: macOS's default app · e.g. Visual Studio Code",
   "레포가 드러나지 않는 일을 여는 폴더": "The folder where work with no obvious repo is opened",
   "비우면 ~/julgi": "Empty means ~/julgi",

@@ -1,3 +1,4 @@
+import FileView, { FileTarget } from "./FileView";
 import Hint from "./Hint";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
@@ -97,6 +98,8 @@ export default function App() {
   const [panes, setPanes] = useState<(string | null)[]>([null]);
   const [widths, setWidths] = useState([1]); // 칸 너비 비율
   const [focus, setFocus] = useState(0);
+  // Julgi 안에서 펴 보는 파일(터미널에서 ⌘ 클릭한 경로, 스킬 목록에서 고른 스킬)
+  const [fileShown, setFileShown] = useState<FileTarget | null>(null);
   const [states, setStates] = useState<Record<string, TermState>>({});
   const [dead, setDead] = useState<string[]>([]);
   const [overlay, setOverlay] = useState<"palette" | "send" | "help" | "history" | "settings" | "threads" | "queue" | "quit" | "close" | "work" | "usage" | "morning" | null>(null);
@@ -2808,6 +2811,8 @@ export default function App() {
     // PR 링크는 어디서 눌러도 여기로 와서 Julgi 안의 PR 화면으로 열린다
     const onPr = (e: Event) => setPrShown((e as CustomEvent<PrTarget>).detail);
     window.addEventListener("julgi:pr", onPr);
+    const onFile = (e: Event) => setFileShown((e as CustomEvent<FileTarget>).detail);
+    window.addEventListener("julgi:file", onFile);
 
     const stateTimer = setInterval(() => {
       if (config.remote) actions.current.publishRemote();
@@ -3150,6 +3155,7 @@ export default function App() {
       window.removeEventListener("focus", scan);
       window.removeEventListener("focus", onFocusBack);
       window.removeEventListener("julgi:pr", onPr);
+      window.removeEventListener("julgi:file", onFile);
       window.removeEventListener("keydown", onKey, true);
     };
   }, []);
@@ -3718,6 +3724,7 @@ export default function App() {
           }}
         />
       )}
+      {fileShown && <FileView key={fileShown.path} target={fileShown} onClose={() => setFileShown(null)} />}
       {prShown && <PrView key={`${prShown.repo}#${prShown.number}`} target={prShown} onClose={() => setPrShown(null)} />}
       {ticketShown && (
         <TicketView

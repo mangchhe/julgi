@@ -125,7 +125,7 @@ const SECTIONS: { id: string; title: string; hint: string; needs?: "jira" | "arg
     { kind: "pick", key: "autoAllow", label: tr("간단한 허락은 대신 답하기"), note: tr("늘 허락하는 종류의 명령은 묻지 않고 넘겨서 내 차례에 올라오는 일을 줄인다. \"살펴보기\"는 아무것도 바꾸지 않는 명령(git status, git diff, ls, gh pr view 같은 것)이고, \"시험과 빌드까지\"는 거기에 npm test, cargo test, pytest 같은 것을 더한다. 파일을 고치거나 지우는 일은 그대로 묻는다. 새로 여는 세션부터 적용된다"), options: [["off", tr("끔")], ["look", tr("살펴보기")], ["check", tr("시험과 빌드까지")]] },
     { kind: "text", key: "allowRules", label: tr("더 묻지 않을 명령"), note: tr("위 목록에 없는 명령을 쉼표로 적는다. 적은 글로 시작하는 명령은 묻지 않는다. 규칙 모양(Bash(…), Read(…))으로 적어도 된다"), hint: "docker ps, make lint" },
     { kind: "text", key: "defaultDir", label: tr("기본 폴더"), note: tr("레포가 드러나지 않는 일을 여는 폴더"), hint: tr("비우면 ~/julgi") },
-    { kind: "text", key: "editor", label: tr("파일을 여는 앱"), note: tr("터미널에서 ⌘ 클릭한 파일을 이 앱으로 연다. 응용 프로그램 폴더에 보이는 이름 그대로 적는다. 그 앱이 없으면 macOS가 정한 앱으로 연다"), hint: tr("비우면 macOS가 정한 앱 · 예: Visual Studio Code") },
+    { kind: "text", key: "editor", label: tr("파일을 여는 앱"), note: tr("터미널에서 ⌘ 클릭한 파일은 Julgi 안에서 펴 본다. 거기서 \"밖에서 열기\"를 누르거나 글이 아닌 파일(그림 등)이면 이 앱으로 연다. 응용 프로그램 폴더에 보이는 이름 그대로 적는다. 그 앱이 없으면 macOS가 정한 앱으로 연다"), hint: tr("비우면 macOS가 정한 앱 · 예: Visual Studio Code") },
     { kind: "text", key: "saveCommand", label: tr("⌘S가 보내는 말"), note: tr("⌘S를 누르면 지금 세션에 이 말을 보낸다"), hint: tr("예: /commit") },
     ],
   },

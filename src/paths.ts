@@ -10,8 +10,8 @@ const SEG = String.raw`[\p{L}\p{N}_.@+\-]`;
  */
 const PATH = new RegExp(String.raw`(?:(?:~|\.{1,2})?/(?:${SEG}+/)*${SEG}*|(?:${SEG}+/)*${SEG}+\.[A-Za-z0-9]{1,8})(?::\d+(?::\d+)?)?`, "gu");
 
-export function findPaths(text: string): { start: number; end: number; path: string }[] {
-  const out: { start: number; end: number; path: string }[] = [];
+export function findPaths(text: string): { start: number; end: number; path: string; line?: number }[] {
+  const out: { start: number; end: number; path: string; line?: number }[] = [];
   for (const m of text.matchAll(PATH)) {
     const start = m.index!;
     let found = m[0];
@@ -29,7 +29,7 @@ export function findPaths(text: string): { start: number; end: number; path: str
     if (rooted && !ext && parts.length < 2 && !path.startsWith("~/")) continue;
     // 폴더 없이 이름만 있으면 이름과 확장자가 두 글자 넘을 때만 파일로 본다 (e.g, v1.2, 2.1.330 같은 것을 거른다)
     if (!path.includes("/") && !/^[\p{L}\p{N}_@+-][\p{L}\p{N}_.@+-]+\.[A-Za-z][A-Za-z0-9]+$/u.test(path)) continue;
-    out.push({ start, end: start + found.length, path });
+    out.push({ start, end: start + found.length, path, line: Number(found.match(/:(\d+)(:\d+)?$/)?.[1]) || undefined });
   }
   return out;
 }

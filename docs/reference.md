@@ -75,7 +75,7 @@ Change them in `⌘,`; they apply at once and are saved to `~/.julgi/config.json
 | `mapRoot` | none | Folder holding your repos; git repos under it go on the map |
 | `mapFetch` | on | Fetch before drawing the map |
 | `defaultDir` | `~/julgi` | Folder for work with no obvious repo |
-| `editor` | (empty) | App that opens a file you ⌘-click in the terminal, by its name in Applications (e.g. `Visual Studio Code`). Empty uses the macOS default for that file type |
+| `editor` | (empty) | App for "Open outside" in the file viewer and for files that are not text, by its name in Applications (e.g. `Visual Studio Code`). Empty uses the macOS default for that file type |
 | `hotkey` | `ctrl+super+KeyJ` | Global key to show and hide the window |
 
 ### Connections (GitHub · GitLab · Jira)

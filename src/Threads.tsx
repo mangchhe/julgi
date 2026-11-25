@@ -1,3 +1,4 @@
+import { openFile } from "./FileView";
 import Hint from "./Hint";
 import { useEffect, useMemo, useRef, useState } from "react";
 import Numbers from "./Numbers";
@@ -123,10 +124,10 @@ export default function Threads({ repos, nameOf, onShow, map, drawing, onRedraw,
       const u = by.get(k.name);
       by.delete(k.name);
       const status = u ? "쓰는 중" : now - k.modified > 90 * 86400 ? "낡음" : "안 쓰임"; // i18n-ok
-      return { name: k.name, source: k.source, description: k.description, modified: k.modified, uses: u?.uses ?? 0, sessions: u?.sessions.size ?? 0, last: u?.last ?? 0, status, repos: [...(u?.repos ?? [])] };
+      return { name: k.name, path: k.path, source: k.source, description: k.description, modified: k.modified, uses: u?.uses ?? 0, sessions: u?.sessions.size ?? 0, last: u?.last ?? 0, status, repos: [...(u?.repos ?? [])] };
     });
     // 목록에 없는데 쓰인 것(Claude Code에 딸린 것, 다른 플러그인의 것)
-    const others = [...by].map(([name, u]) => ({ name, source: tr("다른 곳"), description: "", modified: 0, uses: u.uses, sessions: u.sessions.size, last: u.last, status: "쓰는 중", repos: [...u.repos] })); // i18n-ok
+    const others = [...by].map(([name, u]) => ({ name, path: "", source: tr("다른 곳"), description: "", modified: 0, uses: u.uses, sessions: u.sessions.size, last: u.last, status: "쓰는 중", repos: [...u.repos] })); // i18n-ok
     // 범위는 쓰인 곳으로 정한다: 레포 두 곳 넘게 쓰였으면 공용, 한 곳에서만 쓰였으면 그 레포 전용
     const scope = (r: { uses: number; repos: string[] }) => (!r.uses ? 2 : r.repos.length >= 2 ? 0 : 1);
     return [...known, ...others].map((r) => ({ ...r, scope: scope(r) })).sort((a, b) => a.scope - b.scope || b.uses - a.uses || b.last - a.last || a.name.localeCompare(b.name));
@@ -344,7 +345,7 @@ export default function Threads({ repos, nameOf, onShow, map, drawing, onRedraw,
             {skillRows.map((r, i) => (
               <div key={r.name + r.source}>
                 {(i === 0 || skillRows[i - 1].scope !== r.scope) && <div className="th-group">{[tr("공용 · 레포 두 곳 넘게 쓰임"), tr("레포 전용 · 한 곳에서만 쓰임"), tr("최근 30일 동안 안 쓰임")][r.scope]}</div>}
-              <div className={"sk-row s-" + r.status} title={r.description}>
+              <div className={"sk-row s-" + r.status + (r.path ? " open" : "")} title={r.description + (r.path ? "\n" + tr`누르면 스킬 글을 편다` : "")} onClick={() => r.path && openFile({ path: r.path })}>
                 <span className="sk-name">
                   {r.name}
                   <small>{r.source}</small>

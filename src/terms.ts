@@ -13,6 +13,7 @@ import { openPath, openUrl } from "@tauri-apps/plugin-opener";
 import "@xterm/xterm/css/xterm.css";
 import { tr } from "./i18n";
 import { config } from "./model";
+import { openFile } from "./FileView";
 import { openPr, prOf } from "./pr";
 import { findKeys, keyOfUrl, openTicket } from "./jira";
 
@@ -161,7 +162,7 @@ export function create(spec: TermSpec) {
         text: key,
         activate: (e: MouseEvent) => e.metaKey && openTicket(key),
       }));
-      const links = findPaths(text.trimEnd()).map(({ start, end, path }) => ({
+      const links = findPaths(text.trimEnd()).map(({ start, end, path, line }) => ({
         ...glow({ start: { x: col[start] + 1, y }, end: { x: col[end - 1] + 1, y } }),
         text: path,
         activate: (e: MouseEvent) => {
@@ -170,11 +171,10 @@ export function create(spec: TermSpec) {
           // 세션 폴더 기준으로 없으면 위 폴더들에서 찾는다(옆 워크트리의 파일). 끝내 없으면 없다고 알린다
           const first = resolvePath(path, spec.cwd ?? "", home);
           void invoke<string | null>("path_find", { first, rel: path.replace(/^\.\//, ""), cwd: spec.cwd ?? "" })
-            .then(async (found) => {
+            .then((found) => {
               if (!found) throw 0;
-              // 편집기를 정해 두었으면 그 앱으로 연다. 그 앱이 없으면 macOS가 정한 앱으로 연다
-              if (config.editor.trim() && (await invoke<boolean>("path_open_with", { path: found, app: config.editor.trim() }))) return;
-              await openPath(found);
+              // Julgi 안에서 펴 본다. 글이 아닌 것(그림, 폴더)은 그 창이 밖의 앱으로 넘긴다
+              openFile({ path: found, line });
             })
             .catch(() => handlers.onMiss(path));
         },

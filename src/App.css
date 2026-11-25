@@ -1536,3 +1536,24 @@ body.dragging .pane-body { pointer-events: none; }
 .set-share label.set-toggle { cursor: pointer; }
 .set-share-in { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 8px; flex-basis: 100%; font-size: 12.5px; }
 .set-share .set-note { flex-basis: 100%; text-align: right; }
+
+/* 파일 펴 보기: 다른 창(스킬 목록 등) 위에 뜬다 */
+.fv-back { z-index: 60; }
+.fv { width: min(1080px, 92vw); height: min(820px, 88vh); display: flex; flex-direction: column; background: var(--surface); border: 1px solid var(--line); border-radius: 12px; box-shadow: 0 16px 40px rgba(0, 0, 0, 0.5); overflow: hidden; outline: none; }
+.fv-head { display: flex; align-items: center; gap: 10px; padding: 10px 14px; border-bottom: 1px solid var(--line); }
+.fv-head b { font-size: 13.5px; white-space: nowrap; }
+.fv-head small { flex: 1; min-width: 0; color: var(--muted); font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.fv-head button { font: inherit; font-size: 12px; color: var(--muted); background: var(--bg); border: 1px solid var(--line); border-radius: 7px; padding: 4px 9px; cursor: pointer; white-space: nowrap; }
+.fv-head button:hover { color: var(--ink); }
+.fv-body { flex: 1; min-height: 0; overflow: auto; background: var(--bg); -webkit-user-select: text; user-select: text; }
+.fv-wait { display: block; padding: 16px; color: var(--muted); }
+.fv-code { font-family: ui-monospace, Menlo, "Apple SD Gothic Neo", monospace; font-size: 12.5px; line-height: 1.55; padding: 10px 0; min-width: max-content; }
+.fv-code > div { display: flex; padding-right: 16px; }
+.fv-code > div.hit { background: var(--accent-soft); }
+.fv-code i { flex: none; width: 52px; padding-right: 14px; text-align: right; font-style: normal; color: var(--muted); opacity: 0.6; -webkit-user-select: none; user-select: none; }
+.fv-code span { white-space: pre; }
+.fv-front { margin: 16px 22px 0; padding: 10px 12px; font-family: ui-monospace, Menlo, monospace; font-size: 12px; color: var(--muted); background: var(--surface); border: 1px solid var(--line); border-radius: 8px; white-space: pre-wrap; overflow-wrap: anywhere; }
+.fv-md { padding: 16px 22px 24px; font-size: 13.5px; line-height: 1.6; max-width: 860px; }
+.fv-md h3 { font-size: 17px; margin: 14px 0 6px; }
+.fv-md h4 { font-size: 15px; margin: 12px 0 5px; }
+.sk-row.open { cursor: pointer; }
