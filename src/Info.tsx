@@ -1,3 +1,4 @@
+import { openFile } from "./FileView";
 import { useState } from "react";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import { ago, Change, hot, kilo, linkLabel, Session, Thread } from "./model";
@@ -31,6 +32,7 @@ export default function Info({ session, cwd, thread, memory, members, ops, chang
     const label = linkLabel(url);
     return seen.has(label) ? false : (seen.add(label), true);
   });
+  const files = [...(session.files ?? [])].reverse();
   const name = thread?.name ?? session.title;
   return (
     <div className="info">
@@ -96,12 +98,18 @@ export default function Info({ session, cwd, thread, memory, members, ops, chang
         </>
       )}
 
-      {links.length > 0 && (
+      {links.length + files.length > 0 && (
         <>
           <div className="info-h">{tr("산출물")}</div>
           {links.slice(0, 8).map((url) => (
             <button type="button" key={url} className="info-link" title={url} onClick={() => void openUrl(url)}>
               {linkLabel(url)}
+            </button>
+          ))}
+          {/* 세션이 새로 만든 파일. 누르면 Julgi 안에서 편다 */}
+          {files.slice(0, 8).map((path) => (
+            <button type="button" key={path} className="info-link file" title={path} onClick={() => openFile({ path })}>
+              {path.split("/").slice(-2).join("/")}
             </button>
           ))}
         </>

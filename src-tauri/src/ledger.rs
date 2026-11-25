@@ -32,6 +32,9 @@ pub struct SessionInfo {
     /// 대화에 나온 산출물 링크 (아티팩트, PR·MR, 티켓). 최근 것이 뒤에 온다
     #[serde(default)]
     pub links: Vec<String>,
+    /// 세션이 새로 만든 파일(Write 도구로 통째로 쓴 것)의 경로. 최근 것이 뒤에 온다. 임시 폴더의 것은 뺀다
+    #[serde(default)]
+    pub files: Vec<String>,
     pub mtime: u64,
     pub size: u64,
     /// 폴더가 속한 git 레포 이름. 훑을 때마다 다시 채운다
@@ -92,6 +95,24 @@ fn collect_links(text: &str, links: &mut Vec<String>) {
     }
 }
 
+/// Claude가 Write 도구로 쓴 파일을 모은다. 고치기(Edit)는 코드 변경이라 검토 화면이 보여 주고, 여기는 새로 만든 것만 둔다.
+fn collect_files(v: &Value, files: &mut Vec<String>) {
+    for part in v["message"]["content"].as_array().into_iter().flatten() {
+        if part["type"] != "tool_use" || part["name"] != "Write" {
+            continue;
+        }
+        let Some(path) = part["input"]["file_path"].as_str() else { continue };
+        if ["/tmp/", "/private/tmp/", "/var/folders/", "/private/var/"].iter().any(|t| path.starts_with(t)) {
+            continue;
+        }
+        files.retain(|known| known != path);
+        files.push(path.to_owned());
+    }
+    if files.len() > MAX_LINKS {
+        files.drain(..files.len() - MAX_LINKS);
+    }
+}
+
 fn first_text(message: &Value) -> Option<String> {
     let content = &message["content"];
     let text = match content {
@@ -138,6 +159,7 @@ fn scan_file(path: &Path, mtime: u64, size: u64) -> Option<SessionInfo> {
         // 링크는 사람과 Claude가 주고받은 말에서만 모은다 (도구 설정 같은 기록은 뺀다)
         if matches!(v["type"].as_str(), Some("user" | "assistant")) && v["isSidechain"] != true {
             collect_links(line, &mut info.links);
+            collect_files(&v, &mut info.files);
         }
         if let Some(cwd) = v["cwd"].as_str() {
             info.cwd = cwd.to_owned();
@@ -211,7 +233,7 @@ fn scan_file(path: &Path, mtime: u64, size: u64) -> Option<SessionInfo> {
 }
 
 fn scan_sessions() -> Vec<SessionInfo> {
-    let cache_path = home().join(".julgi/ledger-v5.json");
+    let cache_path = home().join(".julgi/ledger-v6.json");
     let cache: HashMap<String, Option<SessionInfo>> = fs::read_to_string(&cache_path)
         .ok()
         .and_then(|s| serde_json::from_str(&s).ok())

@@ -8,6 +8,8 @@ export type SessionInfo = {
   recap: string;
   tokens: number;
   links: string[];
+  /** 세션이 새로 만든 파일의 경로. 최근 것이 뒤에 온다 */
+  files?: string[];
   mtime: number;
   size: number;
   /** 폴더가 속한 git 레포 이름. 폴더가 이미 없으면 비어 있다 */

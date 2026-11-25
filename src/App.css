@@ -90,6 +90,7 @@ body.dragging .pane-body { pointer-events: none; }
 .info-none { color: var(--muted); }
 .info-link { font: inherit; text-align: left; color: var(--accent); background: none; border: 0; padding: 2px 0; cursor: pointer; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .info-link:hover { text-decoration: underline; }
+.info-link.file { color: var(--ink); font-family: ui-monospace, Menlo, monospace; font-size: 12px; }
 
 .help { width: min(520px, 90vw); background: var(--surface); border: 1px solid var(--line); border-radius: 10px; box-shadow: 0 16px 40px rgba(0, 0, 0, 0.5); overflow: hidden; }
 .help-title { font-weight: 600; padding: 12px 16px 6px; }
