@@ -26,6 +26,8 @@ type Entry = {
   id: number;
   term: Terminal;
   fit: FitAddon;
+  /** 폰이 이 터미널을 보는 동안: 폰이 나가면 돌아갈 맥에서의 크기. 그동안은 칸 크기를 따르지 않는다 */
+  held?: { cols: number; rows: number };
   search: SearchAddon;
   el: HTMLDivElement;
   opened: boolean;
@@ -396,6 +398,30 @@ export const idle = (key: string) => Date.now() - (pool.get(key)?.typedAt ?? 0);
 export const outAt = (key: string) => pool.get(key)?.outAt ?? 0;
 export const age = (key: string) => Date.now() - (pool.get(key)?.startedAt ?? 0);
 
+const byId = (id: number) => [...pool.values()].find((entry) => entry.id === id);
+/**
+ * 폰이 이 터미널을 보기 시작했다. 프로그램은 폰 폭으로 그리니, 맥의 터미널도 그 폭으로 맞춰야 글자가 겹치지 않는다.
+ * 그 폭으로 그려지는 까닭을 터미널 구석에 적어 둔다
+ */
+export function hold(id: number, cols: number, rows: number) {
+  const entry = byId(id);
+  if (!entry) return;
+  entry.held ??= { cols: entry.term.cols, rows: entry.term.rows };
+  entry.term.resize(cols, rows);
+  entry.term.element?.setAttribute("data-held", tr("폰에서 보는 중이라 폰 폭으로 그린다. Julgi를 누르면 되찾는다"));
+}
+/** 폰이 나갔다. 좁게 그려진 지난 줄을 지우고 맥의 크기로 되돌린다. 크기가 바뀌면 프로그램이 그 폭으로 다시 그린다 */
+export function free(id: number) {
+  const entry = byId(id);
+  const back = entry?.held;
+  if (!entry || !back) return;
+  entry.held = undefined;
+  entry.term.element?.removeAttribute("data-held");
+  entry.term.clear();
+  entry.term.resize(back.cols, back.rows);
+  if (entry.term.element?.isConnected) refit(entry);
+}
+
 /** 지금 터미널 색. 폰에서 터미널을 같은 색으로 그리는 데 쓴다 */
 export const colors = () => theme;
 
@@ -486,10 +512,25 @@ export function settle(key: string) {
 
 /** 칸 크기에 터미널을 맞춘다. 줄 수가 늘었으면 xterm이 아래에 붙인 빈 줄만큼 지난 줄을 끌어내린다 */
 function refit(entry: Entry) {
+  if (entry.held) return;
   const [rows, base] = [entry.term.rows, entry.term.buffer.active.baseY];
   entry.fit.fit();
   // 늘어난 줄 가운데 xterm이 스스로 끌어내린 것(base가 준 만큼)을 뺀 나머지가 아래에 붙은 빈 줄이다
   settleBuffer(entry.term, entry.term.rows - rows - (base - entry.term.buffer.active.baseY));
+}
+
+/**
+ * 일하는 세션의 화면에서 지금 찍히고 있는 끝의 몇 줄. 폰의 요약 화면이 대화 기록에 적히기 전의 진행을 보여 주는 데 쓴다.
+ * 입력 칸(가로줄 둘 사이)과 그 아래 안내는 뺀다
+ */
+export function nowOf(key: string, keep = 6): string {
+  const lines = text(key, 30).split("\n");
+  const rules = lines.flatMap((line, i) => (/^[─━]{10,}$/.test(line.trim()) ? [i] : []));
+  return (rules.length > 1 ? lines.slice(0, rules[rules.length - 2]) : lines)
+    .filter((line) => line.trim())
+    .slice(-keep)
+    .map((line) => line.trimEnd().slice(0, 200))
+    .join("\n");
 }
 
 export function text(key: string, tail?: number): string {
@@ -612,5 +653,6 @@ function open(entry: Entry) {
     keySent = { data, at: performance.now() };
     send(data);
   });
-  t.onResize(({ cols, rows }) => void invoke("pty_resize", { id, cols, rows }));
+  // 폰이 보는 동안의 크기는 폰이 정했다. 맥의 크기로 적어 두지 않는다
+  t.onResize(({ cols, rows }) => void (entry.held || invoke("pty_resize", { id, cols, rows })));
 }

@@ -1574,7 +1574,8 @@ export default function App() {
       at = Date.now();
       void invoke("remote_reclaim");
     };
-    const kinds = ["focus", "pointerdown", "keydown"];
+    // 마우스만 움직여도 맥 앞에 있는 것이다
+    const kinds = ["focus", "pointerdown", "keydown", "mousemove"];
     for (const kind of kinds) window.addEventListener(kind, back, true);
     return () => kinds.forEach((kind) => window.removeEventListener(kind, back, true));
   }, []);
@@ -1586,7 +1587,7 @@ export default function App() {
       .map((o) => {
         const st = states[o.key];
         const ch = changesRef.current[o.cwd];
-        return { key: o.key, id: o.sessionId, pty: terms.idOf(o.key), name: nameOf(o.key), repo: repoOf(o.cwd), state: st?.state ?? "", label: STATE_LABEL[st?.state ?? ""] ?? tr("열려 있음"), since: st?.since ?? 0, why: (o.sessionId && triaged.current[o.sessionId]?.since === st?.since && triaged.current[o.sessionId]?.why) || "", changed: ch && ch.by === o.sessionId && ch.files ? tr`파일 ${ch.files} +${ch.adds} −${ch.dels}` : "" };
+        return { key: o.key, id: o.sessionId, pty: terms.idOf(o.key), now: st?.state === "run" || st?.state === "hold" ? terms.nowOf(o.key) : "", name: nameOf(o.key), repo: repoOf(o.cwd), state: st?.state ?? "", label: STATE_LABEL[st?.state ?? ""] ?? tr("열려 있음"), since: st?.since ?? 0, why: (o.sessionId && triaged.current[o.sessionId]?.since === st?.since && triaged.current[o.sessionId]?.why) || "", changed: ch && ch.by === o.sessionId && ch.files ? tr`파일 ${ch.files} +${ch.adds} −${ch.dels}` : "" };
       })
       .sort((a, b) => a.since - b.since);
     const places = [...(base ? [{ repo: tr`기본 폴더 · ${repoOf(base)}`, cwd: base }] : []), ...folders.slice(0, 40).map((f) => ({ repo: f.repo, cwd: f.cwd }))];
@@ -3167,6 +3168,9 @@ export default function App() {
     });
     // 종료(⌘Q)와 창 닫기는 일하는 세션이 있으면 먼저 묻는다
     const offQuit = listen("quit-requested", () => actions.current.requestQuit());
+    // 폰이 터미널을 보기 시작하고 그만 볼 때: 맥의 터미널도 그 폭에 맞췄다가 되돌린다
+    const offHeld = listen<[number, number, number]>("pty-held", (e) => terms.hold(...e.payload));
+    const offFreed = listen<number>("pty-freed", (e) => terms.free(e.payload));
     // 창 닫기는 끄는 게 아니라 숨기는 것이다. 세션은 뒤에서 계속 돌고 메뉴 막대 아이콘으로 다시 연다.
     const offClose = getCurrentWindow().onCloseRequested((event) => {
       event.preventDefault();
@@ -3178,6 +3182,8 @@ export default function App() {
       gone = true;
       offDrop();
       void offQuit.then((off) => off());
+      void offHeld.then((off) => off());
+      void offFreed.then((off) => off());
       void offClose.then((off) => off());
       clearInterval(scanTimer);
       clearInterval(skillTimer);

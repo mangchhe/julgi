@@ -139,7 +139,7 @@ fn pty_spawn(
         .lock()
         .unwrap()
         .insert(id, Session { writer, master: pair.master, child });
-    remote::sized(id, cols, rows);
+    remote::sized(id);
     Ok(())
 }
 
@@ -166,7 +166,7 @@ fn pty_write(state: State<Ptys>, id: u32, data: String) -> Result<(), String> {
 #[tauri::command]
 fn pty_resize(state: State<Ptys>, id: u32, cols: u16, rows: u16) -> Result<(), String> {
     // 폰이 보는 중이면 맥 크기는 적어만 두고, 폰이 나가면 그때 되돌린다
-    if !remote::sized(id, cols, rows) {
+    if !remote::sized(id) {
         return Ok(());
     }
     let map = state.0.lock().unwrap();

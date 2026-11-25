@@ -1520,6 +1520,8 @@ body.dragging .pane-body { pointer-events: none; }
 :root.glass .app { background: color-mix(in srgb, var(--bg) var(--win-alpha, 100%), transparent); }
 :root.glass .side, :root.glass .status, :root.glass .topbar { background: color-mix(in srgb, var(--surface) var(--win-alpha, 100%), transparent); }
 /* 터미널 부품은 글자 뒤에 검은 층(.xterm-viewport)을 하나 깔아 둔다. 창을 비치게 했으면 그 층도 비운다 */
+/* 폰이 보는 동안 터미널이 좁게 그려지는 까닭 */
+.xterm[data-held]::after { content: attr(data-held); position: absolute; right: 10px; top: 8px; z-index: 5; max-width: 46%; padding: 6px 10px; border-radius: 8px; background: var(--surface); color: var(--muted); border: 1px solid var(--line); font: 12px/1.4 var(--font, system-ui); pointer-events: none; }
 :root.glass .xterm .xterm-viewport { background-color: transparent !important; }
 /* 설정: 딸린 줄은 들여 쓰고 왼쪽에 줄을 그어 위 줄에 묶인 것을 보인다 */
 .set-card .set-row.child { position: relative; margin: 0 14px 10px 46px; padding: 10px 14px; border: 1px solid var(--line); border-radius: 10px; background: color-mix(in srgb, var(--bg) 55%, transparent); }

@@ -134,6 +134,9 @@ h2.mine { color: var(--wait); }
 .bubble pre { margin: 0 0 11px; background: var(--sunk); border-radius: 12px; padding: 11px 13px; overflow-x: auto; -webkit-overflow-scrolling: touch; }
 .bubble pre code { background: none; padding: 0; white-space: pre; }
 .bubble .more { display: block; width: 100%; color: var(--accent); font-size: 14px; font-weight: 600; padding: 0 0 11px; margin-bottom: 11px; text-align: left; border-bottom: 1px solid var(--line); }
+.now { margin: 0 0 12px; padding: 10px 12px; border-radius: 12px; background: var(--sunk); color: var(--muted); font: 12px/1.5 ui-monospace, "SF Mono", Menlo, monospace; white-space: pre-wrap; overflow-wrap: anywhere; }
+.now::before { content: attr(data-label); display: block; font: 800 11.5px/1.4 -apple-system, system-ui, sans-serif; color: var(--accent); margin-bottom: 4px; }
+#one.live .now { display: none; }
 .steps { margin-top: 10px; font-size: 13.5px; color: var(--muted); }
 .steps summary { padding: 6px 4px; font-weight: 700; }
 .steps ol { list-style: none; margin: 0; padding: 0 4px; }
@@ -204,6 +207,7 @@ h2.mine { color: var(--wait); }
   <main id="acts" class="view" hidden></main>
   <main id="one" class="view" hidden>
     <div class="status" id="one-status"></div>
+    <pre class="now" id="one-now" hidden></pre>
     <div class="bubble" id="one-reply"></div>
     <details class="steps" id="one-steps" hidden><summary></summary><ol></ol></details>
     <div id="one-term"></div>
@@ -253,7 +257,7 @@ const EN = {
   "응, 진행해": "Yes, go ahead", "계속해": "Continue", "아니, 멈춰": "No, stop", "다시 설명해 줘": "Explain again",
   "앞의 {0}줄 더 보기": "Show {0} earlier lines", "읽는 중": "Loading",
   "일하는 중이다. 답이 오면 여기에 뜬다.": "Working. The reply will appear here.",
-  "터미널": "Terminal", "요약": "Summary", "다시 보기": "Resume", "터미널을 여는 중": "Opening the terminal",
+  "지금 화면": "On screen now", "터미널": "Terminal", "요약": "Summary", "다시 보기": "Resume", "터미널을 여는 중": "Opening the terminal",
   "맥에서 쓰는 중이라 멈췄다.": "Paused: in use on the Mac.", "이 터미널은 끝났다.": "This terminal has ended.", "터미널을 열지 못했다.": "Could not open the terminal.",
   "진행 과정 {0}": "Steps {0}", "읽음": "Read", "실행": "Run", "고침": "Edit", "씀": "Write", "찾음": "Search", "맡김": "Agent", "웹": "Web",
   "마지막 답을 읽지 못했다.": "Could not read the last reply.", "읽지 못했다.": "Could not read it.",
@@ -576,6 +580,8 @@ function paint() {
     const flip = s && s.pty != null ? el("button", "live", live ? T("요약") : T("터미널")) : null;
     if (flip) { flip.type = "button"; flip.addEventListener("click", () => { live ? stopLive() : startLive(s); paint(); }); }
     $("one-status").replaceChildren(...(s ? [pill(s), el("span", "", metaOf(s)), ...(flip ? [flip] : [])] : [el("span", "", T("이 세션은 닫혔다"))]));
+    // 일하는 중이면 맥의 화면 끝 몇 줄을 그대로 보여 준다. 대화 기록에 적히기 전의 진행이 여기 보인다
+    $("one-now").hidden = !(s && busy(s) && s.now); $("one-now").dataset.label = T("지금 화면"); $("one-now").textContent = (s && s.now) || "";
     if (s) { loadReply(s); loadSteps(s); }
   } else if (view === "home") paintHome();
   else if (view === "all") paintAll();

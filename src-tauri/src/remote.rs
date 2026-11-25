@@ -3,6 +3,8 @@
 //! 받는 곳은 Tailscale 망(100.64.0.0/10)과 이 맥 자신뿐이고, 그 안에서도 주소에 든 토큰이 맞아야 한다.
 //! 화면에 보일 상태는 앱이 주기적으로 넘겨 주고(remote_publish), 폰이 시킨 일은 세션들이 쓰는 것과 같은 inbox에 적어 앱이 처리한다.
 use crate::lang::say;
+use tauri::Emitter;
+
 use std::{
     collections::HashMap,
     fs,
@@ -24,10 +26,9 @@ static STATE: Mutex<String> = Mutex::new(String::new());
 static ON: AtomicBool = AtomicBool::new(false);
 static STARTED: OnceLock<u16> = OnceLock::new();
 
-/// 터미널 하나를 폰으로 흘려보내는 자리. 맥에서의 크기와, 지금 보고 있는 폰들
+/// 터미널 하나를 폰으로 흘려보내는 자리: 지금 보고 있는 폰들
 #[derive(Default)]
 struct Tap {
-    mac: (u16, u16),
     viewers: Vec<(u64, SyncSender<Vec<u8>>)>,
 }
 
@@ -48,12 +49,9 @@ pub fn feed(id: u32, bytes: &[u8]) {
     }
 }
 
-/// 맥에서의 터미널 크기를 적어 둔다. 돌려주는 값: 지금 그 크기를 실제로 적용해도 되는가 (폰이 보는 중이면 아니다)
-pub fn sized(id: u32, cols: u16, rows: u16) -> bool {
-    let Ok(mut taps) = TAPS.lock() else { return true };
-    let tap = taps.entry(id).or_default();
-    tap.mac = (cols, rows);
-    tap.viewers.is_empty()
+/// 터미널이 떴거나 맥에서 크기를 바꾸려 한다. 돌려주는 값: 그 크기를 적용해도 되는가 (폰이 보는 중이면 아니다)
+pub fn sized(id: u32) -> bool {
+    TAPS.lock().map_or(true, |mut taps| taps.entry(id).or_default().viewers.is_empty())
 }
 
 /// 터미널이 끝났다. 보던 폰에 알리고 끊는다
@@ -90,6 +88,9 @@ fn stream(request: tiny_http::Request, id: u32, cols: u16, rows: u16) {
     let mut out = request.into_writer();
     let mut alive = out.write_all(b"HTTP/1.1 200 OK\r\nContent-Type: application/octet-stream\r\nCache-Control: no-store\r\nX-Accel-Buffering: no\r\nConnection: close\r\n\r\n").and_then(|_| out.flush()).is_ok();
     if let Some(app) = APP.get() {
+        // 맥의 터미널이 먼저 같은 폭이 되어야 한다. 폭이 다른 채로 프로그램이 다시 그리면 맥 화면의 글자가 겹친다
+        let _ = app.emit("pty-held", (id, cols, rows));
+        std::thread::sleep(Duration::from_millis(250));
         // 크기가 같으면 새로 그리지 않으니 한 줄 줄였다 맞춘다
         crate::pty_size(app, id, cols, rows.saturating_sub(1).max(2));
         crate::pty_size(app, id, cols, rows);
@@ -107,13 +108,15 @@ fn stream(request: tiny_http::Request, id: u32, cols: u16, rows: u16) {
             Err(RecvTimeoutError::Disconnected) => false,
         };
     }
-    let back = TAPS.lock().ok().and_then(|mut taps| {
-        let tap = taps.get_mut(&id)?;
-        tap.viewers.retain(|(who, _)| *who != me);
-        (tap.viewers.is_empty() && tap.mac.0 > 0).then_some(tap.mac)
+    let last = TAPS.lock().ok().is_some_and(|mut taps| {
+        taps.get_mut(&id).is_some_and(|tap| {
+            tap.viewers.retain(|(who, _)| *who != me);
+            tap.viewers.is_empty()
+        })
     });
-    if let (Some((cols, rows)), Some(app)) = (back, APP.get()) {
-        crate::pty_size(app, id, cols, rows);
+    // 마지막 폰이 나갔다. 맥의 터미널이 제 크기로 돌아가며 프로그램의 크기도 되돌린다 (terms.free)
+    if let (true, Some(app)) = (last, APP.get()) {
+        let _ = app.emit("pty-freed", id);
     }
 }
 
