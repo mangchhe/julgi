@@ -197,4 +197,5 @@ export default {
   "\"{0}\"을 다시 띄우며 \"이어서 할까\"라는 물음에 이어 간다고 대신 답함": "Reopened \"{0}\" and answered \"resume this conversation?\" with resume for you",
   "\"{0}\" · 끝낸 줄기의 세션에서 다시 일을 시켜 목록에 올림": "\"{0}\" · work was sent to a session of a finished stem, so it is back on the list",
   "봇 \"{0}\" → \"{1}\": {2}": "Bot \"{0}\" → \"{1}\": {2}",
+  "파일을 찾지 못했다: {0}": "File not found: {0}",
 } as Record<string, string>;

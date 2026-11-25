@@ -2857,6 +2857,7 @@ export default function App() {
       if (at >= 0) setFocus(at);
     };
     terms.handlers.onExit = (key) => actions.current.exited(key);
+    terms.handlers.onMiss = (path) => say(tr`파일을 찾지 못했다: ${path}`);
 
     const onKey = (e: KeyboardEvent) => {
       const { open, panes, focus, home, overlay, fontSize } = live.current;

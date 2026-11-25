@@ -575,6 +575,32 @@ fn dirs_exist(paths: Vec<String>) -> Vec<bool> {
     paths.iter().map(|p| std::path::Path::new(p).is_dir()).collect()
 }
 
+/// 터미널에서 누른 경로가 실제로 있는 자리를 찾는다. 받은 후보를 차례로 보고, 없으면 `cwd`의 위 폴더들에 `rel`을 붙여 본다.
+/// 세션이 옆 워크트리의 파일을 "레포이름/src/a.rs"처럼 부모 폴더 기준으로 적을 때가 있어서다. 홈 폴더 위로는 올라가지 않는다.
+#[tauri::command]
+fn path_find(first: String, rel: String, cwd: String) -> Option<String> {
+    use std::path::Path;
+    if Path::new(&first).exists() {
+        return Some(first);
+    }
+    if rel.is_empty() || rel.starts_with('/') || rel.starts_with('~') {
+        return None;
+    }
+    let home = home_dir();
+    let mut dir = Path::new(&cwd).parent();
+    while let Some(d) = dir {
+        let hit = d.join(&rel);
+        if hit.exists() {
+            return Some(hit.to_string_lossy().into_owned());
+        }
+        if d == Path::new(&home) {
+            break;
+        }
+        dir = d.parent();
+    }
+    None
+}
+
 /// Julgi가 띄우지 않았는데 떠 있는 Claude Code 프로세스의 세션 ID들.
 /// `claude --resume <id>`처럼 ID를 달고 뜬 것만 알 수 있다. Julgi가 띄운 것은 상태 훅(.julgi/state)이 붙어 있어 가려낸다.
 #[tauri::command]
@@ -785,7 +811,7 @@ pub fn run() {
             Ok(())
         })
         .manage(Ptys::default())
-        .invoke_handler(tauri::generate_handler![lang::set_lang, pty_spawn, pty_write, pty_resize, pty_kill, clipboard_paste, term_states, log_line, env_flag, home_dir, layout_load, layout_save, handoff_write, config_load, sessions_elsewhere, app_exit, app_restart, data_read, data_write, data_append, data_remove, brain_load, notify, set_hotkey, repo_peek, repo_refs, repo_sync, git_siblings, route_ask, memory_load, inbox_take, default_dir, dirs_exist, ledger::last_reply, ledger::last_exchange, ledger::session_workdir, ledger::ledger_scan, remote::remote_start, remote::remote_stop, remote::remote_publish, usage::claude_usage, usage::claude_models, jira::jira_connect, jira::jira_disconnect, jira::jira_me, jira::jira_search, jira::jira_mine, jira::jira_projects, jira::jira_statuses, jira::jira_view, jira::jira_image, ci::ci_runs, ci::ci_jobs, ci::ci_log, argo::argo_status, argo::argo_logout, argo::argo_apps, argo::argo_app, argo::argo_reach, argo::argo_trail, jira::jira_transitions, jira::jira_transition, jira::jira_comment, tokens::token_usage, github::gh_status, github::glab_status, github::pr_view, github::pr_diff, github::pr_comments, github::repo_slug, github::pr_status, github::pr_review_requests, github::pr_mine, github::pr_list, github::pr_comment, github::pr_line_comment, github::pr_reply, github::pr_review, github::pr_merge, github::pr_close, github::pr_reopen, term_load, habits::habits, habits::corrections, skills::skill_usage, skills::skills_list, skills::skill_apply, skills::skill_retire, work::worktree_add, work::worktree_drop, work::repo_changes, work::repo_stat, work::repo_has, work::repo_snapshot, work::repo_diff, work::repo_moved, work::repo_state, work::repo_mrs, work::repo_commits, work::commit_message])
+        .invoke_handler(tauri::generate_handler![lang::set_lang, pty_spawn, pty_write, pty_resize, pty_kill, clipboard_paste, term_states, log_line, env_flag, home_dir, layout_load, layout_save, handoff_write, config_load, sessions_elsewhere, app_exit, app_restart, data_read, data_write, data_append, data_remove, brain_load, notify, set_hotkey, repo_peek, repo_refs, repo_sync, git_siblings, route_ask, memory_load, inbox_take, default_dir, dirs_exist, path_find, ledger::last_reply, ledger::last_exchange, ledger::session_workdir, ledger::ledger_scan, remote::remote_start, remote::remote_stop, remote::remote_publish, usage::claude_usage, usage::claude_models, jira::jira_connect, jira::jira_disconnect, jira::jira_me, jira::jira_search, jira::jira_mine, jira::jira_projects, jira::jira_statuses, jira::jira_view, jira::jira_image, ci::ci_runs, ci::ci_jobs, ci::ci_log, argo::argo_status, argo::argo_logout, argo::argo_apps, argo::argo_app, argo::argo_reach, argo::argo_trail, jira::jira_transitions, jira::jira_transition, jira::jira_comment, tokens::token_usage, github::gh_status, github::glab_status, github::pr_view, github::pr_diff, github::pr_comments, github::repo_slug, github::pr_status, github::pr_review_requests, github::pr_mine, github::pr_list, github::pr_comment, github::pr_line_comment, github::pr_reply, github::pr_review, github::pr_merge, github::pr_close, github::pr_reopen, term_load, habits::habits, habits::corrections, skills::skill_usage, skills::skills_list, skills::skill_apply, skills::skill_retire, work::worktree_add, work::worktree_drop, work::repo_changes, work::repo_stat, work::repo_has, work::repo_snapshot, work::repo_diff, work::repo_moved, work::repo_state, work::repo_mrs, work::repo_commits, work::commit_message])
         .build(tauri::generate_context!())
         .expect("error while running tauri application")
         .run(|app, event| {

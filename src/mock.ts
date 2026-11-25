@@ -294,6 +294,8 @@ async function invoke(cmd: string, args: Record<string, unknown> = {}): Promise<
         { id: 2, path: "src/refund/RefundCalculator.kt", line: 90, side: "RIGHT", in_reply_to_id: 1, user: { login: "me" }, body: "배치 쪽에서 잡고 넘기게 할게요.", created_at: new Date(Date.now() - 1500_000).toISOString() },
         { id: 3, path: "src/refund/RefundCalculator.kt", line: null, side: "RIGHT", user: { login: "teammate" }, body: "이전 버전에 단 코멘트", created_at: new Date(Date.now() - 5000_000).toISOString() },
       ]);
+    case "path_find":
+      return args.first as string;
     case "dirs_exist":
       return (args.paths as string[]).map(() => true);
     case "env_flag":

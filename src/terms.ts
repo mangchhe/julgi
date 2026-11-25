@@ -59,6 +59,8 @@ let lot: HTMLDivElement | null = null;
 export const handlers = {
   onFocus: (_key: string) => {},
   onExit: (_key: string) => {},
+  /** ⌘ 클릭한 경로를 찾지 못했거나 열지 못했다 */
+  onMiss: (_path: string) => {},
 };
 
 void listen<number>("pty-exit", (e) => {
@@ -165,7 +167,11 @@ export function create(spec: TermSpec) {
         activate: (e: MouseEvent) => {
           if (!e.metaKey) return;
           // 파일이면 기본 앱으로, 폴더면 Finder로 열린다
-          void openPath(resolvePath(path, spec.cwd ?? "", home)).catch(() => {});
+          // 세션 폴더 기준으로 없으면 위 폴더들에서 찾는다(옆 워크트리의 파일). 끝내 없으면 없다고 알린다
+          const first = resolvePath(path, spec.cwd ?? "", home);
+          void invoke<string | null>("path_find", { first, rel: path.replace(/^\.\//, ""), cwd: spec.cwd ?? "" })
+            .then((found) => (found ? openPath(found) : Promise.reject()))
+            .catch(() => handlers.onMiss(path));
         },
       }));
       const all = [...tickets, ...links];
