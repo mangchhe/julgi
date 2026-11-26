@@ -42,6 +42,7 @@ import { rank } from "./route";
 import { Brief, Change, Job, Progress, MAX_PARALLEL, turnStart, setMapDirs, setPrefs, markAuto, isAuto, autoList, STATE_LABEL, replied, ago, Item, modelFor, SkillInfo, SkillUse, aboutOf, buildFolders, buildItems, aliveElsewhere, config, elsewhere, enrich, markSlept, setAlive, handoffCommand, Ledger, Merge, mergeCandidates, mergeKey, newCommand, Open, repoOf, resumeCommand, Session, TermState, Thread, waiting, withPrompt } from "./model";
 import { selftest } from "./selftest";
 import { tr } from "./i18n";
+import { Block, codeBlocks } from "./codeblocks";
 import "./App.css";
 
 const MAX_PANES = 12;
@@ -107,7 +108,7 @@ export default function App() {
   fileRef.current = fileShown;
   const [states, setStates] = useState<Record<string, TermState>>({});
   const [dead, setDead] = useState<string[]>([]);
-  const [overlay, setOverlay] = useState<"palette" | "send" | "help" | "history" | "settings" | "threads" | "queue" | "quit" | "close" | "work" | "usage" | "morning" | null>(null);
+  const [overlay, setOverlay] = useState<"palette" | "send" | "help" | "history" | "settings" | "threads" | "queue" | "quit" | "close" | "work" | "usage" | "morning" | "copy" | null>(null);
   const [awaySince, setAwaySince] = useState(0); // 브리핑이 "그동안"의 기준으로 삼는 때
   const [threads, setThreads] = useState<Thread[]>([]);
   const [tasks, setTasks] = useState<Job[]>([]); // 조율 세션이 맡긴 일감들
@@ -414,6 +415,9 @@ export default function App() {
   const [handing, setHanding] = useState<string[]>([]);
   const [handed, setHanded] = useState<Record<string, number>>({}); // 방금 갈아타서 이어받은 칸. 잠깐 표시한다
   const [toast, setToast] = useState("");
+  const [copies, setCopies] = useState<Block[]>([]);
+  const copiesRef = useRef(copies);
+  copiesRef.current = copies;
   const [, setConfigTick] = useState(0);
   const lastCloseTry = useRef(0);
   const [info, setInfo] = useState(false);
@@ -2703,8 +2707,22 @@ export default function App() {
     }, 30_000);
     return () => clearInterval(timer);
   }, []);
-  const actions = useRef({ wakeBot, raise, readUsage, publishRemote, say, dispatch, show, close, sleep, requestQuit, handoff, exited, newSession, newShell, nextWaiting, openTerm, resize, split, unsplit, finishThread, move, togglePin, tend, triage, serve, record, confirmClose, toggleReview, prNotice, askNotice, mineNotice, sleepNotice, wake, ticketNotice, ticketOffer, checkEnded });
-  actions.current = { wakeBot, raise, readUsage, publishRemote, say, dispatch, show, close, sleep, requestQuit, handoff, exited, newSession, newShell, nextWaiting, openTerm, resize, split, unsplit, finishThread, move, togglePin, tend, triage, serve, record, confirmClose, toggleReview, prNotice, askNotice, mineNotice, sleepNotice, wake, ticketNotice, ticketOffer, checkEnded };
+  /** ⌘⇧C: 화면을 긁으면 Claude Code가 접은 줄이 깨지므로, 대화 기록의 원문에서 코드 블록을 꺼내 복사한다 */
+  const copyBlock = (b: Block) => {
+    setOverlay(null);
+    void navigator.clipboard.writeText(b.text).then(() => say(tr`복사했다 · ${b.text.split("\n").length}줄`), () => say(tr`복사하지 못했다`));
+  };
+  const copyCode = async (key: string | null | undefined) => {
+    const id = live.current.open.find((o) => o.key === key)?.sessionId;
+    if (!id) return say(tr`코드를 꺼낼 Claude 세션이 아니다`);
+    const blocks = (await invoke<string[]>("recent_replies", { sessionId: id }).catch(() => [])).flatMap(codeBlocks).slice(0, 9);
+    if (!blocks.length) return say(tr`최근 답에 코드 블록이 없다`);
+    if (blocks.length === 1) return copyBlock(blocks[0]);
+    setCopies(blocks);
+    setOverlay("copy");
+  };
+  const actions = useRef({ copyCode, copyBlock, wakeBot, raise, readUsage, publishRemote, say, dispatch, show, close, sleep, requestQuit, handoff, exited, newSession, newShell, nextWaiting, openTerm, resize, split, unsplit, finishThread, move, togglePin, tend, triage, serve, record, confirmClose, toggleReview, prNotice, askNotice, mineNotice, sleepNotice, wake, ticketNotice, ticketOffer, checkEnded });
+  actions.current = { copyCode, copyBlock, wakeBot, raise, readUsage, publishRemote, say, dispatch, show, close, sleep, requestQuit, handoff, exited, newSession, newShell, nextWaiting, openTerm, resize, split, unsplit, finishThread, move, togglePin, tend, triage, serve, record, confirmClose, toggleReview, prNotice, askNotice, mineNotice, sleepNotice, wake, ticketNotice, ticketOffer, checkEnded };
 
   /** 세션이 남긴 링크 가운데 마지막 PR */
   const prOfSession = (id?: string) => {
@@ -3046,6 +3064,7 @@ export default function App() {
       else if (cmd && e.code === "Comma") (setSettingsAt(undefined), setOverlay(overlay === "settings" ? null : "settings"));
       else if (cmd && e.code === "KeyG") setOverlay(overlay === "threads" ? null : "threads");
       else if (cmd && e.shiftKey && e.code === "KeyU") setOverlay(overlay === "usage" ? null : "usage");
+      else if (cmd && e.shiftKey && e.code === "KeyC" && !overlay) void a.copyCode(key);
       else if (cmd && e.code === "KeyU") (setRunShown(""), setDeployShown(""), setOverlay(overlay === "work" ? null : "work"));
       else if (overlay) {
         // 작업 페이지는 Esc를 스스로 다룬다(PR 화면 안이면 목록으로, 목록이면 닫기)
@@ -3055,6 +3074,10 @@ export default function App() {
         if (e.key === "Escape") setOverlay(null);
         else if (overlay === "quit" && e.key === "Enter") void invoke("app_exit");
         else if (overlay === "close" && e.key === "Enter") a.confirmClose(e.altKey);
+        else if (overlay === "copy" && (e.key === "Enter" || /^[1-9]$/.test(e.key))) {
+          const b = copiesRef.current[e.key === "Enter" ? 0 : Number(e.key) - 1];
+          if (b) a.copyBlock(b);
+        }
         else return;
       } else if (e.metaKey && e.altKey && (e.key === "ArrowLeft" || e.key === "ArrowRight"))
         setFocus((focus + (e.key === "ArrowLeft" ? -1 : 1) + panes.length) % panes.length);
@@ -4009,6 +4032,21 @@ export default function App() {
             <b>{tr`일하는 세션이 ${open.filter((o) => states[o.key]?.state === "run").length}개 있다`}</b>
             <p>{tr`지금 끄면 하던 일이 멈춘다. 대화는 남아서 다시 켜면 이어 열 수 있다.`}</p>
             <Hint text={tr`Enter 끄기 · Esc 취소`} />
+          </div>
+        </div>
+      )}
+      {overlay === "copy" && (
+        <div className="pal-back" onMouseDown={() => setOverlay(null)}>
+          <div className="confirm copy" onMouseDown={(e) => e.stopPropagation()}>
+            <b>{tr`복사할 코드 블록`}</b>
+            {copies.map((c, i) => (
+              <button key={i} type="button" onClick={() => copyBlock(c)}>
+                <kbd>{i + 1}</kbd>
+                <span className="copy-head">{c.lang || tr`코드`} · {tr`${c.text.split("\n").length}줄`}</span>
+                <code>{c.text.split("\n").slice(0, 2).join("  ⏎ ").slice(0, 90)}</code>
+              </button>
+            ))}
+            <Hint text={tr`숫자로 고르기 · Enter 맨 위(가장 최근) · Esc 닫기`} />
           </div>
         </div>
       )}

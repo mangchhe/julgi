@@ -39,4 +39,5 @@ export default {
   "몰라도 된다 · 직접 하고 싶을 때만": "Optional · only when you want to do it yourself",
   "세션은 닫는 게 아니라 재운다. 창을 닫아도 메뉴 막대에 남아 세션이 계속 돈다. 끄는 건 ⌘Q뿐이다.": "Sessions are put to sleep, not closed. Closing the window leaves Julgi in the menu bar and sessions keep running. Only ⌘Q quits.",
   "답의 처음으로: 지금 칸에서 내가 한 말 사이를 위아래로 건너뛴다": "To the start of a reply: jump up and down between your own messages in this pane",
+  "지금 세션의 최근 답에서 코드 블록을 골라 복사 (화면을 긁으면 접힌 줄이 깨진다)": "Copy a code block from this session's recent replies (selecting the screen breaks wrapped lines)",
 } as Record<string, string>;

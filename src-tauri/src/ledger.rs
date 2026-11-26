@@ -436,6 +436,19 @@ fn load_works(command: Option<String>) -> Vec<Work> {
 /// 세션의 마지막 Claude 답변 글. 갈아탈 때 인계 요약을 꺼내는 데 쓴다.
 #[tauri::command(async)]
 pub fn last_reply(session_id: String) -> Option<String> {
+    replies_of(&session_id)?.pop()
+}
+
+/// 세션의 최근 Claude 답변 글들, 최근 것이 앞. 코드 블록을 복사하는 데 쓴다.
+#[tauri::command(async)]
+pub fn recent_replies(session_id: String) -> Vec<String> {
+    let mut all = replies_of(&session_id).unwrap_or_default();
+    all.reverse();
+    all.truncate(8);
+    all
+}
+
+fn replies_of(session_id: &str) -> Option<Vec<String>> {
     let projects = home().join(".claude/projects");
     let path = fs::read_dir(projects)
         .ok()?
@@ -444,7 +457,7 @@ pub fn last_reply(session_id: String) -> Option<String> {
         .find(|path| path.is_file())?;
     let size = fs::metadata(&path).ok()?.len();
     let tail = read_range(&path, size.saturating_sub(TAIL_BYTES), TAIL_BYTES)?;
-    let mut reply = None;
+    let mut replies = Vec::new();
     for line in tail.lines() {
         let Ok(v) = serde_json::from_str::<Value>(line) else { continue };
         if v["type"] != "assistant" || v["isSidechain"] == true {
@@ -457,10 +470,10 @@ pub fn last_reply(session_id: String) -> Option<String> {
             .filter_map(|part| part["text"].as_str())
             .collect();
         if !text.is_empty() {
-            reply = Some(text.join("\n"));
+            replies.push(text.join("\n"));
         }
     }
-    reply
+    Some(replies)
 }
 
 /// 이번 차례에 세션이 한 일을 차례대로: 중간에 한 말("say")과 쓴 도구(도구 이름)와 그 대상 한 줄.

@@ -66,7 +66,7 @@ A rule is this: **in this situation, send this message.** When a session finishe
 - **Sessions run by scripts are kept apart.** Sessions started by `claude -p` or the SDK are folded into one group at the bottom, or hidden, and Julgi's own work skips them. Julgi tells them by the `entrypoint` Claude Code writes into the transcript.
 - **Panes.** Sessions waiting on you are brought into panes and the pane count follows the window. Pin a pane (`⌘⇧P`) to keep it.
 - **Finished work leaves.** When a stem is marked done its panes close and are not restored at next launch.
-- **In the terminal.** `⌘`-click a file path to read it inside Julgi (markdown is rendered, `a.ts:42` jumps to the line), `⌘↑` / `⌘↓` jump between your own messages, `⌘F` finds text, and a shell for the session's repo opens with `⌘T`.
+- **In the terminal.** `⌘`-click a file path to read it inside Julgi (markdown is rendered, `a.ts:42` jumps to the line), `⌘↑` / `⌘↓` jump between your own messages, `⌘F` finds text, `⌘⇧C` copies a code block from the recent replies (taken from the transcript, so wrapped lines come out whole), and a shell for the session's repo opens with `⌘T`.
 - **Resizing keeps the prompt at the bottom.** When a pane grows, earlier lines are pulled down instead of leaving empty rows under the input.
 - **Fewer permission prompts.** Optionally let read-only commands, or tests and builds too, through without asking. The install script signs the app so macOS remembers folder access across updates.
 

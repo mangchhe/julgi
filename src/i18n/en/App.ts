@@ -210,4 +210,12 @@ export default {
   "\"{0}\": 한도가 풀려서 이어 가게 했다": "\"{0}\": the limit reset, so it was told to continue",
   "\"{0}\"이 한도에 걸려 멈췄다. {1}에 이어 가게 한다": "\"{0}\" stopped on a usage limit. It will be told to continue at {1}",
   "한도에 걸림 · {0}에 이어 감": "Usage limit · continues at {0}",
+  "복사했다 · {0}줄": "Copied · {0} lines",
+  "복사하지 못했다": "Could not copy",
+  "코드를 꺼낼 Claude 세션이 아니다": "This is not a Claude session to copy code from",
+  "최근 답에 코드 블록이 없다": "No code blocks in the recent replies",
+  "복사할 코드 블록": "Code block to copy",
+  "코드": "Code",
+  "{0}줄": "{0} lines",
+  "숫자로 고르기 · Enter 맨 위(가장 최근) · Esc 닫기": "Pick by number · Enter the top one (most recent) · Esc to close",
 } as Record<string, string>;
