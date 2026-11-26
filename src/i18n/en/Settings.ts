@@ -304,4 +304,6 @@ export default {
   "하루 상한": "Daily limit",
   "최근에 한 일": "Recent runs",
   "+ 봇 더하기": "+ Add a bot",
+  "한도가 풀리면 이어 가기": "Continue when the limit resets",
+  "세션이 사용 한도에 걸려 멈추면 답에 적힌 풀리는 시각을 기억해 두었다가, 그때까지 아무도 그 세션에 말하지 않았으면 \"멈춘 곳부터 이어서 해 줘\"를 보낸다. 풀린 지 하루가 지난 것은 이어 가지 않는다. 기억한 것과 이어 간 것은 ⌘Y에 남는다": "When a session stops on a usage limit, Julgi remembers the reset time written in the reply, and if nobody has said anything to that session by then, sends \"continue where you left off\". Limits that reset more than a day ago are not continued. What was remembered and continued is kept in ⌘Y",
 } as Record<string, string>;

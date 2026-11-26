@@ -32,6 +32,7 @@ English · [한국어](features.ko.md)
 
 - **My turn (`⌘J`).** Every session waiting on you, oldest first, with the question it ended on. Answer there without opening the session. PRs, tickets, failed CI runs and review requests that need you are in the same queue.
 - **Only called when needed.** When a session finishes, a small model reads the reply. A question or a decision brings it up; a plain "done" stays quiet and is collected in the briefing.
+- **Continues when the limit resets.** A session that stops on a usage limit is told to continue at the reset time written in its reply. On the phone it shows "Usage limit · continues at …".
 - **Stalls are flagged.** A session that stops mid-work, or runs one request for too long, is pointed out.
 - **Briefing (`⌘⇧B`).** Come back after a while and one screen shows what is waiting, news on PRs and tickets, where each piece of work stands, and what Julgi did meanwhile.
 - **Progress per stem.** Goal, done, left and blocked for each piece of work, kept up to date as sessions reply.

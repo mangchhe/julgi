@@ -206,4 +206,8 @@ export default {
   "내가 필요함 · {0}": "Needs you · {0}",
   "일하는 중 · {0}": "Working · {0}",
   "깨우는 일이 없다": "Nothing wakes it",
+  "한도가 풀렸다. 멈춘 곳부터 이어서 해 줘.": "The usage limit has reset. Continue where you left off.",
+  "\"{0}\": 한도가 풀려서 이어 가게 했다": "\"{0}\": the limit reset, so it was told to continue",
+  "\"{0}\"이 한도에 걸려 멈췄다. {1}에 이어 가게 한다": "\"{0}\" stopped on a usage limit. It will be told to continue at {1}",
+  "한도에 걸림 · {0}에 이어 감": "Usage limit · continues at {0}",
 } as Record<string, string>;

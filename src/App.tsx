@@ -11,6 +11,7 @@ import Queue from "./Queue";
 import Status from "./Status";
 import History, { Act } from "./History";
 import Morning from "./Morning";
+import { resetAt } from "./limit.ts";
 import { Bot, BotEvent, botPrompt, ran, readBots, settle, timeDue, wakes } from "./bots.ts";
 import { faceOf } from "./BotFace";
 import { Rule, DEFAULT_RULES, TRIAGE_SYSTEM, triagePrompt, parseTriage } from "./triageAsk.ts";
@@ -1356,6 +1357,59 @@ export default function App() {
       })();
     }
   };
+  /**
+   * 열려 있는 세션에 말을 보낸다. Julgi를 다시 켠 뒤 아직 한 번도 안 띄운 세션은 터미널이 없다.
+   * 그대로 보내면 글이 사라지니, 그때는 글을 들려서 세션을 띄운다
+   */
+  const deliver = (key: string, text: string) => {
+    const o = live.current.open.find((x) => x.key === key);
+    if (!o) return;
+    if (terms.opened(key) || !o.sessionId) return void terms.submitWhenClear(key, text);
+    void invoke<string>("data_write", { name: `outbox/${crypto.randomUUID()}.md`, text }).then((file) => {
+      terms.dispose(key);
+      terms.create({ key, cwd: o.cwd, command: withPrompt(resumeCommand(o.sessionId!), file) });
+      terms.wake(key);
+    });
+  };
+  // ---- 한도에 걸려 멈춘 세션: 풀리는 시각을 기억했다가 그때까지 아무 일이 없었으면 이어 가게 한다 ----
+  /** 세션 키마다: 멈춘 그 상태의 시각(since)과 풀리는 시각 */
+  const limits = useRef<Record<string, { since: number; at: number }>>({});
+  /** 한도인지 이미 읽어 본 상태(since). 같은 멈춤을 두 번 읽지 않는다 */
+  const limitRead = useRef<Record<string, number>>({});
+  const clock = (at: number) => new Date(at).toLocaleString(undefined, { month: "numeric", day: "numeric", hour: "numeric", minute: "2-digit" });
+  useEffect(() => {
+    const timer = setInterval(async () => {
+      if (!config.limitResume) return;
+      const { open, states } = live.current;
+      const now = Date.now();
+      for (const o of open) {
+        // Julgi를 다시 켠 뒤의 세션은 아직 훅이 한 번도 안 불려 상태가 없다(안 띄웠거나, 띄웠어도 지난 대화만 보여 주고 서 있다).
+        // 멈춘 채로 본다: 한도에 걸려 멈춘 채 Julgi를 다시 켰을 수 있다
+        const st = states[o.key] ?? { state: "stuck", since: 0 };
+        if (!o.sessionId) continue;
+        const held = limits.current[o.key];
+        // 그사이 누가 말을 했거나 세션이 다시 움직였으면 이어 갈 것이 없다
+        if (held && held.since !== st.since) delete limits.current[o.key];
+        else if (held) {
+          if (now < held.at + 60_000) continue;
+          delete limits.current[o.key];
+          if (now - held.at > 24 * 3600_000) continue;
+          deliver(o.key, tr("한도가 풀렸다. 멈춘 곳부터 이어서 해 줘."));
+          record("이어 감", tr`"${nameOf(o.key).slice(0, 40)}": 한도가 풀려서 이어 가게 했다`, o.sessionId); // i18n-ok
+          continue;
+        }
+        if ((st.state !== "stuck" && st.state !== "wait") || limitRead.current[o.key] === st.since) continue;
+        limitRead.current[o.key] = st.since;
+        const reply = await invoke<string | null>("last_reply", { sessionId: o.sessionId }).catch(() => null);
+        const at = reply ? resetAt(reply, new Date()) : 0;
+        if (!at || now - at > 24 * 3600_000) continue;
+        limits.current[o.key] = { since: st.since, at };
+        record("이어 감", tr`"${nameOf(o.key).slice(0, 40)}"이 한도에 걸려 멈췄다. ${clock(at)}에 이어 가게 한다`, o.sessionId); // i18n-ok
+      }
+    }, 20_000);
+    return () => clearInterval(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   /** 세션이 julgi 명령으로 남긴 부탁을 처리한다 */
   const serve = (requests: string[]) => {
     for (const request of requests) {
@@ -1407,14 +1461,7 @@ export default function App() {
         // 폰에서 내 차례인 세션에 답했다
         const o = open.find((x) => x.key === target);
         if (o) {
-          // Julgi를 다시 켠 뒤 아직 한 번도 안 띄운 세션은 터미널이 없다. 그대로 보내면 글이 사라지니, 글을 들려서 세션을 띄운다
-          if (terms.opened(target) || !o.sessionId) terms.submitWhenClear(target, body);
-          else
-            void invoke<string>("data_write", { name: `outbox/${crypto.randomUUID()}.md`, text: body }).then((file) => {
-              terms.dispose(target);
-              terms.create({ key: target, cwd: o.cwd, command: withPrompt(resumeCommand(o.sessionId!), file) });
-              terms.wake(target);
-            });
+          deliver(target, body);
           record("답함", tr`폰에서 "${nameOf(target)}"에 답함: ${body.slice(0, 80)}`, open.find((o) => o.key === target)?.sessionId); // i18n-ok
         }
       } else if (cmd === "event" && sessionId === "ext" && target.trim()) {
@@ -1601,7 +1648,7 @@ export default function App() {
       .map((o) => {
         const st = states[o.key];
         const ch = changesRef.current[o.cwd];
-        return { key: o.key, id: o.sessionId, pty: terms.idOf(o.key), now: st?.state === "run" || st?.state === "hold" ? terms.nowOf(o.key) : "", name: nameOf(o.key), repo: repoOf(o.cwd), state: st?.state ?? "", label: STATE_LABEL[st?.state ?? ""] ?? tr("열려 있음"), since: st?.since ?? 0, why: (o.sessionId && triaged.current[o.sessionId]?.since === st?.since && triaged.current[o.sessionId]?.why) || "", changed: ch && ch.by === o.sessionId && ch.files ? tr`파일 ${ch.files} +${ch.adds} −${ch.dels}` : "" };
+        return { key: o.key, id: o.sessionId, pty: terms.idOf(o.key), now: st?.state === "run" || st?.state === "hold" ? terms.nowOf(o.key) : "", name: nameOf(o.key), repo: repoOf(o.cwd), state: st?.state ?? "", label: STATE_LABEL[st?.state ?? ""] ?? tr("열려 있음"), since: st?.since ?? 0, why: (limits.current[o.key] && tr`한도에 걸림 · ${clock(limits.current[o.key].at)}에 이어 감`) || (o.sessionId && triaged.current[o.sessionId]?.since === st?.since && triaged.current[o.sessionId]?.why) || "", changed: ch && ch.by === o.sessionId && ch.files ? tr`파일 ${ch.files} +${ch.adds} −${ch.dels}` : "" };
       })
       .sort((a, b) => a.since - b.since);
     const places = [...(base ? [{ repo: tr`기본 폴더 · ${repoOf(base)}`, cwd: base }] : []), ...folders.slice(0, 40).map((f) => ({ repo: f.repo, cwd: f.cwd }))];

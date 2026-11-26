@@ -66,6 +66,7 @@ Change them in `⌘,`; they apply at once and are saved to `~/.julgi/config.json
 | `memoryLimitGb` | 8 | Sleep idle sessions when total memory passes this. 0 disables |
 | `skipPermissions` | `off` | Launch without permission prompts. `mine` (sessions I opened), `all` |
 | `triage` | on | Read each finished reply and bring the session to My turn only when there is something to decide or answer |
+| `limitResume` | on | When a session stops on a usage limit, remember the reset time in the reply and, if nobody has spoken to it by then, send "continue where you left off" |
 | `longRunMin` | 30 | Notify once when one request has been running this many minutes. 0 disables |
 | `claudeFullscreen` | off | Let Claude Code use its fullscreen renderer. Off keeps the conversation in the terminal scrollback, which find (`⌘F`), `⌘`-click on paths and `⌘↑`/`⌘↓` rely on. Applies to sessions opened afterwards |
 | `autoResume` | on | When a large, long-idle session is reopened, answer Claude Code's "Resume this conversation?" with resume |
