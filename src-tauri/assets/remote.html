@@ -594,7 +594,7 @@ function send(text) {
   if (!text || !picked || $("answer").dataset.busy) return;
   $("answer").dataset.busy = "1"; $("answer-send").disabled = true;
   const key = picked;
-  api("/api/answer", { target: key, text }).then(() => { store.set("draft:" + key, ""); $("answer-text").value = ""; toast(T("보냈다")); history.back(); pull(); }, () => { toast(T("보내지 못했다")); $("answer-send").disabled = !$("answer-text").value.trim(); }).finally(() => delete $("answer").dataset.busy);
+  api("/api/answer", { target: key, text }).then(() => { store.set("draft:" + key, ""); $("answer-text").value = ""; toast(T("보냈다")); grow($("answer-text")); shownFor = ""; pull(); }, () => { toast(T("보내지 못했다")); $("answer-send").disabled = !$("answer-text").value.trim(); }).finally(() => delete $("answer").dataset.busy);
 }
 $("answer-text").addEventListener("input", (e) => { grow(e.target); $("answer-send").disabled = !e.target.value.trim(); });
 $("answer").addEventListener("submit", (e) => { e.preventDefault(); send($("answer-text").value.trim()); });
