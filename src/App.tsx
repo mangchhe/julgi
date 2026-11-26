@@ -2598,7 +2598,8 @@ export default function App() {
   /** 작업 페이지의 묶음: 세션 PR(열린 세션과 최근 잠든 세션), 내 PR, 리뷰 요청 */
   const workGroups = (): WorkGroup[] => {
     const { open, sessions, names } = live.current;
-    const status = (t: PrTarget) => prs[`${t.repo}#${t.number}`];
+    // 머지·닫힌 잠든 PR은 다시 묻지 않아 prs에서 빠진다. 마지막으로 본 상태로 보여 준다
+    const status = (t: PrTarget) => prs[`${t.repo}#${t.number}`] ?? prSeen.current[`${t.repo}#${t.number}`];
     const seen = new Set<string>();
     const sessionRows: WorkRow[] = [];
     const cutoff = Date.now() / 1000 - config.recentDays * 86400;
