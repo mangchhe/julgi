@@ -3,7 +3,8 @@ type Faced = { id: string; art?: string; image?: string };
 
 /** 앱에 들어 있는 얼굴 그림들. assets/art 의 bot-*.png 가 전부 선택지가 된다: 파일을 더 넣으면 고를 것이 는다 */
 const FILES = import.meta.glob<string>("./assets/art/bot-*.png", { eager: true, query: "?url", import: "default" });
-const FIRST = ["go", "check", "calm", "sleepy"];
+// 생김새가 저마다 다른 그림을 앞에 둔다. 새 봇은 이 차례로 아직 안 쓰인 얼굴을 받는다
+const FIRST = ["scout", "review", "builder", "courier", "tester", "night", "sage", "spark", "go", "check", "calm", "sleepy"];
 export const ARTS: Record<string, string> = Object.fromEntries(
   Object.entries(FILES)
     .map(([path, url]) => [path.replace(/^.*bot-|\.png$/g, ""), url] as [string, string])
@@ -15,7 +16,7 @@ const NAMES = Object.keys(ARTS);
 /** 그림을 정해 두지 않은 봇은 id에서 하나를 고른다. 같은 봇은 늘 같은 얼굴이다 */
 const artOf = (b: Faced) => (b.art && ARTS[b.art] ? b.art : (OWN[b.id] ?? NAMES[[...b.id].reduce((h, c) => (h * 31 + c.charCodeAt(0)) >>> 0, 7) % NAMES.length]));
 /** 들어 있는 그림마다의 빛깔. 얼굴 뒤 타일과 상태 테두리에 쓴다 */
-const TINTS: Record<string, string> = { calm: "#ff9f43", check: "#2f8cff", go: "#19e37a", pink: "#ff4f8b", sleepy: "#a970ff", teal: "#6fe9e6" };
+const TINTS: Record<string, string> = { calm: "#ff9f43", check: "#2f8cff", go: "#19e37a", pink: "#ff4f8b", sleepy: "#a970ff", teal: "#6fe9e6", scout: "#ffb400", review: "#5a66ff", builder: "#ff4a1c", night: "#a970ff", courier: "#19e38a", tester: "#19e6ff", sage: "#ff4f8b", spark: "#9cff00" };
 /** 봇의 빛깔. 내 그림을 쓰는 봇은 앱의 강조색을 따른다 */
 export const tintOf = (b: Faced) => (b.image ? "var(--accent)" : (TINTS[artOf(b)] ?? "var(--accent)"));
 /** 봇의 얼굴: 내가 고른 그림, 없으면 들어 있는 그림 */
