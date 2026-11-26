@@ -28,6 +28,8 @@ type Entry = {
   fit: FitAddon;
   /** 폰이 이 터미널을 보는 동안: 폰이 나가면 돌아갈 맥에서의 크기. 그동안은 칸 크기를 따르지 않는다 */
   held?: { cols: number; rows: number };
+  /** 마우스가 올라가 있는 링크를 여는 법. 프로그램이 마우스를 가져가면(Claude Code) xterm이 링크 클릭을 못 받아서 직접 연다 */
+  over?: (e: MouseEvent) => void;
   search: SearchAddon;
   el: HTMLDivElement;
   opened: boolean;
@@ -118,8 +120,13 @@ export function create(spec: TermSpec) {
     allowTransparency: glass,
     theme: themed(),
     // Claude Code는 PR·파일 경로를 터미널 하이퍼링크(OSC 8)로 보낸다. 기본 처리는 file://을 버리고 http도 웹뷰에서 못 연다
-    linkHandler: { activate: openLink, allowNonHttpProtocols: true, hover: (_e, _text, range) => light(range), leave: () => unlight() },
+    linkHandler: { activate: openLink, allowNonHttpProtocols: true, hover: (_e, text, range) => (light(range), at((e) => openLink(e, text))), leave: () => off() },
   });
+  const at = (open?: (e: MouseEvent) => void) => {
+    const entry = pool.get(spec.key);
+    if (entry) entry.over = open;
+  };
+  const off = () => (unlight(), at(undefined));
   // 링크 위에 마우스를 올리면 그 글자를 테마의 강조색으로 칠한다. 기본은 글자색 그대로 밑줄만 그어져서 흰 줄로 보인다
   const lit: { dispose(): void }[] = [];
   const unlight = () => lit.splice(0).forEach((d) => d.dispose());
@@ -141,7 +148,7 @@ export function create(spec: TermSpec) {
   term.loadAddon(new Unicode11Addon());
   term.unicode.activeVersion = "11";
   // 링크는 ⌘를 누른 채 눌러야 열린다. 그냥 누르면 글자 선택과 헷갈린다.
-  term.loadAddon(new WebLinksAddon(openLink, { hover: (_e, _text, location) => light(location, true), leave: () => unlight() }));
+  term.loadAddon(new WebLinksAddon(openLink, { hover: (_e, text, location) => (light(location, true), at((e) => openLink(e, text))), leave: () => off() }));
   // 파일 경로는 Claude Code가 링크로 보내지 않는다. 화면에서 찾아 ⌘를 누른 채 누르면 세션 폴더 기준으로 연다
   term.registerLinkProvider({
     provideLinks(y, callback) {
@@ -158,16 +165,14 @@ export function create(spec: TermSpec) {
         text += chars;
       }
       // 티켓 키(아는 프로젝트 키만): ⌘ 클릭하면 티켓 화면
-      const glow = (range: { start: { x: number; y: number }; end: { x: number; y: number } }) => ({ range, hover: () => light(range), leave: () => unlight() });
+      const glow = (range: { start: { x: number; y: number }; end: { x: number; y: number } }, activate: (e: MouseEvent) => void) => ({ range, activate, hover: () => (light(range), at(activate)), leave: () => off() });
       const tickets = findKeys(text).map(({ start, end, key }) => ({
-        ...glow({ start: { x: col[start] + 1, y }, end: { x: col[end - 1] + 1, y } }),
+        ...glow({ start: { x: col[start] + 1, y }, end: { x: col[end - 1] + 1, y } }, (e: MouseEvent) => void (e.metaKey && openTicket(key))),
         text: key,
-        activate: (e: MouseEvent) => e.metaKey && openTicket(key),
       }));
       const links = findPaths(text.trimEnd()).map(({ start, end, path, line }) => ({
-        ...glow({ start: { x: col[start] + 1, y }, end: { x: col[end - 1] + 1, y } }),
         text: path,
-        activate: (e: MouseEvent) => {
+        ...glow({ start: { x: col[start] + 1, y }, end: { x: col[end - 1] + 1, y } }, (e: MouseEvent) => {
           if (!e.metaKey) return;
           // 파일이면 기본 앱으로, 폴더면 Finder로 열린다
           // 세션 폴더 기준으로 없으면 위 폴더들에서 찾는다(옆 워크트리의 파일). 끝내 없으면 없다고 알린다
@@ -179,7 +184,7 @@ export function create(spec: TermSpec) {
               openFile({ path: found, line });
             })
             .catch(() => handlers.onMiss(path));
-        },
+        }),
       }));
       const all = [...tickets, ...links];
       callback(all.length ? all : undefined);
@@ -586,6 +591,18 @@ function open(entry: Entry) {
   let keySent = { data: "", at: 0 };
   let lastKeyCode = 0;
   const MODIFIERS = new Set([16, 17, 18, 20, 91, 93]);
+  // Claude Code가 마우스 모드를 켜면 클릭이 프로그램으로 가서 xterm의 링크가 열리지 않는다.
+  // ⌘를 누른 채 링크를 누르면 xterm보다 먼저 받아서 직접 연다(프로그램에는 보내지 않는다)
+  el.addEventListener(
+    "mousedown",
+    (e) => {
+      if (!e.metaKey || !entry.over || entry.term.modes.mouseTrackingMode === "none") return;
+      e.preventDefault();
+      e.stopPropagation();
+      entry.over(e);
+    },
+    true,
+  );
   el.addEventListener(
     "keydown",
     (e) => {
