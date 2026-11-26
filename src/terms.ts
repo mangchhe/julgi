@@ -422,6 +422,15 @@ export function free(id: number) {
   if (entry.term.element?.isConnected) refit(entry);
 }
 
+/** 맥에서 Julgi를 다시 만졌다. 폰 폭에 붙든 터미널을 모두 풀고, 프로그램이 아는 크기를 지금 화면 크기에 다시 맞춘다.
+ *  폰이 나갔다는 알림(pty-freed)을 놓쳐도 여기서 되돌아온다. 크기가 같으면 커널이 아무것도 보내지 않아 다시 그리지 않는다 */
+export function reclaim() {
+  for (const entry of pool.values()) {
+    if (entry.held) free(entry.id);
+    else if (entry.opened) void invoke("pty_resize", { id: entry.id, cols: entry.term.cols, rows: entry.term.rows });
+  }
+}
+
 /** 지금 터미널 색. 폰에서 터미널을 같은 색으로 그리는 데 쓴다 */
 export const colors = () => theme;
 

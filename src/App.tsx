@@ -1637,7 +1637,8 @@ export default function App() {
     const back = () => {
       if (!config.remote || Date.now() - at < 2000) return;
       at = Date.now();
-      void invoke("remote_reclaim");
+      // 폰을 먼저 끊어야 크기를 되돌릴 수 있다(폰이 보는 동안 pty_resize는 적어만 둔다)
+      void invoke("remote_reclaim").then(terms.reclaim);
     };
     // 마우스만 움직여도 맥 앞에 있는 것이다
     const kinds = ["focus", "pointerdown", "keydown", "mousemove"];
