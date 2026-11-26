@@ -39,7 +39,7 @@ import { TicketWork, firstKey, JiraConn, keyOfUrl, setKnownKeys, Ticket, TicketF
 import { prNo, isLab, newsOf, openPr, prOf, PrStatus, PrTarget, prUrl, repoName, ReviewAsk } from "./pr";
 import * as terms from "./terms";
 import { rank } from "./route";
-import { Brief, Change, Job, Progress, MAX_PARALLEL, turnStart, setMapDirs, setPrefs, markAuto, isAuto, autoList, STATE_LABEL, replied, ago, Item, modelFor, SkillInfo, SkillUse, aboutOf, buildFolders, buildItems, aliveElsewhere, config, elsewhere, enrich, markSlept, setAlive, handoffCommand, Ledger, Merge, mergeCandidates, mergeKey, newCommand, Open, repoOf, resumeCommand, Session, TermState, Thread, waiting, withPrompt } from "./model";
+import { commonModel, Brief, Change, Job, Progress, MAX_PARALLEL, turnStart, setMapDirs, setPrefs, markAuto, isAuto, autoList, STATE_LABEL, replied, ago, Item, modelFor, SkillInfo, SkillUse, aboutOf, buildFolders, buildItems, aliveElsewhere, config, elsewhere, enrich, markSlept, setAlive, handoffCommand, Ledger, Merge, mergeCandidates, mergeKey, newCommand, Open, repoOf, resumeCommand, Session, TermState, Thread, waiting, withPrompt } from "./model";
 import { selftest } from "./selftest";
 import { tr } from "./i18n";
 import { Block, codeBlocks } from "./codeblocks";
@@ -94,7 +94,7 @@ const configLoaded = (() => {
 type Layout = { open: Open[]; panes: (string | null)[]; widths?: number[]; pinned?: string[]; focus: number; fontSize: number; sidebar: boolean };
 
 /** 세션 목록이 달라졌는지 가리는 표시: 세션마다 바뀌면 달라지는 값들과 일감 목록 */
-const ledgerSig = (l: Ledger) => l.sessions.map((x) => `${x.id}:${x.mtime}:${x.size}:${x.tokens}:${x.title}:${x.branch}`).join("|") + "#" + JSON.stringify(l.works);
+const ledgerSig = (l: Ledger) => l.sessions.map((x) => `${x.id}:${x.mtime}:${x.size}:${x.tokens}:${x.model}:${x.title}:${x.branch}`).join("|") + "#" + JSON.stringify(l.works);
 
 export default function App() {
   const [ledger, setLedger] = useState<Ledger | null>(null);
@@ -3558,6 +3558,7 @@ export default function App() {
             <div key={i} className={"pane-slot" + (zoom && focus !== i ? " hide" : "")} ref={(el) => void (paneEls.current[i] = el)}>
               {i > 0 && !zoom && <div className="grip" onMouseDown={(e) => drag(i, e)} onDoubleClick={() => setWidths(widths.map(() => 1))} />}
               <Pane
+                common={commonModel(open.map((x) => (x.sessionId ? byId.get(x.sessionId)?.model : undefined)))}
                 termKey={key}
                 focused={focus === i}
                 active={!overlay && !(finding && focus === i)}

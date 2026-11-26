@@ -5,7 +5,7 @@ import BotFace, { faceOf, tintOf } from "./BotFace";
 import type { Bot } from "./bots.ts";
 import { Rule } from "./triageAsk.ts";
 import { tr } from "./i18n";
-import { Change, Job, ago, config, elsewhere, hot, Item, kilo, Open, Session, STATE_LABEL, TermState, Thread, waiting } from "./model";
+import { commonModel, modelName, Change, Job, ago, config, elsewhere, hot, Item, kilo, Open, Session, STATE_LABEL, TermState, Thread, waiting } from "./model";
 
 /** 이름을 붙였거나 세션이 이어진 줄기는 폴더와 상관없이 이 묶음으로 맨 위에 모은다 */
 const THREADS = "줄기"; // 묶음의 열쇠다. 보여 줄 때만 옮긴다 i18n-ok
@@ -105,6 +105,7 @@ export default function Sidebar({ open, items, threads, byId, states, tasks, cha
     });
   });
 
+  const common = commonModel(open.map((o) => (o.sessionId ? byId.get(o.sessionId)?.model : undefined)));
   return (
     <aside className="side">
       <div className="side-head">
@@ -257,6 +258,7 @@ export default function Sidebar({ open, items, threads, byId, states, tasks, cha
                       {(changes[o.cwd].brief?.found?.length ?? 0) > 0 && <em> !{changes[o.cwd].brief!.found!.length}</em>}
                     </span>
                   )}
+                  {s?.model && common && s.model !== common && <span className="odd-model" title={s.model}> · {modelName(s.model)}</span>}
                   {s && hot(s.tokens) && <span className="hot" title={tr`세션이 크다. 다음에 보낼 때 갈아탄다`}> · {kilo(s.tokens)}</span>}
                 </div>
               </div>

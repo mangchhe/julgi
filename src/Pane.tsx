@@ -3,10 +3,12 @@ import helloArt from "./assets/art/hello.png";
 import Info, { Member, ThreadOps } from "./Info";
 import Review from "./CodeReview";
 import { tr } from "./i18n";
-import { Change, hot, kilo, repoOf, Session, STATE_LABEL, Thread } from "./model";
+import { Change, hot, kilo, modelName, repoOf, Session, STATE_LABEL, Thread } from "./model";
 import * as terms from "./terms";
 
 type Props = {
+  /** 열린 세션이 가장 많이 쓰는 모델. 이 칸만 다르면 모델을 눈에 띄게 한다 */
+  common?: string;
   /** 이 세션의 티켓이 끝났으면 그 사실("티켓 끝남 · 거부"). 누르면 세션을 끝낸다 */
   ticketEnded?: string;
   termKey: string | null;
@@ -47,7 +49,7 @@ type Props = {
   onFocus: () => void;
 };
 
-export default function Pane({ termKey, focused, active, label, cwd, session, thread, memory, state, members, thread_ops, info, onInfoClose, finding, handing, handed, stemDone, ticketNote, deployLine, pinned, change, review, ticketEnded, onPin, onFindClose, onFocus }: Props) {
+export default function Pane({ common, termKey, focused, active, label, cwd, session, thread, memory, state, members, thread_ops, info, onInfoClose, finding, handing, handed, stemDone, ticketNote, deployLine, pinned, change, review, ticketEnded, onPin, onFindClose, onFocus }: Props) {
   const body = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -117,6 +119,11 @@ export default function Pane({ termKey, focused, active, label, cwd, session, th
                 </span>
               )}
               {!handing && STATE_LABEL[state] && <span className={state}>{STATE_LABEL[state]}</span>}
+              {session?.model && (
+                <span className={"tok model" + (common && session.model !== common ? " odd" : "")} title={session.model}>
+                  {modelName(session.model)}
+                </span>
+              )}
               {tokens > 0 && <span className={"tok" + (hot(tokens) ? " hot" : "")}>{kilo(tokens)}</span>}
             </span>
           </>

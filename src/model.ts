@@ -7,6 +7,8 @@ export type SessionInfo = {
   title: string;
   recap: string;
   tokens: number;
+  /** 마지막 답을 쓴 모델 id. 옛 기록에는 없다 */
+  model?: string;
   links: string[];
   /** 세션이 새로 만든 파일의 경로. 최근 것이 뒤에 온다 */
   files?: string[];
@@ -197,6 +199,17 @@ export function ago(seconds: number): string {
   return tr`${Math.round(diff / 86400)}일 전`;
 }
 
+/** claude-opus-5-5 → Opus 5.5, claude-haiku-4-5-20251001 → Haiku 4.5. 모르는 꼴이면 그대로 */
+export function modelName(id = ""): string {
+  const m = /^claude-([a-z]+)-(\d+)(?:-(\d{1,2}))?(?!\d)/.exec(id);
+  return m ? `${m[1][0].toUpperCase()}${m[1].slice(1)} ${m[2]}${m[3] ? "." + m[3] : ""}` : id;
+}
+/** 열린 세션이 가장 많이 쓰는 모델. 이것과 다른 세션만 눈에 띄게 한다 */
+export function commonModel(models: (string | undefined)[]): string {
+  const count = new Map<string, number>();
+  for (const m of models) if (m) count.set(m, (count.get(m) ?? 0) + 1);
+  return [...count].sort((a, b) => b[1] - a[1])[0]?.[0] ?? "";
+}
 export const kilo = (tokens: number) => (tokens ? `${Math.round(tokens / 1000)}k` : "");
 
 // stuck: 일한다면서 화면이 멈춰 있다(내가 Esc로 끊었거나 걸렸다). 내가 봐야 하므로 기다리는 것으로 친다.

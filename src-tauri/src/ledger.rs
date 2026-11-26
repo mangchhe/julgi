@@ -29,6 +29,9 @@ pub struct SessionInfo {
     pub recap: String,
     /// 마지막 턴에 실린 컨텍스트 크기(토큰)
     pub tokens: u64,
+    /// 마지막 답을 쓴 모델 id (claude-opus-5-5 같은). /model로 바꾸면 다음 답부터 바뀐다
+    #[serde(default)]
+    pub model: String,
     /// 대화에 나온 산출물 링크 (아티팩트, PR·MR, 티켓). 최근 것이 뒤에 온다
     #[serde(default)]
     pub links: Vec<String>,
@@ -282,6 +285,10 @@ fn scan_file(path: &Path, mtime: u64, size: u64) -> Option<SessionInfo> {
                     .sum();
                 if sum > 0 {
                     info.tokens = sum;
+                }
+                // 오류 안내 같은 Claude Code가 지어낸 답은 "<synthetic>"이다
+                if let Some(m) = v["message"]["model"].as_str().filter(|m| m.starts_with("claude")) {
+                    info.model = m.to_owned();
                 }
             }
             _ => {}
