@@ -14,6 +14,10 @@ const OWN: Record<string, string> = { go: "go", verify: "check" };
 const NAMES = Object.keys(ARTS);
 /** 그림을 정해 두지 않은 봇은 id에서 하나를 고른다. 같은 봇은 늘 같은 얼굴이다 */
 const artOf = (b: Faced) => (b.art && ARTS[b.art] ? b.art : (OWN[b.id] ?? NAMES[[...b.id].reduce((h, c) => (h * 31 + c.charCodeAt(0)) >>> 0, 7) % NAMES.length]));
+/** 들어 있는 그림마다의 빛깔. 얼굴 뒤 타일과 상태 테두리에 쓴다 */
+const TINTS: Record<string, string> = { calm: "#ff9f43", check: "#2f8cff", go: "#19e37a", pink: "#ff4f8b", sleepy: "#a970ff", teal: "#6fe9e6" };
+/** 봇의 빛깔. 내 그림을 쓰는 봇은 앱의 강조색을 따른다 */
+export const tintOf = (b: Faced) => (b.image ? "var(--accent)" : (TINTS[artOf(b)] ?? "var(--accent)"));
 /** 봇의 얼굴: 내가 고른 그림, 없으면 들어 있는 그림 */
 export const faceOf = (b: Faced) => b.image ?? ARTS[artOf(b)];
 /** 새 봇에 줄 그림: 아직 아무도 안 쓰는 것부터 */

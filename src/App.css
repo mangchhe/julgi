@@ -1582,3 +1582,35 @@ body.dragging .pane-body { pointer-events: none; }
 /* 봇이 연 세션 앞에 붙는 그 봇의 얼굴 */
 .row-face { display: inline-block; flex: none; vertical-align: -3px; margin-right: 5px; line-height: 0; }
 .side .row-head .row-face { margin: 1px 0 0; }
+
+/* 봇 묶음: 봇마다 얼굴 타일, 이름, 상태 한 줄 */
+.side-bots { display: flex; flex-direction: column; gap: 2px; padding: 4px 8px 8px; margin-bottom: 2px; border-bottom: 1px solid var(--line); }
+/* 제목은 아래 묶음 제목(.grp)과 같은 글씨다. 단추가 들어가서 세로만 가운데로 맞춘다 */
+.side .side-bots .grp { align-items: center; padding: 8px 4px 3px 8px; }
+.side-bots-head button { display: inline-flex; padding: 3px; border: 0; border-radius: 6px; background: none; color: var(--muted); cursor: pointer; }
+.side-bots-head button:hover { color: var(--ink); background: var(--bg); }
+.side-bots-head svg { width: 13px; height: 13px; fill: none; stroke: currentColor; stroke-width: 1.5; stroke-linecap: round; }
+.bot-row { --tint: var(--accent); display: flex; align-items: center; gap: 10px; width: 100%; padding: 6px 8px; border: 1px solid transparent; border-radius: 10px; background: none; color: var(--ink); font: inherit; text-align: left; cursor: pointer; }
+.bot-row:hover { background: var(--bg); border-color: var(--line); }
+.bot-tile { position: relative; flex: none; display: grid; place-items: center; width: 38px; height: 38px; border-radius: 11px; background: color-mix(in srgb, var(--tint) 16%, transparent); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--tint) 30%, transparent); }
+.bot-dot { position: absolute; right: -2px; bottom: -2px; width: 10px; height: 10px; border-radius: 50%; box-sizing: border-box; border: 2px solid var(--side-bg, var(--surface)); background: color-mix(in srgb, var(--muted) 70%, transparent); }
+.bot-text { display: flex; flex-direction: column; min-width: 0; flex: 1; gap: 1px; }
+.bot-text b { font-size: 13px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.bot-text small { font-size: 12px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+/* 깨기를 기다림: 빛깔 점. 일하는 중: 타일 테두리가 숨 쉰다. 내가 필요함: 기다림 색. 꺼짐: 흐리게 */
+.bot-row.idle .bot-dot { background: var(--tint); }
+.bot-row.run .bot-dot { background: var(--accent); }
+.bot-row.run .bot-tile { animation: bot-work 1.6s ease-in-out infinite; }
+.bot-row.need .bot-dot { background: var(--wait); }
+.bot-row.need .bot-text small { color: var(--wait); }
+.bot-row.need .bot-tile { box-shadow: inset 0 0 0 1.5px color-mix(in srgb, var(--wait) 70%, transparent); }
+.bot-row.off .bot-tile { filter: grayscale(1); opacity: 0.55; }
+.bot-row.off .bot-text b { color: var(--muted); }
+@keyframes bot-work { 0%, 100% { box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--tint) 30%, transparent), 0 0 0 0 color-mix(in srgb, var(--tint) 35%, transparent); } 50% { box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--tint) 60%, transparent), 0 0 0 4px color-mix(in srgb, var(--tint) 0%, transparent); } }
+@media (prefers-reduced-motion: reduce) { .bot-row.run .bot-tile { animation: none; } }
+/* 대신 답하기: 아래 줄 오른쪽 끝의 작은 단추. 켜져 있으면 점 */
+.side-foot .side-rules { margin-left: auto; position: relative; padding: 5px 7px; }
+.side-foot .side-rules.on::after { content: ""; position: absolute; right: 3px; top: 3px; width: 6px; height: 6px; border-radius: 50%; background: var(--ok); }
+.side-foot .side-rules small { opacity: 1; color: var(--ok); font-weight: 700; }
+/* 설정의 봇 카드: 얼굴을 타일 위에 크게 */
+.set-bot .set-bot-face.tile { display: grid; place-items: center; width: 52px; height: 52px; border-radius: 14px; background: color-mix(in srgb, var(--tint, var(--accent)) 16%, transparent); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--tint, var(--accent)) 30%, transparent); }

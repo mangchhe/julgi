@@ -17,7 +17,7 @@ import { Rule, DEFAULT_RULES, TRIAGE_SYSTEM, triagePrompt, parseTriage } from ".
 import Pane from "./Pane";
 import Palette, { Pick } from "./Palette";
 import Send, { RouteNote, Target } from "./Send";
-import Settings from "./Settings";
+import Settings, { SOURCE_NAMES } from "./Settings";
 import { findings, measure, Review, Route } from "./review";
 import Threads from "./Threads";
 import { applyTheme, themeOf } from "./themes";
@@ -3446,7 +3446,17 @@ export default function App() {
           work={{ prs: minePrs.length, asks: asks.length, news: Object.keys(mineNews).length + Object.keys(prNews).length + Object.keys(sleepNews).length }}
           onWork={() => setOverlay("work")}
           turn={open.filter((o) => calls(o.key) || prNews[o.key]).length + asks.length + Object.keys(mineNews).length + Object.keys(sleepNews).length}
-          crew={crew}
+          crewRows={crew.map((bot) => {
+            // 이 봇이 열어 지금 열려 있는 세션들에서 상태를 읽는다
+            const mine = open.filter((o) => o.sessionId && bot.runs.some((r) => r.session === o.sessionId));
+            const why = (key: string) => bot.runs.find((r) => "c:" + r.session === key)?.why ?? "";
+            const need = mine.filter((o) => calls(o.key));
+            const run = mine.find((o) => states[o.key]?.state === "run");
+            if (need.length) return { bot, state: "need" as const, line: tr`내가 필요함 · ${why(need[0].key)}`, key: need[0].key, count: need.length };
+            if (run) return { bot, state: "run" as const, line: tr`일하는 중 · ${why(run.key)}`, key: run.key, count: 0 };
+            if (!bot.on) return { bot, state: "off" as const, line: tr("꺼져 있다"), count: 0 };
+            return { bot, state: "idle" as const, line: bot.wakes.map((w) => [SOURCE_NAMES[w.source] ?? w.source, w.when.trim()].filter(Boolean).join(" ")).join(" · ") || tr("깨우는 일이 없다"), count: 0 };
+          })}
           onCrew={() => (setSettingsAt("봇"), setOverlay("settings"))} // i18n-ok
           faceBy={faceBy}
           rules={rules}

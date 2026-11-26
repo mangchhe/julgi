@@ -1,8 +1,8 @@
 import { openPr, prParts, PrStatus, PrTarget } from "./pr";
 import { openTicket } from "./jira";
 import { useState } from "react";
-import BotFace, { faceOf } from "./BotFace";
-import { Bot, runsToday } from "./bots.ts";
+import BotFace, { faceOf, tintOf } from "./BotFace";
+import type { Bot } from "./bots.ts";
 import { Rule } from "./triageAsk.ts";
 import { tr } from "./i18n";
 import { Change, Job, ago, config, elsewhere, hot, Item, kilo, Open, Session, STATE_LABEL, TermState, Thread, waiting } from "./model";
@@ -53,7 +53,8 @@ type Props = {
   rules: Rule[];
   ruleRuns: number;
   /** 봇(역할과 기억을 가진 일꾼)과 그 설정을 여는 길 */
-  crew: Bot[];
+  /** 봇마다 지금 상태: need 내가 필요함, run 일하는 중, idle 깨기를 기다림, off 꺼짐. key는 눌렀을 때 갈 세션 */
+  crewRows: { bot: Bot; state: "need" | "run" | "idle" | "off"; line: string; key?: string; count: number }[];
   onCrew: () => void;
   /** 이 세션을 연 봇의 얼굴. 봇이 연 세션이 아니면 없다 */
   faceBy: (sessionId?: string) => string | undefined;
@@ -63,7 +64,7 @@ type Props = {
   onHistory: () => void;
 };
 
-export default function Sidebar({ open, items, threads, byId, states, tasks, changes, pinned, dead, loading, current, shown, onShow, onClose, onOpenSession, onSearch, prOf, prNews, sleepNews, ticketOf, work, onWork, scripts, turn, rules, ruleRuns, crew, onCrew, faceBy, onQueue, onRules, onSettings, onHistory }: Props) {
+export default function Sidebar({ open, items, threads, byId, states, tasks, changes, pinned, dead, loading, current, shown, onShow, onClose, onOpenSession, onSearch, prOf, prNews, sleepNews, ticketOf, work, onWork, scripts, turn, rules, ruleRuns, crewRows, onCrew, faceBy, onQueue, onRules, onSettings, onHistory }: Props) {
   const openIds = new Set(open.map((o) => o.sessionId));
   const cutoff = Date.now() / 1000 - config.recentDays * 86400;
   const [scriptsOpen, setScriptsOpen] = useState(false);
@@ -126,21 +127,29 @@ export default function Sidebar({ open, items, threads, byId, states, tasks, cha
           <span>{tr`작업`}</span>
           <small>{[work.prs ? `PR ${work.prs}` : "", work.asks ? tr`리뷰 ${work.asks}` : "", work.news ? tr`새 소식 ${work.news}` : ""].filter(Boolean).join(" · ") || "⌘U"}</small>
         </button>
-        <button type="button" className="side-work" onClick={onCrew} title={tr`봇: 역할과 기억을 가진 일꾼. 깨우는 일이 생기면 그 역할로 세션을 연다`}>
-          <span className="side-faces">
-            {(crew.some((b) => b.on) ? crew.filter((b) => b.on) : crew).slice(0, 3).map((b) => (
-              <BotFace key={b.id} image={faceOf(b)} size={18} />
-            ))}
-          </span>
-          <span>{tr`봇`}</span>
-          <small>{crew.some((b) => b.on) ? (crew.some((b) => runsToday(b)) ? tr`오늘 ${crew.reduce((n, b) => n + runsToday(b), 0)}번 깸` : tr`${crew.filter((b) => b.on).length}개 켜짐`) : crew.length ? tr`꺼져 있다` : tr`없음`}</small>
-        </button>
-        <button type="button" className="side-work" onClick={onRules} title={tr`대신 답하기: 정해 둔 상황이면 세션에 대신 답한다`}>
-          <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M2.5 4.5a2 2 0 0 1 2-2h7a2 2 0 0 1 2 2v4a2 2 0 0 1-2 2H8l-3 2.5V10.5h-.5a2 2 0 0 1-2-2z" /></svg>
-          <span>{tr`대신 답하기`}</span>
-          <small>{rules.some((b) => b.on) ? (ruleRuns ? tr`오늘 ${ruleRuns}번 답함` : tr`${rules.filter((b) => b.on).length}개 켜짐`) : tr`꺼져 있다`}</small>
-        </button>
       </nav>
+      {/* 봇 묶음: 봇마다 얼굴, 이름, 지금 상태 한 줄. 내가 필요하거나 일하는 중이면 그 세션으로, 아니면 설정의 봇으로 간다 */}
+      <div className="side-bots">
+        <div className="grp side-bots-head">
+          <span>{tr`봇`}</span>
+          <button type="button" onClick={onCrew} title={tr`봇을 만들고 고친다`}>
+            <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 3.5v9M3.5 8h9" /></svg>
+          </button>
+        </div>
+        {crewRows.map(({ bot, state, line, key, count }) => (
+          <button key={bot.id} type="button" className={"bot-row " + state} style={{ "--tint": tintOf(bot) } as React.CSSProperties} onClick={() => (key ? onShow(key) : onCrew())} title={line}>
+            <span className="bot-tile">
+              <BotFace image={faceOf(bot)} size={30} />
+              <i className="bot-dot" />
+            </span>
+            <span className="bot-text">
+              <b>{bot.name || tr`이름 없는 봇`}</b>
+              <small>{line}</small>
+            </span>
+            {count > 0 && <b className="side-count">{count}</b>}
+          </button>
+        ))}
+      </div>
       <div className="side-list">
         {open.length === 0 && (
           <>
@@ -326,6 +335,11 @@ export default function Sidebar({ open, items, threads, byId, states, tasks, cha
           <svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="5.5" /><path d="M8 5v3.2l2 1.3" /></svg>
           {tr`한 일`}
           <small>⌘Y</small>
+        </button>
+        {/* 대신 답하기는 세션 뒤에서 도는 규칙이라 목록이 아니라 여기에 둔다. 켜져 있으면 점이 붙는다 */}
+        <button type="button" className={"side-rules" + (rules.some((b) => b.on) ? " on" : "")} onClick={onRules} title={tr`대신 답하기: 정해 둔 상황이면 세션에 대신 답한다` + " · " + (rules.some((b) => b.on) ? (ruleRuns ? tr`오늘 ${ruleRuns}번 답함` : tr`${rules.filter((b) => b.on).length}개 켜짐`) : tr`꺼져 있다`)}>
+          <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M2.5 4.5a2 2 0 0 1 2-2h7a2 2 0 0 1 2 2v4a2 2 0 0 1-2 2H8l-3 2.5V10.5h-.5a2 2 0 0 1-2-2z" /></svg>
+          {ruleRuns > 0 && <small>{ruleRuns}</small>}
         </button>
       </div>
     </aside>

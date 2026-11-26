@@ -203,4 +203,7 @@ export default {
   "정한 시간 {0}": "Scheduled time {0}",
   "지금 깨움": "Woken by hand",
   "봇": "Bots",
+  "내가 필요함 · {0}": "Needs you · {0}",
+  "일하는 중 · {0}": "Working · {0}",
+  "깨우는 일이 없다": "Nothing wakes it",
 } as Record<string, string>;

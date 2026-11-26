@@ -12,7 +12,7 @@ import { Rule, DEFAULT_RULES } from "./triageAsk.ts";
 import { Bot, SOURCES, newBot, runsToday } from "./bots.ts";
 import { setupDiff, setupOf } from "./setup";
 import { BACKDROPS, presetOf } from "./backdrops";
-import BotFace, { ARTS, faceOf, freeFace, shrinkImage } from "./BotFace";
+import BotFace, { ARTS, faceOf, freeFace, shrinkImage, tintOf } from "./BotFace";
 
 type Key = keyof typeof config;
 type Props = {
@@ -306,7 +306,7 @@ const showKey = (combo: string) =>
 
 /** 설정 (⌘,). 바꾸는 즉시 적용되고 ~/.julgi/config.json에 남는다 */
 /** 깨우는 일의 종류를 화면에 부르는 이름 */
-const SOURCE_NAMES: Record<string, string> = { time: tr("정한 시간"), ticket: tr("티켓 소식"), review: tr("리뷰 요청"), event: tr("바깥 이벤트") };
+export const SOURCE_NAMES: Record<string, string> = { time: tr("정한 시간"), ticket: tr("티켓 소식"), review: tr("리뷰 요청"), event: tr("바깥 이벤트") };
 
 export default function Settings({ onChange, onClose, remoteUrl, onConnect, onConnectLab, argoLogin = [], onRun, startAt, rules, onRules, crew, onCrew, onWakeBot, runLabel, onOpenRun, bg, onBg }: Props) {
   const [at, setAt] = useState(() => Math.max(0, FIRST_OF[SECTIONS.findIndex((s) => s.id === startAt)] ?? 0));
@@ -628,8 +628,8 @@ export default function Settings({ onChange, onClose, remoteUrl, onConnect, onCo
                           return (
                             <div key={b.id} className={"set-bot" + (b.on ? " on" : "")}>
                               <div className="set-bot-head">
-                                <button type="button" tabIndex={-1} className="set-bot-face" title={tr("얼굴 고르기")} onClick={() => setFaceOf(facing === "crew:" + b.id ? "" : "crew:" + b.id)}>
-                                  <BotFace image={faceOf(b)} size={36} />
+                                <button type="button" tabIndex={-1} className="set-bot-face tile" style={{ "--tint": tintOf(b) } as React.CSSProperties} title={tr("얼굴 고르기")} onClick={() => setFaceOf(facing === "crew:" + b.id ? "" : "crew:" + b.id)}>
+                                  <BotFace image={faceOf(b)} size={40} />
                                 </button>
                                 <input tabIndex={-1} className="set-bot-name" value={b.name} placeholder={tr("이름")} spellCheck={false} onChange={(e) => put({ name: e.target.value })} />
                                 <span className="set-note set-bot-job">{tr`오늘 ${runsToday(b)}번 깸 · 하루 ${b.cap}번까지`}</span>
