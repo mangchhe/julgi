@@ -1405,8 +1405,16 @@ export default function App() {
         }
       } else if (cmd === "answer" && body && sessionId === "phone") {
         // 폰에서 내 차례인 세션에 답했다
-        if (open.some((o) => o.key === target)) {
-          terms.submitWhenClear(target, body);
+        const o = open.find((x) => x.key === target);
+        if (o) {
+          // Julgi를 다시 켠 뒤 아직 한 번도 안 띄운 세션은 터미널이 없다. 그대로 보내면 글이 사라지니, 글을 들려서 세션을 띄운다
+          if (terms.opened(target) || !o.sessionId) terms.submitWhenClear(target, body);
+          else
+            void invoke<string>("data_write", { name: `outbox/${crypto.randomUUID()}.md`, text: body }).then((file) => {
+              terms.dispose(target);
+              terms.create({ key: target, cwd: o.cwd, command: withPrompt(resumeCommand(o.sessionId!), file) });
+              terms.wake(target);
+            });
           record("답함", tr`폰에서 "${nameOf(target)}"에 답함: ${body.slice(0, 80)}`, open.find((o) => o.key === target)?.sessionId); // i18n-ok
         }
       } else if (cmd === "event" && sessionId === "ext" && target.trim()) {
