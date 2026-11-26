@@ -720,9 +720,6 @@ export default function Settings({ onChange, onClose, remoteUrl, onConnect, onCo
                           return (
                             <div key={b.id} className={"set-bot" + (b.on ? " on" : "")}>
                               <div className="set-bot-head">
-                                <button type="button" tabIndex={-1} className="set-bot-face" title={tr("얼굴 고르기")} onClick={() => setFaceOf(facing === b.id ? "" : b.id)}>
-                                  <BotFace image={faceOf(b)} size={36} />
-                                </button>
                                 <input tabIndex={-1} className="set-bot-name" value={b.name} placeholder={tr("이름")} spellCheck={false} onChange={(e) => put({ name: e.target.value })} />
                                 <input tabIndex={-1} className="set-bot-job" value={b.job} placeholder={tr("하는 일 한 줄")} spellCheck={false} onChange={(e) => put({ job: e.target.value })} />
                                 <select tabIndex={-1} className="set-bot-model" value={b.model ?? ""} title={tr("이 규칙의 상황을 가릴 모델")} onChange={(e) => put({ model: e.target.value || undefined })}>
@@ -749,24 +746,6 @@ export default function Settings({ onChange, onClose, remoteUrl, onConnect, onCo
                                   ×
                                 </button>
                               </div>
-                              {facing === b.id && (
-                                <div className="set-bot-faces">
-                                  {Object.entries(ARTS).map(([name, url]) => (
-                                    <button key={name} type="button" tabIndex={-1} className={!b.image && faceOf(b) === url ? "on" : ""} onClick={() => (put({ art: name, image: undefined }), setFaceOf(""))}>
-                                      <BotFace image={url} size={40} />
-                                    </button>
-                                  ))}
-                                  {b.image && (
-                                    <button type="button" tabIndex={-1} className="on">
-                                      <BotFace image={b.image} size={40} />
-                                    </button>
-                                  )}
-                                  <label className="set-bot-up" title={tr("내 그림을 얼굴로 쓴다")}>
-                                    {tr("내 그림…")}
-                                    <input type="file" accept="image/*" tabIndex={-1} hidden onChange={(e) => e.target.files?.[0] && void shrinkImage(e.target.files[0]).then((image) => (put({ image }), setFaceOf(""))).catch(() => {})} />
-                                  </label>
-                                </div>
-                              )}
                               <label>
                                 <span>{tr("이런 상황이면")}</span>
                                 <textarea tabIndex={-1} rows={3} value={b.when} placeholder={tr("예: 끝냈다고 보고했는데 커밋하지 않았다")} spellCheck={false} onChange={(e) => put({ when: e.target.value })} />
@@ -778,7 +757,7 @@ export default function Settings({ onChange, onClose, remoteUrl, onConnect, onCo
                             </div>
                           );
                         })}
-                        <button type="button" tabIndex={-1} className="set-toggle" onClick={() => onRules([...rules, { id: crypto.randomUUID().slice(0, 8), name: "", job: "", when: "", say: "", on: false, runs: 0, art: freeFace(rules) }])}>
+                        <button type="button" tabIndex={-1} className="set-toggle" onClick={() => onRules([...rules, { id: crypto.randomUUID().slice(0, 8), name: "", job: "", when: "", say: "", on: false, runs: 0 }])}>
                           {tr("+ 규칙 더하기")}
                         </button>
                       </div>

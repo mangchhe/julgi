@@ -125,10 +125,10 @@ If you use Argo CD, the apps that belong to your repos show sync and health, whe
 
 A rule is this: in this situation, send this message. When a session stops only to ask "shall I go on?", or reports work done without checking it, a rule can answer for you.
 
-Rules never answer a question that asks you to choose, or one about something hard to undo. Register your own in `⌘,` → Auto-reply; each has a name and a face.
+Rules never answer a question that asks you to choose, or one about something hard to undo. Register your own in `⌘,` → Auto-reply; each has a name.
 
 </td>
-<td><img src="docs/images/bots.png" alt="The Auto-reply tab in settings with two rules, each with a face, a name, the situation it watches for and the message it sends" /></td>
+<td><img src="docs/images/bots.png" alt="The Auto-reply tab in settings with two rules, each with a name, the situation it watches for and the message it sends" /></td>
 </tr>
 </table>
 

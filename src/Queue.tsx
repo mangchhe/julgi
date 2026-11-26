@@ -8,10 +8,11 @@ import { PrTarget, ReviewAsk, prNo, repoName } from "./pr";
 import { tr } from "./i18n";
 import { adfToMd, TicketFull, TicketNewsMeta } from "./jira";
 import { md } from "./md";
+import BotFace from "./BotFace";
 
 /** news: PR에 생긴 일(CI 실패, 새 코멘트 등). 있으면 답을 기다리는 게 아니라 PR 때문에 올라온 것이다 */
 /** pr: 이 세션이 올린 PR. ⌥Enter로 PR 화면을 연다. state가 sleep이면 잠든 세션이다(고르면 깨운다) */
-export type Waiting = { key: string; name: string; repo: string; state: string; since: number; sessionId?: string; news?: string; pr?: PrTarget; /** 한꺼번에 맡긴 버그의 진단이 끝난 세션이면 그 티켓 키 */ bug?: string };
+export type Waiting = { key: string; /** 봇이 연 세션이면 그 봇의 얼굴 */ face?: string; name: string; repo: string; state: string; since: number; sessionId?: string; news?: string; pr?: PrTarget; /** 한꺼번에 맡긴 버그의 진단이 끝난 세션이면 그 티켓 키 */ bug?: string };
 type Props = {
   /** 지금 일하는 중인 세션 수. 기다리는 것이 없을 때 보여 준다 */
   busy?: number;
@@ -176,7 +177,10 @@ export default function Queue({ rows, asks, mine, tickets, loadTicket, runs = []
           {list.length > 0 && <div className="qu-head">{tr`내 차례`} {list.length}</div>}
           {list.map((r, i) => (
             <button key={r.key} type="button" tabIndex={-1} className={"qu-row" + (r.key === row?.key ? " on" : "")} onClick={() => (setAt(i), setText(""))}>
-              <b>{r.name}</b>
+              <b>
+                {r.face && <span className="row-face"><BotFace image={r.face} size={15} /></span>}
+                {r.name}
+              </b>
               <small>
                 {r.repo} · {r.state === "sleep" ? tr`잠듦` + " · " : ""}
                 {r.news ? <em className="qu-news">PR{r.pr ? ` #${r.pr.number}` : ""} · {r.news}</em> : r.state === "ask" ? tr`확인이 필요함` : r.bug ? <em className="qu-news">{r.bug} · {tr`진단 끝남`}</em> : tr`답함`}

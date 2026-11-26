@@ -12,6 +12,7 @@ import Status from "./Status";
 import History, { Act } from "./History";
 import Morning from "./Morning";
 import { Bot, BotEvent, botPrompt, ran, readBots, settle, timeDue, wakes } from "./bots.ts";
+import { faceOf } from "./BotFace";
 import { Rule, DEFAULT_RULES, TRIAGE_SYSTEM, triagePrompt, parseTriage } from "./triageAsk.ts";
 import Pane from "./Pane";
 import Palette, { Pick } from "./Palette";
@@ -2624,6 +2625,11 @@ export default function App() {
     void invoke("data_write", { name: "names.json", text: JSON.stringify(named) });
     record("봇", tr`"${who}"이 깸: ${e.title.slice(0, 70)}`, session); // i18n-ok
   };
+  /** 이 세션을 연 봇의 얼굴. 목록에서 누가 연 세션인지 알아보게 한다 */
+  const faceBy = (sessionId?: string) => {
+    const bot = sessionId ? crew.find((b) => b.runs.some((r) => r.session === sessionId)) : undefined;
+    return bot && faceOf(bot);
+  };
   /** 깨울 일이 생겼다. 이 일을 기다리는 봇을 모두 깨운다 */
   const raise = (e: BotEvent) => {
     for (const bot of crewRef.current) if (wakes(bot, e)) void wakeBot(bot, e);
@@ -3440,6 +3446,9 @@ export default function App() {
           work={{ prs: minePrs.length, asks: asks.length, news: Object.keys(mineNews).length + Object.keys(prNews).length + Object.keys(sleepNews).length }}
           onWork={() => setOverlay("work")}
           turn={open.filter((o) => calls(o.key) || prNews[o.key]).length + asks.length + Object.keys(mineNews).length + Object.keys(sleepNews).length}
+          crew={crew}
+          onCrew={() => (setSettingsAt("봇"), setOverlay("settings"))} // i18n-ok
+          faceBy={faceBy}
           rules={rules}
           ruleRuns={acts.filter((a) => a.kind === "대신 답함" && new Date(a.at).toDateString() === new Date().toDateString()).length} // i18n-ok
           onQueue={() => setOverlay("queue")}
@@ -3587,12 +3596,12 @@ export default function App() {
           rows={open
             .filter((o) => calls(o.key) || (prNews[o.key] && states[o.key]?.state !== "run"))
             .sort((a, b) => (states[a.key]?.since ?? Infinity) - (states[b.key]?.since ?? Infinity))
-            .map((o) => ({ key: o.key, name: nameOf(o.key), repo: repoOf(o.cwd), state: states[o.key]?.state ?? "", since: states[o.key]?.since ?? 0, sessionId: o.sessionId, news: prNews[o.key], pr: prOfSession(o.sessionId) ?? undefined, bug: bugJobs.find((j) => j.sessionId === o.sessionId && j.state === "decide")?.key }))
+            .map((o) => ({ key: o.key, face: faceBy(o.sessionId), name: nameOf(o.key), repo: repoOf(o.cwd), state: states[o.key]?.state ?? "", since: states[o.key]?.since ?? 0, sessionId: o.sessionId, news: prNews[o.key], pr: prOfSession(o.sessionId) ?? undefined, bug: bugJobs.find((j) => j.sessionId === o.sessionId && j.state === "decide")?.key }))
             // 잠든 세션도 PR에 일이 생겼으면 내 차례다. 고르면 깨운다
             .concat(
               Object.entries(sleepNews).map(([id, { news, pr }]) => {
                 const s = byId.get(id);
-                return { key: "c:" + id, name: names[id] || s?.title || tr("세션"), repo: s?.repo ?? "", state: "sleep", since: 0, sessionId: id, news, pr, bug: undefined };
+                return { key: "c:" + id, face: faceBy(id), name: names[id] || s?.title || tr("세션"), repo: s?.repo ?? "", state: "sleep", since: 0, sessionId: id, news, pr, bug: undefined };
               }),
             )}
           asks={asks}

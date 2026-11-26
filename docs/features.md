@@ -45,16 +45,17 @@ A bot is **a role, the things that wake it, and a memory**. When one of those th
 - **Memory.** Each bot has `~/.julgi/bots/<id>/MEMORY.md`. It is read on waking and rewritten at the end with only what the next run needs.
 - **When it has a question** it shows up in My turn (`⌘J`) like any session. Auto-reply rules apply to it too.
 - **No leaks.** Each bot has a daily limit and never wakes twice for the same thing. Each wake is listed in `⌘Y`, and `⌘,` → Bots shows recent runs and their sessions.
+- **Faces.** Each bot has a face (a built-in picture or your own), shown in front of the sessions it opened and on the Bots row at the bottom of the list.
 - Text carried by an event is read as data only, and hard-to-undo actions happen only when the role says so.
 
 ## Auto-reply
 
 A rule is this: **in this situation, send this message.** When a session finishes a reply and the reply clearly matches the situation of a rule that is on, Julgi sends the rule's message to the session for you.
 
-<img src="images/bots.png" alt="The Auto-reply tab in settings: two rules, each with a face, a name, what it does, the situation it watches for and the message it sends" width="760" />
+<img src="images/bots.png" alt="The Auto-reply tab in settings: two rules, each with a name, what it does, the situation it watches for and the message it sends" width="760" />
 
 - Two rules come registered and switched off: one answers "shall I go on?", one asks a session to verify work it reported as done. Add your own in `⌘,` → Auto-reply.
-- Each rule has a name, a face (drawn by Julgi, or a picture you choose), and a count of how often it answered.
+- Each rule has a name and a count of how often it answered. Faces belong to bots.
 - No rule answers a question that asks you to choose between options, waits for information from you, follows a failure, or is about something hard to undo (push, merge, deploy, delete).
 - At most three rule messages in a row go to one session. Each one is listed in `⌘Y`.
 

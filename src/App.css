@@ -1578,3 +1578,7 @@ body.dragging .pane-body { pointer-events: none; }
 .send-make { display: inline-flex; align-items: center; }
 .send-make input { width: 150px; margin-left: 1px; font: inherit; color: var(--ink); background: var(--bg); border: 1px solid var(--line); border-radius: 5px; padding: 1px 5px; outline: none; }
 .send-make input:focus { border-color: var(--accent); }
+
+/* 봇이 연 세션 앞에 붙는 그 봇의 얼굴 */
+.row-face { display: inline-block; flex: none; vertical-align: -3px; margin-right: 5px; line-height: 0; }
+.side .row-head .row-face { margin: 1px 0 0; }

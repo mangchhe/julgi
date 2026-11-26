@@ -50,4 +50,6 @@ export default {
   "꺼져 있다": "off",
   "설정 (⌘,)": "Settings (⌘,)",
   "Julgi가 알아서 한 일 (⌘Y)": "What Julgi did on its own (⌘Y)",
+  "봇: 역할과 기억을 가진 일꾼. 깨우는 일이 생기면 그 역할로 세션을 연다": "Bots: workers with a role and a memory. When something wakes one, a session opens in that role",
+  "오늘 {0}번 깸": "woke {0} times today",
 } as Record<string, string>;
