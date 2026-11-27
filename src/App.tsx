@@ -404,6 +404,10 @@ export default function App() {
   const [skills, setSkills] = useState<SkillInfo[]>([]);
   const [skillCands, setSkillCands] = useState<SkillCandidate[]>([]);
   const [names, setNames] = useState<Record<string, string>>({}); // 세션 ID → Julgi가 지은 이름
+  // 세션 ID → 지금 하는 일. 이름은 처음 지은 것으로 두고, 일이 넘어가면 여기에 적어 따로 보여 준다
+  const [topics, setTopics] = useState<Record<string, string>>({});
+  const topicsRef = useRef(topics);
+  topicsRef.current = topics;
   const [progress, setProgress] = useState<Record<string, Progress>>({}); // 줄기 id(없으면 세션 id) → 어디까지 왔나
   // 답을 끝낸 세션마다 "내가 할 일이 있나"를 판정해 둔 것. 열쇠는 세션 id, since가 같을 때만 그 답의 판정이다
   const triaged = useRef<Record<string, { since: number; need: boolean; why: string }>>({});
@@ -591,9 +595,9 @@ export default function App() {
     // 치운 세션은 스크립트가 찍어 낸 세션과 같이 다룬다: 목록과 보낼 곳에서 빠지고 ⌘K로는 찾는다
     // 일감을 맡은 세션도 같다. 조율 세션의 일부라 따로 말을 걸 대상이 아니고, 보낼 곳 후보에 끼면 조율 세션으로 갈 말을 가로챈다
     for (const t of tasks) if (t.session) gone.add(t.session);
-    return ledger ? enrich(ledger).map((s) => ({ ...s, title: names[s.id] ?? s.title, auto: s.auto || gone.has(s.id) })) : [];
+    return ledger ? enrich(ledger).map((s) => ({ ...s, title: names[s.id] ?? s.title, topic: topics[s.id], auto: s.auto || gone.has(s.id) })) : [];
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [ledger, names, hidden, tasks, config.scriptShow, config.scriptEntry]);
+  }, [ledger, names, topics, hidden, tasks, config.scriptShow, config.scriptEntry]);
   const byId = useMemo(() => new Map(sessions.map((s) => [s.id, s])), [sessions]);
   const items = useMemo(() => buildItems(sessions, threads, memories), [sessions, threads, memories]);
   const threadOf = (sessionId?: string) => (sessionId ? threads.find((t) => t.sessions.includes(sessionId)) : undefined);
@@ -1175,7 +1179,16 @@ export default function App() {
       const named = text.match(/^이름:\s*(.+)\n?/);
       const name = named?.[1].replace(/["'`*]/g, "").trim().slice(0, 40);
       const body = (named ? text.slice(named[0].length) : text).trim();
-      if (name) {
+      // 이름은 한 번만 짓는다. 그 뒤에 지은 이름은 "지금 하는 일"로 둔다(이름과 같으면 지운다)
+      const had = live.current.names[sessionId];
+      if (name && had) {
+        const next = { ...topicsRef.current };
+        if (name === had) delete next[sessionId];
+        else next[sessionId] = name;
+        topicsRef.current = next;
+        setTopics(next);
+        void invoke("data_write", { name: "topics.json", text: JSON.stringify(next) });
+      } else if (name) {
         const next = { ...live.current.names, [sessionId]: name };
         live.current.names = next;
         setNames(next);
@@ -3299,6 +3312,13 @@ export default function App() {
         if (json) setProgress(JSON.parse(json));
       } catch {
         // 깨졌으면 다음 요약 때 다시 만든다
+      }
+    });
+    void invoke<string | null>("data_read", { name: "topics.json" }).then((json) => {
+      try {
+        if (json) setTopics(JSON.parse(json));
+      } catch {
+        // 깨졌으면 다음 요약 때 다시 적는다
       }
     });
     void invoke<string | null>("data_read", { name: "names.json" }).then((json) => {

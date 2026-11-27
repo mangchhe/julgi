@@ -59,6 +59,8 @@ export default function Info({ session, cwd, thread, memory, members, ops, chang
       {hot(session.tokens) && <div className="info-note">{tr("세션이 크다. 다음에 ⌘L로 보낼 때 Julgi가 알아서 갈아탄다.")}</div>}
 
       <div className="info-h">{tr("지금")}</div>
+      {/* 이름은 처음 지은 그대로다. 일이 다른 데로 넘어갔으면 지금 하는 일을 여기 적는다 */}
+      {session.topic && <div className="info-v"><b>{session.topic}</b></div>}
       <div className="info-v">{session.recap || (!thread && memory.trim()) || tr("요약이 아직 없다. 세션이 쉬면 Julgi가 만든다")}</div>
 
       {change && change.files > 0 && (

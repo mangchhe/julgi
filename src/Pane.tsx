@@ -81,7 +81,8 @@ export default function Pane({ common, termKey, focused, active, label, cwd, ses
         {termKey ? (
           <>
             <span className={"dot " + state} />
-            <b>{thread?.name ?? session?.title ?? label}</b>
+            {/* 칸 머리는 좁아서 지금 하는 일은 마우스를 올렸을 때만 보인다. 왼쪽 목록에는 한 줄로 늘 나온다 */}
+            <b title={session?.topic && session.topic !== (thread?.name ?? session.title) ? tr`지금: ${session.topic}` : undefined}>{thread?.name ?? session?.title ?? label}</b>
             {thread && <span>{tr`줄기`} {thread.sessions.length}</span>}
             {[session?.work?.key, session?.repo ?? repoOf(cwd), session?.branch].filter(Boolean).map((m) => (
               <span key={m}>{m}</span>

@@ -27,7 +27,7 @@ export type Ledger = { sessions: SessionInfo[]; works: Work[] };
 /** 장부의 세션에 프로젝트 이름과 속한 작업을 붙인 것 */
 /** script: 사람이 연 것이 아니라 스크립트가 돌린 세션. auto: 목록과 보낼 곳, Julgi가 알아서 하는 일에서 빼는 세션 */
 /** said: 세션을 열 때 내가 처음 한 말. title은 Julgi가 요약에서 지은 이름으로 바뀔 수 있어서, 찾을 때는 이것도 본다 */
-export type Session = SessionInfo & { repo: string; work?: Work; group: string; auto: boolean; script: boolean; said: string };
+export type Session = SessionInfo & { topic?: string; repo: string; work?: Work; group: string; auto: boolean; script: boolean; said: string };
 
 /** 같은 제목이 이만큼 되면 사람이 연 세션이 아니라고 본다 */
 const AUTO_REPEATS = 4;

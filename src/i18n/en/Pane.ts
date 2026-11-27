@@ -17,4 +17,5 @@ export default {
   "끝낸 줄기": "Finished stem",
   "목록으로 다시 올린다": "Put it back on the list",
   "칸을 닫는다. ⌘K로는 계속 찾는다": "Close the pane. ⌘K still finds it",
+  "지금: {0}": "Now: {0}",
 } as Record<string, string>;

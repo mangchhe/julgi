@@ -173,7 +173,7 @@ export default function Palette({ open, sessions, byId, cwd, repos = [], onPick,
       const links: Row[] = [];
       for (const s of sessions) {
         if (links.length >= 40) break;
-        if (q && !`${s.title} ${s.said} ${s.group} ${s.repo} ${s.branch} ${s.recap}`.toLowerCase().includes(q)) continue;
+        if (q && !`${s.title} ${s.topic ?? ""} ${s.said} ${s.group} ${s.repo} ${s.branch} ${s.recap}`.toLowerCase().includes(q)) continue;
         for (const url of s.links) if (wanted.some(([, kind]) => kind.test(url))) links.push({ pick: { kind: "link", url }, title: linkLabel(url), meta: `${s.title.slice(0, 44)} · ${s.repo} · ${ago(s.mtime)}`, isLink: true, session: s });
       }
       return links;
@@ -186,14 +186,14 @@ export default function Palette({ open, sessions, byId, cwd, repos = [], onPick,
       const s = o.sessionId ? byId.get(o.sessionId) : undefined;
       if (o.sessionId) openIds.add(o.sessionId);
       const row: Row = { pick: { kind: "open", key: o.key }, title: s?.title ?? o.label, meta: `${tr`열림`} · ${s?.repo ?? repoOf(o.cwd)}`, session: s };
-      if (!q || has(s?.title ?? o.label, s?.said, s?.group, s?.repo, s?.branch)) out.push(row);
+      if (!q || has(s?.title ?? o.label, s?.topic, s?.said, s?.group, s?.repo, s?.branch)) out.push(row);
       else if (has(s?.recap)) weak.push(row);
     }
     let count = 0;
     for (const s of sessions) {
       if (count >= MAX_SESSIONS) break;
       if (openIds.has(s.id)) continue;
-      const strong = !q || has(s.title, s.said, s.group, s.repo, s.branch);
+      const strong = !q || has(s.title, s.topic, s.said, s.group, s.repo, s.branch);
       if (!strong && !has(s.recap)) continue;
       count++;
       (strong ? out : weak).push({

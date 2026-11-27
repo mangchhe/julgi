@@ -52,7 +52,7 @@ Change them in `⌘,`; they apply at once and are saved to `~/.julgi/config.json
 | `hotTokens` | 150000 | Sessions larger than this are handed off to a fresh session before sending |
 | `sleepHours` | 3 | Put sessions idle this long to sleep. 0 disables |
 | `autoFill` | on | Bring sessions waiting on you into panes and fit the pane count |
-| `summarize` | on | Summarize and name sessions |
+| `summarize` | on | Summarize and name sessions. A session is named once; when its work moves on, the new topic shows in the ⌘I info panel |
 | `judgeMerges` | on | Join sessions doing the same work into one stem without asking |
 | `brain` | on | Store to and recall from the brain |
 | `autoLead` | on | Make a coordinator for large work that spans repos |
