@@ -218,4 +218,5 @@ export default {
   "코드": "Code",
   "{0}줄": "{0} lines",
   "숫자로 고르기 · Enter 맨 위(가장 최근) · Esc 닫기": "Pick by number · Enter the top one (most recent) · Esc to close",
+  "\"{0}\" · 지금: {1}": "\"{0}\" · now: {1}",
 } as Record<string, string>;

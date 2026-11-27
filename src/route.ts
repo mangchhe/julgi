@@ -24,7 +24,7 @@ function words(text: string): { word: string; origin: string; strength: number }
 function fields(item: Item): [string, number][] {
   const s = item.session;
   return [
-    [`${item.name} ${s.title} ${s.said}`, 3],
+    [`${item.name} ${s.title} ${s.topic ?? ""} ${s.said}`, 3],
     [`${s.branch} ${s.work?.key ?? ""} ${s.links.map(linkLabel).join(" ")}`, 3],
     [s.repo, 2],
     [s.recap, 1],

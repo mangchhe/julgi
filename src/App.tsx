@@ -1185,6 +1185,8 @@ export default function App() {
         const next = { ...topicsRef.current };
         if (name === had) delete next[sessionId];
         else next[sessionId] = name;
+        // 일이 넘어간 자취를 이력에 남긴다. 주제가 실제로 바뀔 때만
+        if ((topicsRef.current[sessionId] ?? had) !== name) record("주제", tr`"${had.slice(0, 40)}" · 지금: ${name}`, sessionId); // i18n-ok
         topicsRef.current = next;
         setTopics(next);
         void invoke("data_write", { name: "topics.json", text: JSON.stringify(next) });

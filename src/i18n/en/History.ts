@@ -39,4 +39,5 @@ export default {
   "대신 답함": "Answered for me",
   "이어 감": "Continued",
   "봇": "Bots",
+  "주제": "Topic",
 } as Record<string, string>;
