@@ -484,10 +484,11 @@ fn replies_of(session_id: &str) -> Option<Vec<String>> {
 }
 
 /// 이번 차례에 세션이 한 일을 차례대로: 중간에 한 말("say")과 쓴 도구(도구 이름)와 그 대상 한 줄.
-/// 내가 마지막으로 말한 뒤부터 센다. 폰에서 진행 과정을 보여 주는 데 쓴다.
+/// 내가 마지막으로 말한 뒤부터 센다. 맨 앞은 그 내 말("me")이다. 폰에서 진행 과정을 보여 주는 데 쓴다.
 fn steps_of(tail: &str) -> Vec<(String, String)> {
     let short = |text: &str, max: usize| text.lines().next().unwrap_or("").chars().take(max).collect::<String>();
     let mut steps = Vec::new();
+    let mut me: Option<String> = None;
     for line in tail.lines() {
         let Ok(v) = serde_json::from_str::<Value>(line) else { continue };
         if v["isSidechain"] == true || v["isMeta"] == true || v["isCompactSummary"] == true {
@@ -502,6 +503,7 @@ fn steps_of(tail: &str) -> Vec<(String, String)> {
             // 도구 결과나 시스템이 끼워 넣은 글은 내 말이 아니다
             if !text.trim().is_empty() && !text.trim_start().starts_with('<') {
                 steps.clear();
+                me = Some(text.trim().chars().take(400).collect());
             }
         } else if v["type"] == "assistant" {
             for part in content.as_array().into_iter().flatten() {
@@ -519,7 +521,9 @@ fn steps_of(tail: &str) -> Vec<(String, String)> {
         }
     }
     // ponytail: 마지막 60개만. 더 긴 차례는 앞이 잘린다
-    steps.split_off(steps.len().saturating_sub(60))
+    let mut out: Vec<(String, String)> = me.map(|text| ("me".to_string(), text)).into_iter().collect();
+    out.extend(steps.split_off(steps.len().saturating_sub(60)));
+    out
 }
 
 pub fn steps(session_id: &str) -> Vec<(String, String)> {
@@ -680,7 +684,7 @@ mod name_tests {
             r#"{"type":"assistant","message":{"content":[{"type":"tool_use","name":"Edit","input":{"file_path":"/a/b/md.ts"}}]}}"#,
         ]
         .join("\n");
-        let want: Vec<(String, String)> = [("say", "한글로 길게 말한다"), ("Bash", "테스트 돌리기"), ("Edit", "md.ts")].iter().map(|(a, b)| (a.to_string(), b.to_string())).collect();
+        let want: Vec<(String, String)> = [("me", "다음 일"), ("say", "한글로 길게 말한다"), ("Bash", "테스트 돌리기"), ("Edit", "md.ts")].iter().map(|(a, b)| (a.to_string(), b.to_string())).collect();
         assert_eq!(steps_of(&tail), want);
     }
 

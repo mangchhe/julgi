@@ -136,7 +136,10 @@ h2.mine { color: var(--wait); }
 .bubble .more { display: block; width: 100%; color: var(--accent); font-size: 14px; font-weight: 600; padding: 0 0 11px; margin-bottom: 11px; text-align: left; border-bottom: 1px solid var(--line); }
 .now { margin: 0 0 12px; padding: 10px 12px; border-radius: 12px; background: var(--sunk); color: var(--muted); font: 12px/1.5 ui-monospace, "SF Mono", Menlo, monospace; white-space: pre-wrap; overflow-wrap: anywhere; }
 .now::before { content: attr(data-label); display: block; font: 800 11.5px/1.4 -apple-system, system-ui, sans-serif; color: var(--accent); margin-bottom: 4px; }
-#one.live .now { display: none; }
+#one.live .now, #one.live .me { display: none; }
+.me { align-self: flex-end; max-width: 86%; margin: 0 0 10px; background: color-mix(in srgb, var(--accent) 14%, var(--surface)); border-radius: 18px 18px 6px 18px; padding: 10px 14px; font-size: 14.5px; line-height: 1.5; white-space: pre-wrap; overflow-wrap: anywhere; }
+.steps li.cur span::after { content: ""; display: inline-block; width: 7px; height: 7px; margin-left: 7px; border-radius: 50%; background: var(--accent); vertical-align: middle; animation: blink 1s ease-in-out infinite; }
+@keyframes blink { 50% { opacity: 0.2; } }
 .steps { margin-top: 10px; font-size: 13.5px; color: var(--muted); }
 .steps summary { padding: 6px 4px; font-weight: 700; }
 .steps ol { list-style: none; margin: 0; padding: 0 4px; }
@@ -207,9 +210,10 @@ h2.mine { color: var(--wait); }
   <main id="acts" class="view" hidden></main>
   <main id="one" class="view" hidden>
     <div class="status" id="one-status"></div>
+    <div class="me" id="one-me" hidden></div>
+    <details class="steps" id="one-steps" hidden><summary></summary><ol></ol></details>
     <pre class="now" id="one-now" hidden></pre>
     <div class="bubble" id="one-reply"></div>
-    <details class="steps" id="one-steps" hidden><summary></summary><ol></ol></details>
     <div id="one-term"></div>
     <div class="grow"></div>
     <form class="composer" id="answer">
@@ -259,7 +263,7 @@ const EN = {
   "일하는 중이다. 답이 오면 여기에 뜬다.": "Working. The reply will appear here.",
   "지금 화면": "On screen now", "터미널": "Terminal", "요약": "Summary", "다시 보기": "Resume", "터미널을 여는 중": "Opening the terminal",
   "맥에서 쓰는 중이라 멈췄다.": "Paused: in use on the Mac.", "이 터미널은 끝났다.": "This terminal has ended.", "터미널을 열지 못했다.": "Could not open the terminal.",
-  "진행 과정 {0}": "Steps {0}", "읽음": "Read", "실행": "Run", "고침": "Edit", "씀": "Write", "찾음": "Search", "맡김": "Agent", "웹": "Web",
+  "진행 과정 {0}": "Steps {0}", "진행 중 · {0}": "Working · {0}", "보냈다. 시작을 기다리는 중": "Sent. Waiting for it to start", "생각하는 중": "Thinking", "읽음": "Read", "실행": "Run", "고침": "Edit", "씀": "Write", "찾음": "Search", "맡김": "Agent", "웹": "Web",
   "마지막 답을 읽지 못했다.": "Could not read the last reply.", "읽지 못했다.": "Could not read it.",
   "맥의 Julgi가 {0}부터 응답하지 않는다.": "Julgi on the Mac stopped responding {0}.",
   "맥의 Julgi에서 아직 상태를 받지 못했다.": "No status from Julgi on the Mac yet.",
@@ -297,6 +301,9 @@ const store = { get: (k) => { try { return sessionStorage.getItem(k) || ""; } ca
 let state = null; // 처음 받기 전에는 뼈대만 그린다
 let view = "home", picked = "", shownFor = "", whole = false, where = "";
 let toastTimer = 0;
+/** 폰에서 막 보낸 말. 세션이 일을 시작했다고 알려 오기 전까지 화면에 먼저 그려 둔다 */
+let sent = null;
+const sentTo = (s) => !!sent && sent.key === s.key;
 const toast = (text) => { $("toast").textContent = text; $("toast").hidden = false; clearTimeout(toastTimer); toastTimer = setTimeout(() => ($("toast").hidden = true), 2200); };
 const mine = (s) => s.state === "wait" || s.state === "ask";
 const busy = (s) => s.state === "run" || s.state === "hold";
@@ -441,24 +448,41 @@ $("keys").append(...KEYS.map(([name, data]) => { const b = el("button", "", name
 document.addEventListener("visibilitychange", () => { const s = live && state && state.sessions.find((x) => x.key === live.key); if (document.hidden) { if (live) { live.away = true; live.why = "away"; live.ctl && live.ctl.abort(); } } else if (live && live.away && s) startLive(s); });
 
 const TOOL = { Read: "읽음", Bash: "실행", Edit: "고침", NotebookEdit: "고침", Write: "씀", Grep: "찾음", Glob: "찾음", Agent: "맡김", Task: "맡김", WebFetch: "웹", WebSearch: "웹" };
-/** 이번 차례에 세션이 한 일. 일하는 중이면 3초마다 다시 읽어 펼쳐 두고, 답이 온 뒤에는 접어 둔다 */
+/** 이번 차례: 내 말 → 세션이 한 일(일하는 동안 1초마다 다시 읽어 아래로 쌓는다) → 답. 일이 끝나면 한 일은 접는다 */
 function loadSteps(s) {
   const box = $("one-steps"), stamp = `${s.key}|${s.state}|${s.since}`;
-  if (!s.id || (!busy(s) && box.dataset.stamp === stamp)) return;
+  if (!s.id || (!busy(s) && !sentTo(s) && box.dataset.stamp === stamp)) return;
   api("/api/steps?id=" + encodeURIComponent(s.id)).then(({ steps }) => {
     if (picked !== s.key) return;
     const fresh = box.dataset.stamp !== stamp;
     box.dataset.stamp = stamp;
-    box.hidden = !steps.length;
-    if (fresh) box.open = busy(s);
-    box.querySelector("summary").textContent = T("진행 과정 {0}", steps.length);
-    const near = innerHeight + scrollY >= document.body.scrollHeight - 80;
-    box.querySelector("ol").replaceChildren(...steps.map(([tool, text]) => { const li = el("li", tool === "say" ? "say" : ""); li.append(el("b", "", TOOL[tool] ? T(TOOL[tool]) : tool.replace(/^mcp__.*__/, "")), el("span", "", text)); return li; }));
-    if (box.open && busy(s) && near) window.scrollTo(0, document.body.scrollHeight);
+    const me = steps[0] && steps[0][0] === "me" ? steps.shift()[1] : "";
+    // 보낸 말이 기록에 올라왔으면 미리 그린 것을 거둔다
+    if (sentTo(s) && (me.startsWith(sent.text.slice(0, 40)) || Date.now() - sent.at > 20000)) sent = null;
+    paintTurn(s, me, steps, fresh);
   }, () => {});
+}
+function paintTurn(s, me, steps, fresh) {
+  const box = $("one-steps"), mine = sentTo(s) ? sent.text : me, working = busy(s) || sentTo(s);
+  $("one-me").hidden = !mine; $("one-me").textContent = mine;
+  const sig = JSON.stringify([steps, working]);
+  if (box.dataset.sig === sig && !fresh) return;
+  box.dataset.sig = sig;
+  const near = innerHeight + scrollY >= document.body.scrollHeight - 120;
+  const rows = sentTo(s) ? [] : steps.map(([tool, text]) => { const li = el("li", tool === "say" ? "say" : ""); li.append(el("b", "", TOOL[tool] ? T(TOOL[tool]) : tool.replace(/^mcp__.*__/, "")), el("span", "", text)); return li; });
+  if (working && !rows.length) { const li = el("li", "say"); li.append(el("b", "", ""), el("span", "", sentTo(s) ? T("보냈다. 시작을 기다리는 중") : T("생각하는 중"))); rows.push(li); }
+  if (working) rows[rows.length - 1].classList.add("cur");
+  box.hidden = !rows.length;
+  box.querySelector("ol").replaceChildren(...rows);
+  box.querySelector("summary").textContent = working ? T("진행 중 · {0}", steps.length) : T("진행 과정 {0}", steps.length);
+  if (fresh || working) box.open = working;
+  if (working && (near || fresh)) requestAnimationFrame(() => window.scrollTo(0, document.body.scrollHeight));
 }
 function loadReply(s) {
   const stamp = `${s.key}|${s.state}|${s.since}`;
+  // 일하는 동안 지난 답을 띄워 두면 새 답처럼 보인다. 끝나면 그때 읽는다
+  $("one-reply").hidden = busy(s) || sentTo(s);
+  if (busy(s) || sentTo(s)) return void (shownFor = "");
   if (shownFor === stamp) return;
   const first = !shownFor.startsWith(s.key + "|");
   shownFor = stamp;
@@ -469,7 +493,7 @@ function loadReply(s) {
     if (picked !== s.key) return;
     if (!text) { box.className = "bubble note"; box.textContent = busy(s) ? T("일하는 중이다. 답이 오면 여기에 뜬다.") : T("마지막 답을 읽지 못했다."); return; }
     paintReply(text);
-    if (first) window.scrollTo(0, document.body.scrollHeight);
+    window.scrollTo(0, document.body.scrollHeight);
   }, () => { shownFor = ""; if (first) { box.className = "bubble note"; box.textContent = T("읽지 못했다."); } });
 }
 
@@ -477,7 +501,7 @@ const TABS = ["home", "all", "acts"];
 function show(next, key, fromHistory) {
   if (view === "one" && picked) store.set("draft:" + picked, $("answer-text").value);
   const sheet = next === "throw";
-  if (!sheet) { stopLive(); view = next; picked = key || ""; shownFor = ""; whole = false; $("one-steps").hidden = true; delete $("one-steps").dataset.stamp; }
+  if (!sheet) { stopLive(); view = next; picked = key || ""; shownFor = ""; whole = false; $("one-steps").hidden = true; $("one-me").hidden = true; delete $("one-steps").dataset.stamp; delete $("one-steps").dataset.sig; }
   if (!fromHistory) {
     const hash = sheet ? "#new" : view === "one" ? "#s=" + encodeURIComponent(picked) : view === "home" ? "" : "#" + view;
     const url = location.pathname + location.search + hash;
@@ -594,7 +618,7 @@ function send(text) {
   if (!text || !picked || $("answer").dataset.busy) return;
   $("answer").dataset.busy = "1"; $("answer-send").disabled = true;
   const key = picked;
-  api("/api/answer", { target: key, text }).then(() => { store.set("draft:" + key, ""); $("answer-text").value = ""; toast(T("보냈다")); grow($("answer-text")); shownFor = ""; pull(); }, () => { toast(T("보내지 못했다")); $("answer-send").disabled = !$("answer-text").value.trim(); }).finally(() => delete $("answer").dataset.busy);
+  api("/api/answer", { target: key, text }).then(() => { store.set("draft:" + key, ""); $("answer-text").value = ""; grow($("answer-text")); sent = { key, text, at: Date.now() }; shownFor = ""; const s = state && state.sessions.find((x) => x.key === key); if (s) { loadReply(s); paintTurn(s, "", [], true); } pull(); }, () => { toast(T("보내지 못했다")); $("answer-send").disabled = !$("answer-text").value.trim(); }).finally(() => delete $("answer").dataset.busy);
 }
 $("answer-text").addEventListener("input", (e) => { grow(e.target); $("answer-send").disabled = !e.target.value.trim(); });
 $("answer").addEventListener("submit", (e) => { e.preventDefault(); send($("answer-text").value.trim()); });
