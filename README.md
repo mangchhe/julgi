@@ -202,6 +202,7 @@ Optional, for the integrations: [`gh`](https://cli.github.com) for GitHub, [`gla
 | Key | What it does |
 |---|---|
 | `⌘L` | Say something. Julgi decides where it goes |
+| `⌥⌘L` | The same, by voice (macOS Dictation) |
 | `⌘J` | My turn: waiting sessions, PRs, tickets, review requests |
 | `⌘K` | Find a session, or type `pr` / `jira` to pick a PR or ticket |
 | `⌘E` | Code review of the current session |

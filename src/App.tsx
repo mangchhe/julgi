@@ -3084,7 +3084,11 @@ export default function App() {
       const tops = open.filter((o) => !tasksRef.current.some((t) => t.session === o.sessionId && open.some((l) => l.sessionId === t.lead)));
       let handled = true;
       if (cmd && e.code === "KeyK") setOverlay(overlay === "palette" ? null : "palette");
-      else if (cmd && e.shiftKey && e.code === "KeyL" && !overlay) void a.move();
+      // ⌥⌘L: 보내기 상자를 열고 macOS 받아쓰기를 시작한다. 말이 끝나면 Enter
+      else if (e.metaKey && e.altKey && !e.ctrlKey && e.code === "KeyL") {
+        if (overlay !== "send") (setMoving(""), setOverlay("send"));
+        setTimeout(() => void invoke("dictate"), 300);
+      } else if (cmd && e.shiftKey && e.code === "KeyL" && !overlay) void a.move();
       else if (cmd && e.code === "KeyL") {
         setMoving("");
         setOverlay(overlay === "send" ? null : "send");

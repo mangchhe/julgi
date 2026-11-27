@@ -2119,6 +2119,7 @@ name = "julgi"
 version = "0.1.0"
 dependencies = [
  "arboard",
+ "objc2",
  "png 0.17.16",
  "portable-pty",
  "serde",

@@ -743,6 +743,21 @@ fn env_flag(name: String) -> bool {
 }
 
 /// 붙여넣을 내용. 클립보드에 그림이 있으면 임시 PNG로 저장해 그 경로를 돌려준다.
+/// macOS 받아쓰기를 시작한다. 초점이 있는 글 칸(보내기 상자)에 말이 글로 들어간다.
+/// 메뉴의 "받아쓰기 시작"과 같은 동작이라, 응답자 사슬로 보내서 받는 칸이 없으면 아무 일도 없다
+#[tauri::command]
+fn dictate(app: AppHandle) {
+    #[cfg(target_os = "macos")]
+    let _ = app.run_on_main_thread(|| unsafe {
+        use objc2::runtime::{AnyClass, AnyObject, Bool};
+        use objc2::{msg_send, sel};
+        let Some(class) = AnyClass::get(c"NSApplication") else { return };
+        let ns: *mut AnyObject = msg_send![class, sharedApplication];
+        let none: *mut AnyObject = std::ptr::null_mut();
+        let _: Bool = msg_send![ns, sendAction: sel!(startDictation:), to: none, from: none];
+    });
+}
+
 /// Claude Code는 붙여넣은 그림 경로를 첨부로 받는다.
 #[tauri::command]
 fn clipboard_paste() -> Result<String, String> {
@@ -872,7 +887,7 @@ pub fn run() {
             Ok(())
         })
         .manage(Ptys::default())
-        .invoke_handler(tauri::generate_handler![lang::set_lang, pty_spawn, pty_write, pty_resize, pty_kill, clipboard_paste, term_states, log_line, env_flag, home_dir, layout_load, layout_save, handoff_write, config_load, sessions_elsewhere, app_exit, app_restart, data_read, data_write, data_append, data_remove, brain_load, notify, set_hotkey, repo_peek, repo_refs, repo_sync, git_siblings, route_ask, memory_load, inbox_take, default_dir, dirs_exist, path_find, path_open_with, file_read, project_make, ledger::last_reply, ledger::recent_replies, ledger::last_exchange, ledger::session_workdir, ledger::ledger_scan, remote::remote_start, remote::remote_stop, remote::remote_publish, remote::remote_reclaim, usage::claude_usage, usage::claude_models, jira::jira_connect, jira::jira_disconnect, jira::jira_me, jira::jira_search, jira::jira_mine, jira::jira_projects, jira::jira_statuses, jira::jira_view, jira::jira_image, ci::ci_runs, ci::ci_jobs, ci::ci_log, argo::argo_status, argo::argo_logout, argo::argo_apps, argo::argo_app, argo::argo_reach, argo::argo_trail, jira::jira_transitions, jira::jira_transition, jira::jira_comment, tokens::token_usage, github::gh_status, github::glab_status, github::pr_view, github::pr_diff, github::pr_comments, github::repo_slug, github::pr_status, github::pr_review_requests, github::pr_mine, github::pr_list, github::pr_comment, github::pr_line_comment, github::pr_reply, github::pr_review, github::pr_merge, github::pr_close, github::pr_reopen, term_load, habits::habits, habits::corrections, skills::skill_usage, skills::skills_list, skills::skill_apply, skills::skill_retire, work::worktree_add, work::worktree_drop, work::repo_changes, work::repo_stat, work::repo_has, work::repo_snapshot, work::repo_diff, work::repo_moved, work::repo_state, work::repo_mrs, work::repo_commits, work::commit_message])
+        .invoke_handler(tauri::generate_handler![lang::set_lang, pty_spawn, pty_write, pty_resize, pty_kill, clipboard_paste, dictate, term_states, log_line, env_flag, home_dir, layout_load, layout_save, handoff_write, config_load, sessions_elsewhere, app_exit, app_restart, data_read, data_write, data_append, data_remove, brain_load, notify, set_hotkey, repo_peek, repo_refs, repo_sync, git_siblings, route_ask, memory_load, inbox_take, default_dir, dirs_exist, path_find, path_open_with, file_read, project_make, ledger::last_reply, ledger::recent_replies, ledger::last_exchange, ledger::session_workdir, ledger::ledger_scan, remote::remote_start, remote::remote_stop, remote::remote_publish, remote::remote_reclaim, usage::claude_usage, usage::claude_models, jira::jira_connect, jira::jira_disconnect, jira::jira_me, jira::jira_search, jira::jira_mine, jira::jira_projects, jira::jira_statuses, jira::jira_view, jira::jira_image, ci::ci_runs, ci::ci_jobs, ci::ci_log, argo::argo_status, argo::argo_logout, argo::argo_apps, argo::argo_app, argo::argo_reach, argo::argo_trail, jira::jira_transitions, jira::jira_transition, jira::jira_comment, tokens::token_usage, github::gh_status, github::glab_status, github::pr_view, github::pr_diff, github::pr_comments, github::repo_slug, github::pr_status, github::pr_review_requests, github::pr_mine, github::pr_list, github::pr_comment, github::pr_line_comment, github::pr_reply, github::pr_review, github::pr_merge, github::pr_close, github::pr_reopen, term_load, habits::habits, habits::corrections, skills::skill_usage, skills::skills_list, skills::skill_apply, skills::skill_retire, work::worktree_add, work::worktree_drop, work::repo_changes, work::repo_stat, work::repo_has, work::repo_snapshot, work::repo_diff, work::repo_moved, work::repo_state, work::repo_mrs, work::repo_commits, work::commit_message])
         .build(tauri::generate_context!())
         .expect("error while running tauri application")
         .run(|app, event| {

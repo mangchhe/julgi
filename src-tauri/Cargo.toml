@@ -30,6 +30,9 @@ tauri-plugin-global-shortcut = "2"
 tiny_http = "0.12"
 tauri-plugin-notification = "2"
 
+[target.'cfg(target_os = "macos")'.dependencies]
+objc2 = "0.6"
+
 
 # Read the optimization guideline for more details: https://tauri.app/concept/size/#cargo-configuration
 [profile.release]
