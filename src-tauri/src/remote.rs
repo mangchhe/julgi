@@ -200,7 +200,19 @@ fn ask(cmd: &str, target: &str, body: &str) -> bool {
     fs::write(file.with_extension("tmp"), text).and_then(|_| fs::rename(file.with_extension("tmp"), file.with_extension("req"))).is_ok()
 }
 
-fn serve(server: Server, token: String) {
+/// 맥이 폰에 보여 준 세션 하나(STATE에 적힌 것). 폰이 보낸 값은 여기 있는 것만 믿는다
+fn shown_session(field: &str, value: &serde_json::Value) -> Option<serde_json::Value> {
+    let state: serde_json::Value = serde_json::from_str(&STATE.lock().ok()?.clone()).ok()?;
+    state["sessions"].as_array()?.iter().find(|s| &s[field] == value).cloned()
+}
+
+fn body_json(request: &mut tiny_http::Request) -> serde_json::Value {
+    let mut body = String::new();
+    let _ = request.as_reader().take(40_000).read_to_string(&mut body);
+    serde_json::from_str(&body).unwrap_or_default()
+}
+
+fn serve(server: &Server, token: &str) {
     for mut request in server.incoming_requests() {
         let url = request.url().to_owned();
         let path = url.split('?').next().unwrap_or("");
@@ -221,7 +233,7 @@ fn serve(server: Server, token: String) {
             continue;
         }
         let given = request.headers().iter().find(|h| h.field.equiv("x-julgi-token")).map(|h| h.value.as_str().to_owned()).or_else(|| param(&url, "t").map(str::to_owned));
-        if given.as_deref() != Some(token.as_str()) {
+        if given.as_deref() != Some(token) {
             let _ = request.respond(json("{\"error\":\"token\"}".into(), 401));
             continue;
         }
@@ -266,6 +278,60 @@ fn serve(server: Server, token: String) {
                 let ok = watched && APP.get().is_some_and(|app| crate::pty_type(app, id, value["data"].as_str().unwrap_or("").as_bytes()));
                 json(format!("{{\"ok\":{ok}}}"), if ok { 200 } else { 409 })
             }
+            // 고르기 단추와 멈추기. 터미널을 보고 있지 않아도 되는 대신, 맥이 보여 준 세션에 정해 둔 키만 넣는다
+            (Method::Post, "/api/press") => {
+                let value = body_json(&mut request);
+                let bytes: Option<&[u8]> = match value["key"].as_str().unwrap_or("") {
+                    "esc" => Some(b"\x1b"),
+                    "enter" => Some(b"\r"),
+                    "mode" => Some(b"\x1b[Z"),
+                    k if k.len() == 1 && k.as_bytes()[0].is_ascii_digit() && k != "0" => Some(k.as_bytes()),
+                    _ => None,
+                };
+                // 고르기 번호는 폰이 본 고르기와 지금 맥 화면의 고르기가 같을 때만 넣는다. 그새 다른 물음으로 바뀌었으면 엉뚱한 답이 된다
+                let fresh = |s: &serde_json::Value| {
+                    let now: Vec<&str> = s["choices"].as_array().map(|list| list.iter().filter_map(|c| c["label"].as_str()).collect()).unwrap_or_default();
+                    value["sig"].is_null() || value["sig"].as_str() == Some(now.join("|").as_str())
+                };
+                let ok = match (bytes, shown_session("pty", &value["pty"])) {
+                    (Some(bytes), Some(s)) if fresh(&s) => APP.get().is_some_and(|app| crate::pty_type(app, value["pty"].as_u64().unwrap_or(0) as u32, bytes)),
+                    _ => false,
+                };
+                json(format!("{{\"ok\":{ok}}}"), if ok { 200 } else { 409 })
+            }
+            // 세션이 고친 것: 커밋하지 않은 것과 기본 브랜치에서 갈라진 뒤 커밋한 것
+            (Method::Get, "/api/diff") => {
+                let key = serde_json::Value::String(param(&url, "key").map(|k| k.replace("%3A", ":").replace("%3a", ":")).unwrap_or_default());
+                match shown_session("key", &key).and_then(|s| s["dir"].as_str().map(str::to_owned)).and_then(crate::work::repo_changes) {
+                    Some(changes) => json(serde_json::to_string(&changes).unwrap_or_default(), 200),
+                    None => json("{\"error\":\"no repo\"}".into(), 404),
+                }
+            }
+            // 잠든 세션 깨우기. 맥이 폰에 보여 준 잠든 세션만
+            (Method::Post, "/api/wake") => {
+                let value = body_json(&mut request);
+                let id = value["id"].as_str().unwrap_or("");
+                let listed = STATE.lock().ok().and_then(|s| serde_json::from_str::<serde_json::Value>(&s).ok()).is_some_and(|state| state["sleeping"].as_array().is_some_and(|list| list.iter().any(|s| s["id"] == id)));
+                let ok = listed && ask("wake", id, "1");
+                json(format!("{{\"ok\":{ok}}}"), if ok { 200 } else { 404 })
+            }
+            // 폰에서 고른 그림. ~/.julgi/uploads 에 두고 그 경로를 돌려준다. 답에 경로를 붙이면 Claude Code가 그림을 읽는다
+            (Method::Post, "/api/upload") => {
+                let ext = match param(&url, "ext").unwrap_or("") {
+                    e @ ("png" | "jpg" | "gif" | "webp") => e,
+                    _ => "",
+                };
+                let mut bytes = Vec::new();
+                let _ = request.as_reader().take(15_000_001).read_to_end(&mut bytes);
+                let dir = root().join("uploads");
+                let stamp = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map_or(0, |d| d.as_millis());
+                let path = dir.join(format!("phone-{stamp}.{ext}"));
+                if ext.is_empty() || bytes.is_empty() || bytes.len() > 15_000_000 || fs::create_dir_all(&dir).and_then(|_| fs::write(&path, &bytes)).is_err() {
+                    json("{\"error\":\"upload\"}".into(), 400)
+                } else {
+                    json(serde_json::json!({ "path": path.to_string_lossy() }).to_string(), 200)
+                }
+            }
             (Method::Post, "/api/answer") | (Method::Post, "/api/new") => {
                 let mut body = String::new();
                 let _ = request.as_reader().take(40_000).read_to_string(&mut body);
@@ -293,7 +359,8 @@ pub fn remote_start(port: u16) -> Result<String, String> {
         let server = Server::http(("0.0.0.0", port)).map_err(|e| say(&format!("{port}번 포트를 열지 못했다: {e}"), &format!("Could not open port {port}: {e}")))?;
         let _ = STARTED.set(port);
         let held = token.clone();
-        std::thread::spawn(move || serve(server, held));
+        // 요청 하나를 처리하다 panic이 나도 폰 화면이 죽지 않게 다시 받기 시작한다
+        std::thread::spawn(move || while std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| serve(&server, &held))).is_err() {});
     }
     ON.store(true, Ordering::Relaxed);
     let port = *STARTED.get().unwrap_or(&port);

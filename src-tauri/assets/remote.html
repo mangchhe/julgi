@@ -113,7 +113,7 @@ h2.mine { color: var(--wait); }
 /* 세션 하나: 마지막 답과 답 쓰는 칸 */
 #one { padding-bottom: 0; min-height: calc(100dvh - 60px); display: flex; flex-direction: column; }
 .status { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--muted); padding: 0 2px 12px; min-width: 0; }
-.status span:last-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.status > span:not(.pill) { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .bubble { background: var(--surface); border-radius: 18px 18px 18px 6px; box-shadow: var(--shadow); padding: 15px 17px; overflow-wrap: anywhere; font-size: 15.5px; line-height: 1.58; }
 .bubble.note { color: var(--muted); text-align: center; box-shadow: none; background: none; padding: 48px 16px; }
 .bubble p { margin: 0 0 11px; white-space: pre-wrap; }
@@ -194,6 +194,30 @@ h2.mine { color: var(--wait); }
 .go:active { transform: scale(0.985); }
 .go:disabled { opacity: 0.4; }
 .hint { color: var(--muted); font-size: 13px; text-align: center; margin-top: 10px; }
+.choices { display: flex; flex-direction: column; gap: 7px; padding-bottom: 10px; }
+.choices .ask { font-size: 12.5px; font-weight: 800; color: var(--wait); }
+.choices button, .need .opts button { display: flex; gap: 10px; align-items: baseline; width: 100%; text-align: left; background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 11px 14px; font-size: 15px; line-height: 1.35; }
+.choices button b, .need .opts button b { flex: none; color: var(--accent); font-weight: 800; }
+.choices button.on { border-color: var(--accent); }
+.choices button:active, .need .opts button:active { background: var(--sunk); }
+.need .opts { display: flex; flex-direction: column; gap: 6px; margin-top: 10px; }
+.need .opts button { padding: 9px 12px; font-size: 14px; }
+.status button.act { flex: none; font-size: 12.5px; font-weight: 700; color: var(--accent); background: var(--accent-soft); border-radius: 999px; padding: 4px 10px; }
+.status button.act.stop { color: var(--wait); background: var(--wait-soft); }
+.status button.act.armed { color: var(--on-accent); background: var(--wait); }
+.attach { flex: none; width: 34px; height: 38px; margin-left: -9px; color: var(--muted); display: grid; place-items: center; }
+.attach svg { width: 22px; height: 22px; }
+.quick button.more { color: var(--muted); }
+#diff-body details { border-top: 1px solid var(--line); }
+#diff-body summary { display: flex; gap: 8px; padding: 10px 2px; font: 600 13px ui-monospace, "SF Mono", Menlo, monospace; overflow-wrap: anywhere; }
+#diff-body summary > span:first-child { flex: 1; min-width: 0; text-align: left; } #diff-body summary > span:last-child { flex: none; }
+#diff-body .add { color: var(--ok, #2f9e44); } #diff-body .del { color: var(--wait); }
+#diff-body pre { margin: 0 -18px 10px; padding: 8px 18px; background: var(--sunk); font: 11.5px/1.45 ui-monospace, "SF Mono", Menlo, monospace; overflow-x: auto; white-space: pre; }
+#diff-body pre i { display: block; font-style: normal; }
+#diff-body pre i.a { background: color-mix(in srgb, #2f9e44 16%, transparent); }
+#diff-body pre i.d { background: color-mix(in srgb, var(--wait) 16%, transparent); }
+#diff-body pre i.h { color: var(--accent); }
+#diff-body .meta { color: var(--muted); font-size: 13px; margin-bottom: 8px; }
 .toast { position: fixed; left: 50%; top: calc(14px + env(safe-area-inset-top, 0px)); transform: translateX(-50%); background: var(--ink); color: var(--bg); border-radius: 999px; padding: 10px 19px; font-size: 14.5px; font-weight: 700; z-index: 12; box-shadow: 0 8px 24px rgb(0 0 0 / 0.3); white-space: nowrap; animation: in 0.18s ease-out; }
 </style>
 </head>
@@ -217,9 +241,12 @@ h2.mine { color: var(--wait); }
     <div id="one-term"></div>
     <div class="grow"></div>
     <form class="composer" id="answer">
+      <div class="choices" id="choices" hidden></div>
       <div class="quick" id="quick"></div>
       <div id="keys"></div>
       <div class="write">
+        <button type="button" class="attach" id="attach"><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4.5" width="14" height="11" rx="2"/><circle cx="7.5" cy="8.5" r="1.4"/><path d="m4 14 4-3.5 3 2.5 2.5-2 3 2.5"/></svg></button>
+        <input type="file" id="attach-file" accept="image/*" hidden>
         <textarea id="answer-text" rows="1"></textarea>
         <button type="submit" class="send" id="answer-send" disabled><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M10 16V4M4.5 9.5 10 4l5.5 5.5"/></svg></button>
       </div>
@@ -245,6 +272,11 @@ h2.mine { color: var(--wait); }
   <button type="submit" class="go" id="throw-send" disabled></button>
   <div class="hint" id="throw-hint"></div>
 </form>
+<div class="sheet" id="diff" hidden>
+  <div class="grip"></div>
+  <div class="head"><b id="diff-title"></b><button type="button" id="diff-close"></button></div>
+  <div id="diff-body"></div>
+</div>
 <div class="toast" id="toast" role="status" hidden></div>
 <script>
 const $ = (id) => document.getElementById(id);
@@ -263,7 +295,7 @@ const EN = {
   "일하는 중이다. 답이 오면 여기에 뜬다.": "Working. The reply will appear here.",
   "지금 화면": "On screen now", "터미널": "Terminal", "요약": "Summary", "다시 보기": "Resume", "터미널을 여는 중": "Opening the terminal",
   "맥에서 쓰는 중이라 멈췄다.": "Paused: in use on the Mac.", "이 터미널은 끝났다.": "This terminal has ended.", "터미널을 열지 못했다.": "Could not open the terminal.",
-  "진행 과정 {0}": "Steps {0}", "진행 중 · {0}": "Working · {0}", "보냈다. 시작을 기다리는 중": "Sent. Waiting for it to start", "생각하는 중": "Thinking", "읽음": "Read", "실행": "Run", "고침": "Edit", "씀": "Write", "찾음": "Search", "맡김": "Agent", "웹": "Web",
+  "진행 과정 {0}": "Steps {0}", "골랐다: {0}": "Chose: {0}", "물음이 바뀌었다. 다시 본다": "The question changed. Refreshing", "멈추기": "Stop", "한 번 더 누르면 멈춘다": "Tap again to stop", "멈추라고 했다": "Told it to stop", "변경 보기": "Changes", "변경": "Changes", "파일 {0}": "{0} files", "길어서 앞부분만": "truncated", "… {0}줄 더": "… {0} more lines", "바뀐 것이 없다": "No changes", "변경을 읽지 못했다": "Could not read the changes", "잠든 세션": "Sleeping", "깨우기": "Wake", "깨우는 중. 열리면 바로 보여 준다": "Waking it. It opens here when ready", "깨우지 못했다": "Could not wake it", "모델: Opus": "Model: Opus", "모델: Sonnet": "Model: Sonnet", "모드 바꾸기": "Switch mode", "모드를 바꿨다": "Mode switched", "접기": "Less", "더 ⋯": "More ⋯", "그림을 올리는 중": "Uploading the picture", "그림: {0}": "Picture: {0}", "그림을 붙였다": "Picture attached", "그림을 올리지 못했다": "Could not upload the picture", "진행 중 · {0}": "Working · {0}", "보냈다. 시작을 기다리는 중": "Sent. Waiting for it to start", "생각하는 중": "Thinking", "읽음": "Read", "실행": "Run", "고침": "Edit", "씀": "Write", "찾음": "Search", "맡김": "Agent", "웹": "Web",
   "마지막 답을 읽지 못했다.": "Could not read the last reply.", "읽지 못했다.": "Could not read it.",
   "맥의 Julgi가 {0}부터 응답하지 않는다.": "Julgi on the Mac stopped responding {0}.",
   "맥의 Julgi에서 아직 상태를 받지 못했다.": "No status from Julgi on the Mac yet.",
@@ -312,6 +344,22 @@ const CHEV = '<svg class="chev" viewBox="0 0 20 20" fill="none" stroke="currentC
 const QUICK = [T("응, 진행해"), T("계속해"), T("아니, 멈춰"), T("다시 설명해 줘")];
 const metaOf = (s) => [s.repo, s.since ? ago(s.since) : "", s.changed].filter(Boolean).join(" · ");
 const pill = (s) => el("span", "pill " + kindOf(s), s.state === "ask" ? T("확인이 필요함") : s.label || T("열려 있음"));
+/** 고르기(권한 묻기 따위)를 단추로. 누를 때 본 고르기를 함께 보내서, 그새 물음이 바뀌었으면 맥이 받지 않는다 */
+const choiceSig = (s) => (s.choices || []).map((c) => c.label).join("|");
+const choose = (s, c) => api("/api/press", { pty: s.pty, key: String(c.n), sig: choiceSig(s) }).then(() => toast(T("골랐다: {0}", c.label.slice(0, 24))), (code) => toast(code === 409 ? T("물음이 바뀌었다. 다시 본다") : T("보내지 못했다"))).finally(pull);
+const optsOf = (s, cls) => {
+  const box = el("div", cls);
+  for (const c of s.choices || []) {
+    const b = el("button", c.on ? "on" : ""); b.type = "button";
+    b.append(el("b", "", String(c.n)), el("span", "", c.label));
+    b.addEventListener("click", (e) => { e.stopPropagation(); choose(s, c); });
+    box.append(b);
+  }
+  return box;
+};
+/** 멈추기는 한 번 더 눌러야 한다. 주머니에서 잘못 눌려 일을 끊지 않게 */
+let armed = 0;
+let wantWake = "";
 
 /** 답 글을 화면에 쓸 조각으로: 코드 울타리, 제목, 표, 목록, 인용, 문단. 글자는 전부 textContent로만 넣는다 */
 function inline(node, text) {
@@ -508,7 +556,7 @@ function show(next, key, fromHistory) {
     // 탭 사이는 기록을 쌓지 않는다. 세션 하나와 새 일만 뒤로 가기로 닫힌다
     if (sheet || view === "one") history.pushState(null, "", url); else history.replaceState(null, "", url);
   }
-  $("throw").hidden = $("veil").hidden = !sheet;
+  $("throw").hidden = $("veil").hidden = !sheet; $("diff").hidden = true;
   if (sheet) { paintPlaces(); setTimeout(() => $("throw-text").focus(), 260); return; }
   for (const id of [...TABS, "one"]) $(id).hidden = view !== id;
   $("back").hidden = view !== "one"; $("tabs").hidden = $("new").hidden = view === "one";
@@ -516,11 +564,54 @@ function show(next, key, fromHistory) {
   for (const b of document.querySelectorAll(".tab")) b.classList.toggle("on", b.dataset.tab === view);
   if (view === "one") {
     $("answer-text").value = store.get("draft:" + picked); grow($("answer-text")); $("answer-send").disabled = !$("answer-text").value.trim();
-    $("quick").replaceChildren(...QUICK.map((q) => { const b = el("button", "", q); b.type = "button"; b.addEventListener("click", () => send(q)); return b; }));
+    paintQuick(false);
+    delete $("one-status").dataset.sig; delete $("choices").dataset.sig;
   }
   paint();
   window.scrollTo(0, 0);
 }
+/** 빠른 답. "더"를 누르면 세션에 줄 명령(대화 줄이기, 모델 바꾸기, 모드 바꾸기)이 펼쳐진다 */
+const MORE = [["/compact", "/compact"], [T("모델: Opus"), "/model opus"], [T("모델: Sonnet"), "/model sonnet"], [T("모드 바꾸기"), "mode"]];
+function paintQuick(open) {
+  const chip = (text, run, cls) => { const b = el("button", cls || "", text); b.type = "button"; b.addEventListener("click", run); return b; };
+  const s = () => state && state.sessions.find((x) => x.key === picked);
+  $("quick").replaceChildren(
+    ...QUICK.map((q) => chip(q, () => send(q))),
+    ...(open ? MORE.map(([label, what]) => chip(label, () => (what === "mode" ? s() && api("/api/press", { pty: s().pty, key: "mode" }).then(() => toast(T("모드를 바꿨다")), () => toast(T("보내지 못했다"))) : send(what)))) : []),
+    chip(open ? T("접기") : T("더 ⋯"), () => paintQuick(!open), "more"),
+  );
+}
+/** 세션이 고친 것을 파일별로 접어서 보여 준다 */
+function openDiff(s) {
+  $("diff-title").textContent = T("변경"); $("diff-close").textContent = T("닫기");
+  $("diff-body").replaceChildren(el("div", "meta", T("읽는 중")));
+  $("diff").hidden = $("veil").hidden = false;
+  api("/api/diff?key=" + encodeURIComponent(s.key)).then((c) => {
+    const files = c.diff.split(/^(?=diff --git )/m).filter((f) => f.startsWith("diff --git"));
+    const nodes = [el("div", "meta", [c.branch, T("파일 {0}", files.length), c.cut ? T("길어서 앞부분만") : ""].filter(Boolean).join(" · "))];
+    for (const f of files) {
+      const lines = f.split("\n");
+      const name = (/^diff --git a\/(.+?) b\//.exec(lines[0]) || [, "?"])[1];
+      const body = lines.slice(lines.findIndex((l) => l.startsWith("@@")));
+      const adds = body.filter((l) => l[0] === "+").length, dels = body.filter((l) => l[0] === "-").length;
+      const d = el("details"); const sum = el("summary"); const tally = el("span");
+      tally.append(el("b", "add", "+" + adds), document.createTextNode(" "), el("b", "del", "−" + dels));
+      sum.append(el("span", "", name), tally); d.append(sum);
+      // 펼칠 때 그린다. 큰 변경을 한 번에 다 그리면 폰이 버벅인다
+      d.addEventListener("toggle", () => {
+        if (!d.open || d.querySelector("pre")) return;
+        const pre = el("pre");
+        for (const l of body.slice(0, 600)) pre.append(el("i", l[0] === "+" ? "a" : l[0] === "-" ? "d" : l.startsWith("@@") ? "h" : "", l || " "));
+        if (body.length > 600) pre.append(el("i", "h", T("… {0}줄 더", body.length - 600)));
+        d.append(pre);
+      });
+      nodes.push(d);
+    }
+    if (!files.length) nodes.push(el("div", "meta", T("바뀐 것이 없다")));
+    $("diff-body").replaceChildren(...nodes);
+  }, () => $("diff-body").replaceChildren(el("div", "meta", T("변경을 읽지 못했다"))));
+}
+const closeDiff = () => { $("diff").hidden = true; $("veil").hidden = $("throw").hidden; };
 function paintPlaces() {
   const folders = (state && state.folders) || [];
   const last = store.get("where");
@@ -560,10 +651,11 @@ function paintHome() {
   }
   const nodes = [hero];
   nodes.push(...section(T("내 차례"), "mine", waiting, (s) => {
-    const b = el("button", "need"); b.type = "button";
+    const b = el("div", "need"); b.setAttribute("role", "button"); b.tabIndex = 0;
     const name = el("div", "name"); name.append(el("b", "", s.name)); name.insertAdjacentHTML("beforeend", CHEV);
     b.append(name, el("div", "meta", [s.state === "ask" ? T("확인이 필요함") : T("답을 기다림"), metaOf(s)].join(" · ")));
     if (s.why) b.append(el("div", "why", s.why));
+    if (s.choices && s.choices.length) b.append(optsOf(s, "opts"));
     b.addEventListener("click", () => show("one", s.key));
     return b;
   }));
@@ -572,9 +664,17 @@ function paintHome() {
   else if (!waiting.length && !running.length) nodes.push(el("div", "empty", T("세션이 물음을 남기면 여기에 올라온다.")));
   $("home").replaceChildren(...nodes);
 }
+/** 잠든 세션: 누르면 맥에서 깨우고, 열리면 바로 그 세션으로 간다 */
+const sleepRow = (z) => {
+  const b = el("button", "row"); b.type = "button";
+  const text = el("span"); text.append(el("b", "", z.name), el("small", "", [z.repo, ago(z.at)].filter(Boolean).join(" · ")));
+  b.append(el("span", "dot"), text, el("span", "pill", T("깨우기")));
+  b.addEventListener("click", () => api("/api/wake", { id: z.id }).then(() => { wantWake = z.id; toast(T("깨우는 중. 열리면 바로 보여 준다")); }, () => toast(T("깨우지 못했다"))));
+  return b;
+};
 function paintAll() {
   const s = state.sessions;
-  const nodes = [...section(T("내 차례"), "mine", s.filter(mine), rowOf), ...section(T("일하는 중"), "", s.filter(busy), rowOf), ...section(T("열려 있음"), "", s.filter((x) => !mine(x) && !busy(x)), rowOf)];
+  const nodes = [...section(T("내 차례"), "mine", s.filter(mine), rowOf), ...section(T("일하는 중"), "", s.filter(busy), rowOf), ...section(T("열려 있음"), "", s.filter((x) => !mine(x) && !busy(x)), rowOf), ...section(T("잠든 세션"), "", state.sleeping || [], sleepRow)];
   if (!s.length) { const none = el("div", "empty"); const img = el("img"); img.src = "/mascot.png"; img.alt = ""; none.append(img, el("b", "", T("열려 있는 세션이 없다")), document.createTextNode(T("새 일을 던지면 맥에서 세션이 열린다."))); nodes.push(none); }
   $("all").replaceChildren(...nodes);
 }
@@ -601,17 +701,51 @@ function paint() {
   if (view === "one") {
     const s = state.sessions.find((x) => x.key === picked);
     $("title").textContent = s ? s.name : T("세션");
-    const flip = s && s.pty != null ? el("button", "live", live ? T("요약") : T("터미널")) : null;
-    if (flip) { flip.type = "button"; flip.addEventListener("click", () => { live ? stopLive() : startLive(s); paint(); }); }
-    $("one-status").replaceChildren(...(s ? [pill(s), el("span", "", metaOf(s)), ...(flip ? [flip] : [])] : [el("span", "", T("이 세션은 닫혔다"))]));
+    // 1초마다 다시 그리면 누르는 사이에 단추가 바뀌어 눌림이 사라진다. 바뀐 것이 있을 때만 그린다
+    const sig = JSON.stringify(s ? [s.key, s.state, s.label, s.since, s.changed, s.model, s.repo, !!live, armed > Date.now(), Math.floor(Date.now() / 60000)] : null);
+    if ($("one-status").dataset.sig !== sig) {
+      $("one-status").dataset.sig = sig;
+      const flip = s && s.pty != null ? el("button", "live", live ? T("요약") : T("터미널")) : null;
+      if (flip) { flip.type = "button"; flip.addEventListener("click", () => { live ? stopLive() : startLive(s); paint(); }); }
+      const acts = [];
+      if (s && busy(s) && s.pty != null) {
+        const stop = el("button", "act stop" + (armed > Date.now() ? " armed" : ""), armed > Date.now() ? T("한 번 더 누르면 멈춘다") : T("멈추기")); stop.type = "button";
+        stop.addEventListener("click", () => {
+          if (armed > Date.now()) { armed = 0; api("/api/press", { pty: s.pty, key: "esc" }).then(() => toast(T("멈추라고 했다")), () => toast(T("보내지 못했다"))); }
+          else { armed = Date.now() + 3000; setTimeout(paint, 3100); }
+          paint();
+        });
+        acts.push(stop);
+      }
+      if (s && s.changed) { const d = el("button", "act", T("변경 보기")); d.type = "button"; d.addEventListener("click", () => openDiff(s)); acts.push(d); }
+      $("one-status").replaceChildren(...(s ? [pill(s), el("span", "", [metaOf(s), s.model].filter(Boolean).join(" · ")), ...acts, ...(flip ? [flip] : [])] : [el("span", "", T("이 세션은 닫혔다"))]));
+    }
+    const csig = s ? choiceSig(s) : "";
+    if ($("choices").dataset.sig !== csig) {
+      $("choices").dataset.sig = csig;
+      $("choices").hidden = !csig;
+      $("choices").replaceChildren(...(csig ? [el("div", "ask", T("확인이 필요함")), optsOf(s, "list")] : []));
+      $("quick").hidden = !!csig;
+    }
     // 일하는 중이면 맥의 화면 끝 몇 줄을 그대로 보여 준다. 대화 기록에 적히기 전의 진행이 여기 보인다
     $("one-now").hidden = !(s && busy(s) && s.now); $("one-now").dataset.label = T("지금 화면"); $("one-now").textContent = (s && s.now) || "";
     if (s) { loadReply(s); loadSteps(s); }
-  } else if (view === "home") paintHome();
-  else if (view === "all") paintAll();
-  else paintActs();
+  } else {
+    const sig = JSON.stringify([view, state.sessions.map(({ now, ...rest }) => rest), state.sleeping, state.usage, state.ruleRuns, state.acts && state.acts[0], Math.floor(Date.now() / 60000)]);
+    if ($(view).dataset.sig === sig) return;
+    $(view).dataset.sig = sig;
+    if (view === "home") paintHome();
+    else if (view === "all") paintAll();
+    else paintActs();
+  }
 }
-const pull = () => api("/api/state").then((s) => { delete $("banner").dataset.auth; if (s && s.sessions) state = s; paint(); }, (code) => { if (code === 401) { $("banner").dataset.auth = "1"; $("banner").hidden = false; $("conn").classList.add("off"); $("banner").textContent = T("토큰이 맞지 않는다. 맥의 Julgi 설정(⌘,)에 나온 주소로 다시 연다."); } else paint(); });
+const pull = () => api("/api/state").then((s) => {
+  delete $("banner").dataset.auth; if (s && s.sessions) state = s;
+  // 깨운 세션이 열렸으면 그 세션으로 간다
+  const woke = wantWake && state && state.sessions.find((x) => x.id === wantWake);
+  if (woke) { wantWake = ""; show("one", woke.key); return; }
+  paint();
+}, (code) => { if (code === 401) { $("banner").dataset.auth = "1"; $("banner").hidden = false; $("conn").classList.add("off"); $("banner").textContent = T("토큰이 맞지 않는다. 맥의 Julgi 설정(⌘,)에 나온 주소로 다시 연다."); } else paint(); });
 
 const grow = (t) => { t.style.height = "auto"; t.style.height = t.scrollHeight + "px"; };
 function send(text) {
@@ -632,7 +766,28 @@ $("throw").addEventListener("submit", (e) => {
 });
 $("back").addEventListener("click", () => history.back());
 $("throw-close").addEventListener("click", () => history.back());
-$("veil").addEventListener("click", () => history.back());
+$("veil").addEventListener("click", () => ($("diff").hidden ? history.back() : closeDiff()));
+$("diff-close").addEventListener("click", closeDiff);
+// 그림 붙이기: 폰에서 줄여 JPEG로 올리고, 맥에 놓인 경로를 답에 적는다. Claude Code는 경로를 보고 그림을 읽는다
+$("attach").addEventListener("click", () => $("attach-file").click());
+$("attach-file").addEventListener("change", async (e) => {
+  const file = e.target.files && e.target.files[0]; e.target.value = "";
+  if (!file) return;
+  toast(T("그림을 올리는 중"));
+  try {
+    const url = URL.createObjectURL(file);
+    const img = await new Promise((ok, fail) => { const i = new Image(); i.onload = () => ok(i); i.onerror = fail; i.src = url; });
+    const scale = Math.min(1, 1800 / Math.max(img.naturalWidth, img.naturalHeight));
+    const c = document.createElement("canvas"); c.width = Math.round(img.naturalWidth * scale); c.height = Math.round(img.naturalHeight * scale);
+    c.getContext("2d").drawImage(img, 0, 0, c.width, c.height); URL.revokeObjectURL(url);
+    const blob = await new Promise((ok) => c.toBlob(ok, "image/jpeg", 0.85));
+    const r = await fetch("/api/upload?ext=jpg", { method: "POST", headers: { "x-julgi-token": token }, body: blob });
+    if (!r.ok) throw r.status;
+    const { path } = await r.json();
+    const t = $("answer-text"); t.value = (t.value.trim() ? t.value.trimEnd() + "\n" : "") + T("그림: {0}", path) + "\n"; grow(t); $("answer-send").disabled = false; t.focus();
+    toast(T("그림을 붙였다"));
+  } catch (err) { toast(T("그림을 올리지 못했다")); }
+});
 $("new").addEventListener("click", () => show("throw"));
 for (const b of document.querySelectorAll(".tab")) b.addEventListener("click", () => show(b.dataset.tab));
 // 폰의 뒤로 가기(스와이프)가 세션 하나와 새 일 판을 닫게, 화면을 주소의 # 뒤에 적는다

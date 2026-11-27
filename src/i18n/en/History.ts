@@ -40,4 +40,5 @@ export default {
   "이어 감": "Continued",
   "봇": "Bots",
   "주제": "Topic",
+  "깨움": "Woke",
 } as Record<string, string>;

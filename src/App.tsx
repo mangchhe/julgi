@@ -39,10 +39,11 @@ import { TicketWork, firstKey, JiraConn, keyOfUrl, setKnownKeys, Ticket, TicketF
 import { prNo, isLab, newsOf, openPr, prOf, PrStatus, PrTarget, prUrl, repoName, ReviewAsk } from "./pr";
 import * as terms from "./terms";
 import { rank } from "./route";
-import { commonModel, Brief, Change, Job, Progress, MAX_PARALLEL, turnStart, setMapDirs, setPrefs, markAuto, isAuto, autoList, STATE_LABEL, replied, ago, Item, modelFor, SkillInfo, SkillUse, aboutOf, buildFolders, buildItems, aliveElsewhere, config, elsewhere, enrich, markSlept, setAlive, handoffCommand, Ledger, Merge, mergeCandidates, mergeKey, newCommand, Open, repoOf, resumeCommand, Session, TermState, Thread, waiting, withPrompt } from "./model";
+import { commonModel, modelName, Brief, Change, Job, Progress, MAX_PARALLEL, turnStart, setMapDirs, setPrefs, markAuto, isAuto, autoList, STATE_LABEL, replied, ago, Item, modelFor, SkillInfo, SkillUse, aboutOf, buildFolders, buildItems, aliveElsewhere, config, elsewhere, enrich, markSlept, setAlive, handoffCommand, Ledger, Merge, mergeCandidates, mergeKey, newCommand, Open, repoOf, resumeCommand, Session, TermState, Thread, waiting, withPrompt } from "./model";
 import { selftest } from "./selftest";
 import { tr } from "./i18n";
 import { Block, codeBlocks } from "./codeblocks";
+import { choicesOf } from "./choices";
 import "./App.css";
 
 const MAX_PANES = 12;
@@ -1487,6 +1488,13 @@ export default function App() {
         // 바깥 도구가 `julgi event <이름> "제목"`으로 넣은 일. 그 이름을 기다리는 봇을 깨운다
         const [title, ...text] = body.split("\n");
         actions.current.raise({ source: "event", kind: target.trim().slice(0, 40), key: `event:${Date.now()}:${Math.random().toString(36).slice(2, 8)}`, title: title.trim().slice(0, 200) || target.trim(), body: text.join("\n") });
+      } else if (cmd === "wake" && sessionId === "phone") {
+        // 폰에서 잠든 세션을 깨웠다. 폰에 보여 준 세션(사람이 연 것)만 깨운다
+        const s = live.current.byId.get(target);
+        if (s && !s.auto && !open.some((o) => o.sessionId === target)) {
+          actions.current.wake(target);
+          record("깨움", tr`폰에서 "${s.title.slice(0, 60)}"을 깨움`, target); // i18n-ok
+        }
       } else if (cmd === "throw" && body && sessionId === "phone") {
         // 폰에서 새 일을 던졌다. 화면에 보여 준 폴더에서만 연다
         const { folders, base } = live.current;
@@ -1668,11 +1676,18 @@ export default function App() {
       .map((o) => {
         const st = states[o.key];
         const ch = changesRef.current[o.cwd];
-        return { key: o.key, id: o.sessionId, pty: terms.idOf(o.key), now: st?.state === "run" || st?.state === "hold" ? terms.nowOf(o.key) : "", name: nameOf(o.key), repo: repoOf(o.cwd), state: st?.state ?? "", label: STATE_LABEL[st?.state ?? ""] ?? tr("열려 있음"), since: st?.since ?? 0, why: (limits.current[o.key] && tr`한도에 걸림 · ${clock(limits.current[o.key].at)}에 이어 감`) || (o.sessionId && triaged.current[o.sessionId]?.since === st?.since && triaged.current[o.sessionId]?.why) || "", changed: ch && ch.by === o.sessionId && ch.files ? tr`파일 ${ch.files} +${ch.adds} −${ch.dels}` : "" };
+        return { key: o.key, id: o.sessionId, pty: terms.idOf(o.key), now: st?.state === "run" || st?.state === "hold" ? terms.nowOf(o.key) : "", name: nameOf(o.key), repo: repoOf(o.cwd), state: st?.state ?? "", label: STATE_LABEL[st?.state ?? ""] ?? tr("열려 있음"), since: st?.since ?? 0, why: (limits.current[o.key] && tr`한도에 걸림 · ${clock(limits.current[o.key].at)}에 이어 감`) || (o.sessionId && triaged.current[o.sessionId]?.since === st?.since && triaged.current[o.sessionId]?.why) || "", changed: ch && ch.by === o.sessionId && ch.files ? tr`파일 ${ch.files} +${ch.adds} −${ch.dels}` : "", dir: dirOf(o), model: modelName(live.current.byId.get(o.sessionId ?? "")?.model), choices: st?.state === "ask" ? choicesOf(terms.text(o.key, 30)) : [] };
       })
       .sort((a, b) => a.since - b.since);
+    // 잠든 최근 세션: 폰에서 깨워 이어 할 수 있게
+    const openIds = new Set(open.map((o) => o.sessionId));
+    const sleeping = live.current.sessions
+      .filter((s) => !s.auto && !openIds.has(s.id))
+      .sort((a, b) => b.mtime - a.mtime)
+      .slice(0, 20)
+      .map((s) => ({ id: s.id, name: s.title.slice(0, 60), repo: s.repo, at: s.mtime * 1000 }));
     const places = [...(base ? [{ repo: tr`기본 폴더 · ${repoOf(base)}`, cwd: base }] : []), ...folders.slice(0, 40).map((f) => ({ repo: f.repo, cwd: f.cwd }))];
-    void invoke("remote_publish", { state: JSON.stringify({ at: Date.now(), theme: terms.colors(), sessions, folders: places, acts: acts.slice(-30).reverse().map((a) => ({ at: a.at, kind: tr(a.kind), text: a.text.slice(0, 160) })), usage: config.usage ? (usageRef.current ?? []).map((u) => ({ name: u.name, used: u.used })) : [], ruleRuns: acts.filter((a) => a.kind === "대신 답함" && new Date(a.at).toDateString() === new Date().toDateString()).length }) }); // i18n-ok
+    void invoke("remote_publish", { state: JSON.stringify({ at: Date.now(), theme: terms.colors(), sessions, sleeping, folders: places, acts: acts.slice(-30).reverse().map((a) => ({ at: a.at, kind: tr(a.kind), text: a.text.slice(0, 160) })), usage: config.usage ? (usageRef.current ?? []).map((u) => ({ name: u.name, used: u.used })) : [], ruleRuns: acts.filter((a) => a.kind === "대신 답함" && new Date(a.at).toDateString() === new Date().toDateString()).length }) }); // i18n-ok
   };
   const setConfig = (key: keyof typeof config, value: string | number | boolean) => {
     Object.assign(config, { [key]: value });
