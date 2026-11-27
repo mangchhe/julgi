@@ -36,5 +36,7 @@ tauri-plugin-notification = "2"
 codegen-units = 1
 lto = true
 opt-level = 3
-panic = "abort"
+# 폰 서버(tiny_http)는 폰이 요청 도중 끊기면 일하는 스레드에서 panic한다(peer_addr unwrap).
+# abort면 그 한 번에 앱 전체가 꺼진다. unwind면 그 스레드만 끝나고 앱은 산다
+panic = "unwind"
 strip = true
