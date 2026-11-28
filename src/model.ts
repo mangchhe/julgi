@@ -464,3 +464,5 @@ export const withPrompt = (command: string, path: string) => `${command} "$(cat 
 export const newCommand = (id: string) => launch(id, "--session-id");
 /** 인계 글 파일을 첫 입력으로 넣고 시작한다 */
 export const handoffCommand = (id: string, path: string) => withPrompt(newCommand(id), path);
+/** 대화를 그대로 복제한 새 세션(id)으로 띄운다. 원래 세션(from)은 그대로 남는다 */
+export const forkCommand = (from: string, id: string) => `${newCommand(id)} --resume ${from} --fork-session`;

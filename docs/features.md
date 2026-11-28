@@ -26,6 +26,7 @@ English · [한국어](features.ko.md)
 - **Paste a picture.** An image pasted into the send box goes to the session with the message.
 - **The draft stays.** Close the box mid-sentence and the text is still there next time; it is cleared when you send.
 - **Hand-off without losing your place.** A session that has grown too large writes a brief and a fresh session takes over in the same pane, with the earlier screen still above it.
+- **Branch off.** `⌘⇧O` copies the whole conversation into a new session in the next pane, `⌥⌘⇧O` carries only a brief; the original keeps going.
 - **Sessions can pass work on.** A session can hand a message to another stem or start a new one through the `julgi` command.
 
 ## Knowing whose turn it is

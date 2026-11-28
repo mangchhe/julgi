@@ -5,6 +5,7 @@ export default {
   "옮김": "Moved",
   "칸": "Pane",
   "갈아탐": "Handoff",
+  "갈래": "Branch",
   "재움": "Put to sleep",
   "끝냄": "Finished",
   "합침": "Merged",

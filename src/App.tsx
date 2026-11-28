@@ -39,7 +39,7 @@ import { TicketWork, firstKey, JiraConn, keyOfUrl, setKnownKeys, Ticket, TicketF
 import { prNo, isLab, newsOf, openPr, prOf, PrStatus, PrTarget, prUrl, repoName, ReviewAsk } from "./pr";
 import * as terms from "./terms";
 import { rank } from "./route";
-import { commonModel, modelName, Brief, Change, Job, Progress, MAX_PARALLEL, turnStart, setMapDirs, setPrefs, markAuto, isAuto, autoList, STATE_LABEL, replied, ago, Item, modelFor, SkillInfo, SkillUse, aboutOf, buildFolders, buildItems, aliveElsewhere, config, elsewhere, enrich, markSlept, setAlive, handoffCommand, Ledger, Merge, mergeCandidates, mergeKey, newCommand, Open, repoOf, resumeCommand, Session, TermState, Thread, waiting, withPrompt } from "./model";
+import { commonModel, modelName, Brief, Change, Job, Progress, MAX_PARALLEL, turnStart, setMapDirs, setPrefs, markAuto, isAuto, autoList, STATE_LABEL, replied, ago, Item, modelFor, SkillInfo, SkillUse, aboutOf, buildFolders, buildItems, aliveElsewhere, config, elsewhere, enrich, markSlept, setAlive, handoffCommand, forkCommand, Ledger, Merge, mergeCandidates, mergeKey, newCommand, Open, repoOf, resumeCommand, Session, TermState, Thread, waiting, withPrompt } from "./model";
 import { selftest } from "./selftest";
 import { tr } from "./i18n";
 import { Block, codeBlocks } from "./codeblocks";
@@ -1754,8 +1754,22 @@ export default function App() {
     else void invoke("app_exit");
   };
   /** 갈아타기: 지금 세션에게 인계 글을 받아, 그 글만 들고 새 세션을 같은 칸에 연다 */
-  const handoff = (key: string, opts: { open?: Open; after?: string; sent?: boolean } = {}) => {
+  /** 갈래: 지금 세션은 두고, 대화를 그대로 들고(memo면 인계 글만 들고) 옆 칸에 새 세션을 띄운다. 비슷하지만 다른 일을 나란히 시킬 때 */
+  const fork = (key: string, memo = false) => {
+    const o = live.current.open.find((x) => x.key === key);
+    if (!o?.sessionId) return;
+    if (memo) return handoff(key, { keep: true });
+    const id = crypto.randomUUID();
+    const next: Open = { key: "c:" + id, label: tr`${o.label} · 갈래`, cwd: o.cwd, sessionId: id };
+    terms.create({ key: next.key, cwd: o.cwd, command: forkCommand(o.sessionId, id) });
+    setOpen((list) => [...list, next]);
+    split(next.key);
+    record("갈래", tr`${o.label.slice(0, 40)} · 대화를 그대로 들고 옆 칸에 갈라 나옴`, id); // i18n-ok
+    say(tr("갈라 나왔다. 옆 칸에 다른 일을 시키면 된다. 원래 세션은 그대로다."));
+  };
+  const handoff = (key: string, opts: { open?: Open; after?: string; sent?: boolean; keep?: boolean } = {}) => {
     // after: 갈아탄 새 세션에 이어서 시킬 말. sent: 인계 부탁을 이미 보냈다(잠든 세션을 깨우며 넣은 경우)
+    // keep: 갈래. 이전 세션을 두고 옆 칸에 띄운다. 새 세션은 인계를 읽고 내 지시를 기다린다
     const o = opts.open ?? live.current.open.find((x) => x.key === key);
     if (!o?.sessionId || live.current.handing.includes(key)) return;
     if (!opts.sent && live.current.states[key]?.state === "run") return say(tr("일하는 중이다. 끝난 뒤에 갈아탄다."));
@@ -1787,6 +1801,15 @@ export default function App() {
           const reply = await invoke<string | null>("last_reply", { sessionId: oldId });
           if (!reply) return stop(tr("인계 글을 읽지 못해 갈아타기를 그만뒀다."));
           const id = crypto.randomUUID();
+          if (opts.keep) {
+            const path = await invoke<string>("handoff_write", { id, text: `# 인계: ${title}\n\n이전 세션(${oldId})에서 갈라져 나왔다. 이전 세션은 하던 일을 계속한다. 아래를 읽고 맥락만 익힌 뒤, 아무것도 하지 말고 내 다음 지시를 기다린다. 다음 지시는 비슷하지만 다른 일이다.\n\n${reply}\n` }); // i18n-ok
+            const next: Open = { key: "c:" + id, label: tr`${title} · 갈래`, cwd: o.cwd, sessionId: id };
+            terms.create({ key: next.key, cwd: o.cwd, command: handoffCommand(id, path) });
+            setOpen((list) => [...list, next]);
+            split(next.key);
+            record("갈래", tr`${title.slice(0, 40)} · 인계 글만 들고 옆 칸에 갈라 나옴`, id); // i18n-ok
+            return stop(tr("인계 글로 갈라 나왔다. 옆 칸에 다른 일을 시키면 된다."));
+          }
           const todo = opts.after ? `\n---\n\n인계를 읽었으면 바로 이어서 할 일:\n\n${opts.after}\n` : ""; // i18n-ok
           const path = await invoke<string>("handoff_write", { id, text: `# 인계: ${title}\n\n이전 세션(${oldId})에서 넘어왔다. 아래를 읽고 이어서 진행한다.\n\n${reply}\n${todo}` }); // i18n-ok
           // 줄기에 새 세션을 잇고, 인계 글을 줄기의 기억으로 둔다. 줄기가 없었으면 여기서 생긴다.
@@ -2752,8 +2775,8 @@ export default function App() {
     setCopies(blocks);
     setOverlay("copy");
   };
-  const actions = useRef({ copyCode, copyBlock, wakeBot, raise, readUsage, publishRemote, say, dispatch, show, close, sleep, requestQuit, handoff, exited, newSession, newShell, nextWaiting, openTerm, resize, split, unsplit, finishThread, move, togglePin, tend, triage, serve, record, confirmClose, toggleReview, prNotice, askNotice, mineNotice, sleepNotice, wake, ticketNotice, ticketOffer, checkEnded });
-  actions.current = { copyCode, copyBlock, wakeBot, raise, readUsage, publishRemote, say, dispatch, show, close, sleep, requestQuit, handoff, exited, newSession, newShell, nextWaiting, openTerm, resize, split, unsplit, finishThread, move, togglePin, tend, triage, serve, record, confirmClose, toggleReview, prNotice, askNotice, mineNotice, sleepNotice, wake, ticketNotice, ticketOffer, checkEnded };
+  const actions = useRef({ copyCode, copyBlock, wakeBot, raise, readUsage, publishRemote, say, dispatch, show, close, sleep, requestQuit, handoff, fork, exited, newSession, newShell, nextWaiting, openTerm, resize, split, unsplit, finishThread, move, togglePin, tend, triage, serve, record, confirmClose, toggleReview, prNotice, askNotice, mineNotice, sleepNotice, wake, ticketNotice, ticketOffer, checkEnded });
+  actions.current = { copyCode, copyBlock, wakeBot, raise, readUsage, publishRemote, say, dispatch, show, close, sleep, requestQuit, handoff, fork, exited, newSession, newShell, nextWaiting, openTerm, resize, split, unsplit, finishThread, move, togglePin, tend, triage, serve, record, confirmClose, toggleReview, prNotice, askNotice, mineNotice, sleepNotice, wake, ticketNotice, ticketOffer, checkEnded };
 
   /** 세션이 남긴 링크 가운데 마지막 PR */
   const prOfSession = (id?: string) => {
@@ -3152,6 +3175,8 @@ export default function App() {
         else a.split();
       } else if (cmd && e.shiftKey && e.code === "KeyS") {
         if (key) a.handoff(key);
+      } else if (cmd && e.shiftKey && e.code === "KeyO") {
+        if (key) a.fork(key, e.altKey);
       } else if (cmd && e.shiftKey && e.code === "KeyE") {
         const o = open.find((x) => x.key === key);
         if (o?.sessionId) a.finishThread(o.sessionId);

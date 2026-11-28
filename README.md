@@ -140,6 +140,7 @@ Rules never answer a question that asks you to choose, or one about something ha
 
 **Sessions**
 - **Hand-off in place** — a session that has grown too large is replaced by a fresh one in the same pane, with a written brief and the earlier screen still above it.
+- **Branch** — `⌘⇧O` keeps the current session and opens a copy of its whole conversation in the next pane; `⌥⌘⇧O` carries only a written brief. For similar but different work side by side.
 - **Sessions run by scripts are kept apart** — `claude -p` and SDK runs are folded into one group, so the list shows the sessions you opened.
 - **In the terminal** — `⌘`-click a path to open it, `⌘↑` / `⌘↓` to jump between your own messages, paste a picture into `⌘L`.
 - **Fewer permission prompts** — optionally let read-only commands, or tests and builds too, through without asking.

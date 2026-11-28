@@ -41,4 +41,5 @@ export default {
   "답의 처음으로: 지금 칸에서 내가 한 말 사이를 위아래로 건너뛴다": "To the start of a reply: jump up and down between your own messages in this pane",
   "지금 세션의 최근 답에서 코드 블록을 골라 복사 (화면을 긁으면 접힌 줄이 깨진다)": "Copy a code block from this session's recent replies (selecting the screen breaks wrapped lines)",
   "말로 보내기: 보내기 상자를 열고 macOS 받아쓰기를 켠다. 말이 끝나면 Enter (받아쓰기는 시스템 설정 → 키보드에서 켠다)": "Send by voice: opens the send box and starts macOS Dictation. Press Enter when done (turn Dictation on in System Settings → Keyboard)",
+  "갈래: 이 세션은 두고 옆 칸에 새 세션. 대화를 그대로 들고 / 인계 글만 들고 (비슷하지만 다른 일을 나란히)": "Branch: keep this session and open a new one in the next pane, carrying the whole conversation / only a handoff note (similar but different work side by side)",
 } as Record<string, string>;

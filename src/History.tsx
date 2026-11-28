@@ -13,7 +13,7 @@ type Props = { acts: Act[]; tasks: Job[]; onPick: (sessionId: string) => void; o
 type Row = Act & { head: string; rest: string[]; times: number; open?: boolean };
 
 /** 종류를 색으로 나눈다: 내가 봐야 하는 것, 세션을 움직인 것, 지식을 다룬 것 */
-const TONE: Record<string, string> = { "확인 필요": "warn", 보냄: "move", 옮김: "move", 칸: "move", 갈아탐: "move", 재움: "move", 끝냄: "move", 합침: "move", 일감: "move", 조율: "move", 배움: "know", 꺼냄: "know", 기억: "know", 지도: "know", 스킬: "know", 점검: "know", 허용: "move" }; // i18n-ok
+const TONE: Record<string, string> = { "확인 필요": "warn", 보냄: "move", 옮김: "move", 칸: "move", 갈아탐: "move", 갈래: "move", 재움: "move", 끝냄: "move", 합침: "move", 일감: "move", 조율: "move", 배움: "know", 꺼냄: "know", 기억: "know", 지도: "know", 스킬: "know", 점검: "know", 허용: "move" }; // i18n-ok
 
 const clock = (at: number) => new Date(at).toLocaleTimeString("ko-KR", { hour: "2-digit", minute: "2-digit", hour12: false });
 const dayOf = (at: number) => {

@@ -220,4 +220,9 @@ export default {
   "숫자로 고르기 · Enter 맨 위(가장 최근) · Esc 닫기": "Pick by number · Enter the top one (most recent) · Esc to close",
   "\"{0}\" · 지금: {1}": "\"{0}\" · now: {1}",
   "폰에서 \"{0}\"을 깨움": "Woke \"{0}\" from the phone",
+  "{0} · 갈래": "{0} · branch",
+  "{0} · 대화를 그대로 들고 옆 칸에 갈라 나옴": "{0} · branched into the next pane with the whole conversation",
+  "갈라 나왔다. 옆 칸에 다른 일을 시키면 된다. 원래 세션은 그대로다.": "Branched. Give the next pane its own work. The original session is untouched.",
+  "{0} · 인계 글만 들고 옆 칸에 갈라 나옴": "{0} · branched into the next pane with only the handoff note",
+  "인계 글로 갈라 나왔다. 옆 칸에 다른 일을 시키면 된다.": "Branched with a handoff note. Give the next pane its own work.",
 } as Record<string, string>;
